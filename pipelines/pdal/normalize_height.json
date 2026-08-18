@@ -1,0 +1,8 @@
+{
+  "_comment": "Requires ground classification first (see ground_filter.json).",
+  "pipeline": [
+    { "type": "readers.las", "filename": "INPUT.las" },
+    { "type": "filters.hag_nn" },
+    { "type": "writers.las", "filename": "OUTPUT_normalized.las", "extra_dims": "HeightAboveGround=float32" }
+  ]
+}

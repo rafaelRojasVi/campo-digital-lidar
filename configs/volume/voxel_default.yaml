@@ -1,0 +1,4 @@
+# Default parameters for VoxelVolumeEstimator.
+method: voxel_occupancy_baseline
+voxel_size: 0.05  # source coordinate units; sensitivity must be tested (see tests/)
+volume_unit: cubic_units_unspecified

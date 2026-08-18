@@ -1,0 +1,22 @@
+# GeoSun GS-100G - terrestrial/backpack SLAM LiDAR system.
+sensor:
+  vendor: GeoSun
+  model: GS-100G
+  category: terrestrial_slam_lidar
+  outputs:
+    - LAS
+  scanning_mechanism: null  # TODO: confirm LiDAR unit (e.g. Livox/Hesai/other)
+  range_precision_mm: null  # TODO
+  relative_accuracy_mm: null  # TODO
+  absolute_accuracy_note: >
+    TODO: obtain vendor datasheet; SLAM-based systems require independent
+    validation of absolute accuracy under field conditions.
+  registration_method: SLAM
+  typical_use_in_this_project: >
+    Ground-based capture of timber stacks; primary source for
+    terrestrial LAS point clouds in this PoC.
+  crs_handling: >
+    Verify georeferencing (GNSS-aided vs local coordinate frame) per export.
+  notes:
+    - "TODO: confirm point density / typical point spacing achieved in field use."
+    - "TODO: confirm IMU/GNSS specs if georeferenced mode is used."

@@ -1,0 +1,28 @@
+# DJI Zenmuse L2 - aerial LiDAR + RGB payload for drones.
+sensor:
+  vendor: DJI
+  model: Zenmuse L2
+  category: aerial_lidar
+  outputs:
+    - LAS
+  scanning_mechanism: "Non-repetitive scanning LiDAR (per DJI public specs)"
+  range_precision_mm: null  # TODO: cite exact figure from DJI's published datasheet
+  detection_range_note: >
+    DJI publishes detection range figures dependent on reflectivity and
+    ambient light; do not hardcode a single number here without citing the
+    exact datasheet revision. TODO.
+  absolute_accuracy_note: >
+    DJI publishes RTK-aided absolute accuracy figures (horizontal/vertical)
+    under specific flight conditions (altitude, speed, RTK fix quality).
+    TODO: cite the exact published figures and flight conditions used by
+    Campo Digital, rather than assuming a generic number.
+  registration_method: "Direct georeferencing via onboard RTK GNSS + IMU (when RTK fixed)"
+  typical_use_in_this_project: >
+    Aerial overview capture of stockpile/timber-stack yards; likely lower
+    point density on vertical faces of stacks compared to terrestrial scans.
+  crs_handling: >
+    RTK base station CRS/datum must be explicitly recorded per flight;
+    never assumed from file alone.
+  notes:
+    - "TODO: confirm flight parameters (altitude, speed, overlap) used by Campo Digital."
+    - "TODO: confirm point density achieved on vertical/near-vertical stack faces."

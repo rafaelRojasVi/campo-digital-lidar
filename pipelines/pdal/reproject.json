@@ -1,0 +1,8 @@
+{
+  "_comment": "Reprojection requires an EXPLICIT source CRS -- never inferred. Set in_srs to the file's known CRS (or omit only if the LAS header already encodes it correctly).",
+  "pipeline": [
+    { "type": "readers.las", "filename": "INPUT.las", "override_srs": "SOURCE_EPSG:XXXX" },
+    { "type": "filters.reprojection", "in_srs": "EPSG:SOURCE", "out_srs": "EPSG:TARGET" },
+    { "type": "writers.las", "filename": "OUTPUT.las" }
+  ]
+}

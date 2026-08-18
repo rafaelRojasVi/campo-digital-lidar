@@ -1,0 +1,30 @@
+# XGRIDS Lixel K2 - handheld/backpack SLAM LiDAR + camera unit.
+# Only publicly documented facts are filled in; unknown/unverified fields
+# are explicitly null with a TODO rather than guessed.
+sensor:
+  vendor: XGRIDS
+  model: Lixel K2
+  category: handheld_slam_lidar
+  outputs:
+    - LAS
+    - mesh
+    - 3DGS  # 3D Gaussian Splatting
+  scanning_mechanism: null  # TODO: confirm exact LiDAR unit / channel count
+  range_precision_mm: null  # TODO: obtain from vendor datasheet
+  relative_accuracy_mm: null  # TODO
+  absolute_accuracy_note: >
+    Absolute XYZ accuracy for SLAM-based handheld scanners is highly
+    dependent on loop-closure quality, GCP usage, and environment; do not
+    assume a fixed spec without a controlled test. TODO: obtain vendor
+    datasheet and independent validation data.
+  registration_method: SLAM (simultaneous localization and mapping)
+  typical_use_in_this_project: >
+    Log-stack scanning where mesh/3DGS output may be used for visualization
+    but LAS is the primary interchange format for volume algorithms in this
+    PoC.
+  crs_handling: >
+    K2 output CRS behavior (local/arbitrary vs georeferenced) must be
+    verified per-export; never assumed. See docs/coordinate-systems.md.
+  notes:
+    - "TODO: confirm firmware/software version used by Campo Digital."
+    - "TODO: confirm point density / typical point spacing achieved in field use."

@@ -1,0 +1,10 @@
+{
+  "pipeline": [
+    { "type": "readers.las", "filename": "INPUT.las" },
+    {
+      "type": "filters.crop",
+      "bounds": "([MIN_X, MAX_X], [MIN_Y, MAX_Y])"
+    },
+    { "type": "writers.las", "filename": "OUTPUT.las" }
+  ]
+}

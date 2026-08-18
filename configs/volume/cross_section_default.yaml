@@ -1,0 +1,6 @@
+# Default parameters for CrossSectionVolumeEstimator. Not tuned to any
+# specific Campo Digital dataset -- placeholders for experimentation.
+method: cross_section_integration
+axis: 0  # 0=x, 1=y, 2=z; set to the actual stack's long axis
+n_sections: 20
+volume_unit: cubic_units_unspecified  # set to m3 only if source CRS/scale confirmed metric
