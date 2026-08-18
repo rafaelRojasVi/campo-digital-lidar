@@ -123,21 +123,73 @@ References:
 - We rely on `laspy[lazrs]` (pure Python + Rust LAZ codec) for LAS/LAZ I/O
   in this repo instead of requiring LAStools at all.
 
-## GUI tools -- install on the WINDOWS HOST, not in WSL
+## GUI tools -- Windows host
 
-WSL2 has no reliable GUI stack for these; do not attempt to install them
-here.
+WSL2 remains the CLI/headless development environment. GUI point-cloud/GIS
+tools run on the Windows host and can open ignored files under the WSL
+filesystem through the WSL network share.
 
-- **CloudCompare** (point cloud viewing/editing): download the Windows
-  installer from https://www.danielgm.net/cc/ (or
-  https://github.com/CloudCompare/CloudCompare releases).
-- **QGIS** (GIS/CRS work): download the Windows installer from
-  https://qgis.org/en/site/forusers/download.html
+### CloudCompare
 
-WSL in this repo hosts CLI/headless tooling (PDAL CLI and Python
-libraries). If you need to view a point cloud, use the Windows-host GUI;
-files under the WSL filesystem are also reachable from Windows through the
-WSL network share, or can be copied to `/mnt/c/...` when convenient.
+CloudCompare is installed and validated on the Windows host.
+
+Validated on 2026-08-18:
+
+- version: `v2.14.beta` (`Aug 16 2026`, 64-bit)
+- executable: `C:\Program Files\CloudCompare\CloudCompare.exe`
+- renderer observed: NVIDIA GeForce RTX 5080
+- OpenGL: 4.6 / GLSL 4.60
+- LAS I/O plugin loaded successfully
+- a real ~330 MB / 9.7M-point LAS opened successfully from the WSL network
+  path in about 8.366 seconds
+
+Find the executable from WSL:
+
+```bash
+powershell.exe -NoProfile -Command \
+  "Get-ChildItem 'C:\Program Files','C:\Program Files (x86)' -Filter CloudCompare.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName"
+```
+
+Launch it from WSL:
+
+```bash
+"/mnt/c/Program Files/CloudCompare/CloudCompare.exe"
+```
+
+Open a WSL-hosted LAS from the terminal:
+
+```bash
+LAS="$(realpath data/raw/v01_MG_23jun2026/v01_MG_23jun2026.las)"
+WIN_LAS="$(wslpath -w "$LAS")"
+"/mnt/c/Program Files/CloudCompare/CloudCompare.exe" "$WIN_LAS"
+```
+
+For the first real dataset, CloudCompare automatically applied a display
+re-centering translation:
+
+```text
+(-499995.00 ; 4166584.00 ; 0.00)
+```
+
+This is required for numerical/display precision with large coordinates and
+must not be confused with changing the source coordinate system or permanently
+transforming the LAS. Do not overwrite the private source LAS after interactive
+CloudCompare operations.
+
+See `docs/datasets/v01_MG_23jun2026.md` for the corresponding real-data
+forensic baseline.
+
+References:
+
+- https://www.cloudcompare.org/
+- https://github.com/CloudCompare/CloudCompare
+
+### QGIS
+
+- Status: **not installed yet** on the Windows host.
+- Intended use: CRS/GIS validation and spatial context after the source CRS is
+  established.
+- Download: https://qgis.org/en/site/forusers/download.html
 
 ## Python libraries (installed via `uv sync`, see pyproject.toml)
 
