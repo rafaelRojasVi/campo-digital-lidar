@@ -72,10 +72,21 @@ classification/return-number histograms stream the file in chunks.
 
 `pipelines/pdal/*.json` are PDAL pipeline templates (info, crop,
 reprojection, decimation, ground filtering, height normalization,
-LAS->LAZ). PDAL CLI is **not installed on this dev host** -- see
-`docs/tooling.md` for the exact install command. `lidar_io.pdal_wrapper`
-calls PDAL via subprocess and fails gracefully (clear error, or
-pytest-skip in tests) when it's absent.
+LAS->LAZ). PDAL 2.10.2 is installed on the current WSL2 development host
+in an isolated Micromamba environment named `pdal-cli`; the project itself
+continues to use its independent `uv` / Python 3.12 environment.
+
+Activate PDAL before running PDAL-backed workflows or tests:
+
+```bash
+source ~/.zshrc
+micromamba activate pdal-cli
+```
+
+The PDAL pipeline suite currently validates successfully (`8/8` tests),
+and the complete repository suite passes `27/27` with no skipped tests.
+See `docs/tooling.md` for the exact installation, validation commands, and
+the known warning affecting the optional HDF/IceBridge reader plugins.
 
 ## Volume experiments
 
@@ -105,6 +116,8 @@ uv run pytest
 
 All tests run on synthetic, deterministically-generated point clouds
 (`lidar_core.testing`) -- no real/private data required, no network calls.
+PDAL-backed tests require the `pdal` executable to be visible in `PATH`;
+on the current development host that means activating `pdal-cli` first.
 
 ## Data privacy
 
@@ -126,8 +139,10 @@ refers to.
 
 - No real Campo Digital data has been used or is present in this repo.
 - Grid-2.5D and mesh volume estimators are unimplemented stubs.
-- PDAL, CloudCompare, QGIS, and LAStools CLI are not installed on this
-  dev host (see `docs/tooling.md` for exact manual steps).
+- CloudCompare, QGIS, and LAStools CLI are not installed on this dev host.
+- PDAL core/pipeline validation is operational, but the optional HDF and
+  IceBridge readers currently emit a missing `libhdf5_cpp.so.320` warning;
+  they are not required by the current LAS workflow.
 - No commercial cubicación conversion rule is implemented anywhere.
 - No CRS is ever assumed; files without an encoded CRS report
   "CRS missing/ambiguous" rather than a guess.
