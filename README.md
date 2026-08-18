@@ -12,7 +12,7 @@ rules, and it does not claim to produce production-ready volume figures.
 It scaffolds the data pipeline, LAS tooling, geometry primitives, and two
 honestly-implemented raw geometric volume methods (cross-section
 integration and voxel occupancy), plus interfaces for two more
-(grid-2.5D, mesh) that are stubbed pending real data.
+(grid-2.5D, mesh) that are stubbed pending validated real-data methodology.
 
 ## Campo Digital technical context
 
@@ -67,6 +67,25 @@ uv run lidar inspect path/to/file.las --no-checksum   # skip sha256 for huge fil
 
 Reads only the header/VLRs for most fields (no full point-cloud load);
 classification/return-number histograms stream the file in chunks.
+
+## Real-data forensic baseline
+
+A real Campo Digital LAS dataset has now been inspected locally without
+committing the point cloud itself. The first baseline is documented at
+`docs/datasets/v01_MG_23jun2026.md` and records:
+
+- source ZIP and extracted LAS SHA-256 hashes
+- archive safety/inventory checks
+- LAS 1.2 / point-format-3 structure and point count
+- independent `lidar inspect` and PDAL metadata/statistics checks
+- missing CRS/unit status
+- a material discrepancy between LAS-header bounds and extents recomputed
+  from the actual points
+- attribute statistics, provenance caveats, and CloudCompare visual baseline
+
+No volume result from this real dataset is considered meaningful yet: CRS/units,
+source/export provenance, a reproducible timber ROI, and an authoritative
+reference measurement for the same physical region are still unresolved.
 
 ## Point-cloud pipeline
 
@@ -127,6 +146,10 @@ contents of `data/raw/`, `data/interim/`, `data/reference/private/`
 (only `.gitkeep` placeholders are tracked). If you need to share sample
 data with a collaborator, use an out-of-band channel, never `git add -f`.
 
+Sanitized forensic metadata (hashes, LAS structure/statistics, commands,
+methodology observations) may be documented under `docs/datasets/`; raw client
+points and derived point-level exports remain local/private.
+
 ## Accuracy terminology
 
 Range precision, point-cloud thickness, relative/local precision, absolute
@@ -137,9 +160,15 @@ refers to.
 
 ## Current limitations
 
-- No real Campo Digital data has been used or is present in this repo.
+- Real Campo Digital data has been inspected locally, but no raw/private point
+  cloud is present in Git.
+- The first real LAS has no encoded CRS or unit metadata, so `m3` results are
+  explicitly blocked until units are confirmed.
+- The exact source sensor/export pipeline and target timber ROI for the first
+  dataset are not yet confirmed.
 - Grid-2.5D and mesh volume estimators are unimplemented stubs.
-- CloudCompare, QGIS, and LAStools CLI are not installed on this dev host.
+- CloudCompare is installed and validated on the Windows host; QGIS and
+  LAStools CLI are not yet installed.
 - PDAL core/pipeline validation is operational, but the optional HDF and
   IceBridge readers currently emit a missing `libhdf5_cpp.so.320` warning;
   they are not required by the current LAS workflow.
@@ -149,7 +178,9 @@ refers to.
 
 ## Roadmap (not built here)
 
-Grid-2.5D and mesh volume estimators against real data; ROI
-selection/segmentation workflow; a real viewer app; API persistence
-(PostgreSQL/PostGIS via SQLAlchemy/Alembic), object storage, job queue;
-ties to Campo Digital's commercial cubicación rules once specified.
+Resolve real-dataset CRS/provenance; identify and persist a reproducible timber
+ROI; obtain a reference result for the same physical region; then validate
+cross-section, voxel, grid-2.5D and mesh methods against real data. Later work
+may include a real viewer app; API persistence (PostgreSQL/PostGIS via
+SQLAlchemy/Alembic), object storage, job queue; and ties to Campo Digital's
+commercial cubicación rules once specified.
