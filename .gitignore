@@ -44,3 +44,6 @@ htmlcov/
 .DS_Store
 .vscode/
 .idea/
+
+# Generated measurement/report artifacts - may contain client-derived data
+reports/out/**

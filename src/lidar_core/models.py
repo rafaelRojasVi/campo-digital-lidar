@@ -297,17 +297,123 @@ class VolumeResult(BaseModel):
     )
 
 
-class MeasurementRun(BaseModel):
-    """A single end-to-end run tying an input file to one or more
-    VolumeResults and optional reference comparisons."""
+class MeasurementRunStatus(StrEnum):
+    """Lifecycle state for one persisted measurement run."""
+
+    STARTED = "started"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class MeasurementWarningSeverity(StrEnum):
+    """Severity of a structured run-level warning."""
+
+    INFO = "info"
+    WARNING = "warning"
+    BLOCKER = "blocker"
+
+
+class MeasurementWarning(BaseModel):
+    """Machine-readable warning suitable for CLI/API/UI presentation."""
 
     model_config = ConfigDict(frozen=True)
 
+    code: str
+    severity: MeasurementWarningSeverity = MeasurementWarningSeverity.WARNING
+    message: str
+
+
+class MeasurementArtifact(BaseModel):
+    """Output artifact produced by a measurement run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: str = Field(description="Logical artifact type, e.g. front_profile or sensitivity_plot.")
+    path: str
+    media_type: str | None = None
+    description: str | None = None
+
+
+class TimberStackSummary(BaseModel):
+    """Structured diagnostics from timber-stack localization."""
+
+    model_config = ConfigDict(frozen=True)
+
+    point_count_input: int
+    point_count_selected: int
+    selected_fraction: float
+
+    detected_components: int | None = None
+    longitudinal_coverage: float | None = None
+    vertical_extent_fraction: float | None = None
+    transverse_extent_fraction: float | None = None
+
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class FrontCrossSectionSummary(BaseModel):
+    """Observable front-wall geometry in source-coordinate units."""
+
+    model_config = ConfigDict(frozen=True)
+
+    longitudinal_span: float
+    median_height: float
+    maximum_height: float
+
+    rectangle_area: float
+    trapezoid_area: float
+    valid_bin_fraction: float
+
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class LogDetectionSummary(BaseModel):
+    """Runtime summary for one visible-log detection pass."""
+
+    model_config = ConfigDict(frozen=True)
+
+    method: str
+    candidate_count: int
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class MeasurementRun(BaseModel):
+    """Persistable record for one end-to-end measurement run.
+
+    The record distinguishes directly observed geometry, optional volume
+    estimates, diagnostics, warnings, artifacts, and provenance.
+
+    It does not imply that source-coordinate units are metres and does not
+    imply that a raw geometric volume is commercial timber cubicacion.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: str = "1"
+
     run_id: str
     source_path: str
+    source_sha256: str | None = None
+
+    status: MeasurementRunStatus = MeasurementRunStatus.STARTED
+
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime | None = None
+
+    code_version: str | None = None
+    coordinate_metadata: CoordinateMetadata | None = None
+
+    timber_stack: TimberStackSummary | None = None
+    front_cross_section: FrontCrossSectionSummary | None = None
+    log_detection: LogDetectionSummary | None = None
+
     results: list[VolumeResult] = Field(default_factory=list)
     reference: ReferenceMeasurement | None = None
+
+    warnings: list[MeasurementWarning] = Field(default_factory=list)
+    artifacts: list[MeasurementArtifact] = Field(default_factory=list)
+
+    provenance: dict[str, Any] = Field(default_factory=dict)
     notes: str | None = None
 
 
