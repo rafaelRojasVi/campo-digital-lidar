@@ -20,6 +20,7 @@ from rich.table import Table
 from lidar_core.testing import cube, cylinder, rectangular_prism
 from lidar_io.analyze import analyze_las
 from lidar_io.inspect import inspect_las
+from lidar_io.measurement_pipeline import run_timber_measurement
 from lidar_volume.front_cross_section import (
     FrontCrossSectionConfig,
     estimate_front_cross_section,
@@ -557,6 +558,127 @@ def volume(
             "extrusion A_front × depth. The supplied depth is not "
             "inferred or validated from the current LAS."
         )
+
+
+@app.command()
+def measure(
+    input_path: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to a LAS/LAZ candidate region containing the timber stack.",
+        ),
+    ],
+    output_root: Annotated[
+        Path,
+        typer.Option(
+            "--output-root",
+            help="Root directory for persisted measurement-run artifacts.",
+        ),
+    ] = Path("reports/out"),
+    run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--run-id",
+            help="Optional explicit run identifier.",
+        ),
+    ] = None,
+    code_version: Annotated[
+        str | None,
+        typer.Option(
+            "--code-version",
+            help="Optional code/version identifier recorded in run provenance.",
+        ),
+    ] = None,
+) -> None:
+    """Run the observable timber-stack measurement pipeline."""
+
+    if not input_path.is_file():
+        console.print(f"[red]Error:[/red] LAS/LAZ file not found: {input_path}")
+        raise typer.Exit(code=1)
+
+    try:
+        run, measurement_path = run_timber_measurement(
+            input_path,
+            output_root,
+            run_id=run_id,
+            code_version=code_version,
+        )
+    except (ValueError, FileExistsError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"Measurement Run: {run.run_id}")
+    table.add_column("Field")
+    table.add_column("Value")
+
+    table.add_row(
+        "Status",
+        run.status.value,
+    )
+    table.add_row(
+        "Source",
+        run.source_path,
+    )
+    table.add_row(
+        "Measurement JSON",
+        str(measurement_path),
+    )
+
+    if run.timber_stack is not None:
+        table.add_row(
+            "Input points",
+            f"{run.timber_stack.point_count_input:,}",
+        )
+        table.add_row(
+            "Selected timber points",
+            f"{run.timber_stack.point_count_selected:,}",
+        )
+        table.add_row(
+            "Selected fraction",
+            f"{run.timber_stack.selected_fraction:.3%}",
+        )
+
+    if run.front_cross_section is not None:
+        table.add_row(
+            "Longitudinal span",
+            (f"{run.front_cross_section.longitudinal_span:.6f} source units"),
+        )
+        table.add_row(
+            "Median height",
+            (f"{run.front_cross_section.median_height:.6f} source units"),
+        )
+        table.add_row(
+            "Rectangle area",
+            (f"{run.front_cross_section.rectangle_area:.6f} source-units²"),
+        )
+        table.add_row(
+            "Trapezoid area",
+            (f"{run.front_cross_section.trapezoid_area:.6f} source-units²"),
+        )
+
+    console.print(table)
+
+    if run.artifacts:
+        console.print()
+        artifact_table = Table(title="Artifacts")
+        artifact_table.add_column("Kind")
+        artifact_table.add_column("Path")
+
+        for artifact in run.artifacts:
+            artifact_table.add_row(
+                artifact.kind,
+                str(measurement_path.parent / artifact.path),
+            )
+
+        console.print(artifact_table)
+
+    blockers = [warning for warning in run.warnings if warning.severity.value == "blocker"]
+
+    if blockers:
+        console.print()
+        console.print("[yellow]Blockers:[/yellow]")
+        for warning in blockers:
+            console.print(f"- {warning.code}: {warning.message}")
 
 
 @app.command()
