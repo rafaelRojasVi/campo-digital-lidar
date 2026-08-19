@@ -78,3 +78,109 @@ def test_analyze_command(tmp_path):
     assert result.exit_code == 0, result.output
     assert '"point_count": 100' in result.output
     assert '"gps_time_present": true' in result.output
+
+
+def _write_synthetic_front_wall(path) -> None:
+    import laspy
+    import numpy as np
+
+    x_values = np.linspace(
+        0.0,
+        10.0,
+        220,
+    )
+    z_values = np.linspace(
+        0.0,
+        2.0,
+        300,
+    )
+
+    xx, zz = np.meshgrid(
+        x_values,
+        z_values,
+    )
+
+    header = laspy.LasHeader(
+        point_format=3,
+        version="1.2",
+    )
+
+    las = laspy.LasData(header)
+    las.x = xx.ravel()
+    las.y = np.zeros(xx.size)
+    las.z = zz.ravel()
+
+    las.write(path)
+
+
+def test_volume_without_depth_reports_area_only(tmp_path):
+    source = tmp_path / "front_wall.las"
+    _write_synthetic_front_wall(source)
+
+    result = runner.invoke(
+        app,
+        [
+            "volume",
+            str(source),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Rectangle area" in result.output
+    assert "Trapezoid area" in result.output
+    assert "not computed" in result.output
+
+    # No cubic result may be invented when depth is absent.
+    assert "source-units³" not in result.output
+
+
+def test_volume_with_explicit_depth_reports_extrusion(tmp_path):
+    source = tmp_path / "front_wall.las"
+    _write_synthetic_front_wall(source)
+
+    result = runner.invoke(
+        app,
+        [
+            "volume",
+            str(source),
+            "--depth",
+            "2.0",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Assumed depth" in result.output
+    assert "Extruded volume" in result.output
+    assert "source-units³" in result.output
+    assert "not inferred or validated" in result.output
+
+
+def test_volume_rejects_negative_depth(tmp_path):
+    source = tmp_path / "front_wall.las"
+    _write_synthetic_front_wall(source)
+
+    result = runner.invoke(
+        app,
+        [
+            "volume",
+            str(source),
+            "--depth",
+            "-1",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "--depth must be non-negative" in result.output
+
+
+def test_volume_missing_file():
+    result = runner.invoke(
+        app,
+        [
+            "volume",
+            "/nonexistent/front-wall.las",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "file not found" in result.output.lower()

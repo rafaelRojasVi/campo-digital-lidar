@@ -1,7 +1,7 @@
 """`lidar` CLI entry point.
 
-Genuinely functional: inspect, analyze, info, crop, generate-synthetic.
-Explicit "not yet implemented" stubs: sections, volume, compare.
+Genuinely functional: inspect, analyze, info, crop, generate-synthetic, volume.
+Explicit "not yet implemented" stubs: sections, compare.
 """
 
 from __future__ import annotations
@@ -20,6 +20,11 @@ from rich.table import Table
 from lidar_core.testing import cube, cylinder, rectangular_prism
 from lidar_io.analyze import analyze_las
 from lidar_io.inspect import inspect_las
+from lidar_volume.front_cross_section import (
+    FrontCrossSectionConfig,
+    estimate_front_cross_section,
+    extruded_volume,
+)
 
 app = typer.Typer(add_completion=False, help="Campo Digital LiDAR engineering CLI.")
 console = Console()
@@ -416,13 +421,142 @@ def sections(input_path: Annotated[Path, typer.Argument()]) -> None:
 
 
 @app.command()
-def volume(input_path: Annotated[Path, typer.Argument()]) -> None:
-    """NOT YET IMPLEMENTED: end-to-end volume CLI (ROI selection not wired up)."""
-    console.print(
-        "[yellow]Not yet implemented.[/yellow] "
-        "Use lidar_volume estimators directly on a numpy array."
+def volume(
+    input_path: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to a LAS/LAZ timber-front ROI.",
+        ),
+    ],
+    depth: Annotated[
+        float | None,
+        typer.Option(
+            "--depth",
+            help=(
+                "Explicit extrusion depth in source-coordinate units. "
+                "If omitted, no cubic volume is computed."
+            ),
+        ),
+    ] = None,
+    bins: Annotated[
+        int,
+        typer.Option(
+            "--bins",
+            help="Number of longitudinal bins for the front-wall profile.",
+        ),
+    ] = 160,
+) -> None:
+    """Measure observable timber-front area and optional extrusion volume."""
+
+    if not input_path.is_file():
+        console.print(f"[red]Error:[/red] LAS/LAZ file not found: {input_path}")
+        raise typer.Exit(code=1)
+
+    if bins < 2:
+        console.print("[red]Error:[/red] --bins must be >= 2.")
+        raise typer.Exit(code=1)
+
+    if depth is not None and depth < 0:
+        console.print("[red]Error:[/red] --depth must be non-negative.")
+        raise typer.Exit(code=1)
+
+    las = laspy.read(input_path)
+
+    xyz = np.column_stack(
+        (
+            np.asarray(las.x),
+            np.asarray(las.y),
+            np.asarray(las.z),
+        )
     )
-    raise typer.Exit(code=2)
+
+    try:
+        estimate = estimate_front_cross_section(
+            xyz,
+            FrontCrossSectionConfig(
+                n_bins=bins,
+            ),
+        )
+    except ValueError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"Timber Front Measurement: {input_path}")
+
+    table.add_column("Field")
+    table.add_column("Value")
+
+    table.add_row(
+        "Point count",
+        f"{len(xyz):,}",
+    )
+
+    table.add_row(
+        "Longitudinal span",
+        f"{estimate.longitudinal_span:.6f} source units",
+    )
+
+    table.add_row(
+        "Valid bins",
+        f"{estimate.valid_bin_fraction:.3%}",
+    )
+
+    table.add_row(
+        "Median height",
+        f"{np.median(estimate.height):.6f} source units",
+    )
+
+    table.add_row(
+        "Maximum height",
+        f"{np.max(estimate.height):.6f} source units",
+    )
+
+    table.add_row(
+        "Rectangle area",
+        f"{estimate.rectangle_area:.6f} source-units²",
+    )
+
+    table.add_row(
+        "Trapezoid area",
+        f"{estimate.trapezoid_area:.6f} source-units²",
+    )
+
+    if depth is None:
+        table.add_row(
+            "Extruded volume",
+            "(not computed; provide --depth)",
+        )
+    else:
+        volume_value = extruded_volume(
+            estimate.rectangle_area,
+            depth,
+        )
+
+        table.add_row(
+            "Assumed depth",
+            f"{depth:.6f} source units",
+        )
+
+        table.add_row(
+            "Extruded volume",
+            f"{volume_value:.6f} source-units³",
+        )
+
+    console.print(table)
+
+    console.print()
+    console.print(
+        "[yellow]Units:[/yellow] Results remain in source-coordinate "
+        "units. This command does not infer metres from LAS scale, "
+        "offsets, or missing/ambiguous CRS metadata."
+    )
+
+    if depth is not None:
+        console.print(
+            "[yellow]Model:[/yellow] Cubic volume is the geometric "
+            "extrusion A_front × depth. The supplied depth is not "
+            "inferred or validated from the current LAS."
+        )
 
 
 @app.command()
