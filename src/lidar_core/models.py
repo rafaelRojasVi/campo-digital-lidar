@@ -297,6 +297,48 @@ class VolumeResult(BaseModel):
     )
 
 
+class VolumeComparison(BaseModel):
+    """One estimate/reference volume comparison.
+
+    Signed error is estimate minus reference. This represents error for one
+    comparison, not statistical bias across a population of measurements.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    estimate_method: str
+    estimate_value: float
+
+    reference: ReferenceMeasurement
+
+    unit: VolumeUnit
+
+    signed_error: float
+    absolute_error: float
+
+    relative_error: float | None = None
+    absolute_relative_error: float | None = None
+
+    percent_error: float | None = None
+    absolute_percent_error: float | None = None
+
+
+class VolumeComparisonRecord(BaseModel):
+    """Persisted record linking a measurement run to one comparison."""
+
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: str = "1"
+
+    comparison_id: str
+    run_id: str
+    estimate_result_index: int
+
+    comparison: VolumeComparison
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class MeasurementRunStatus(StrEnum):
     """Lifecycle state for one persisted measurement run."""
 

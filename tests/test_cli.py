@@ -298,3 +298,117 @@ def test_measure_command_requires_depth_source(
 
     assert result.exit_code == 1
     assert "depth_source is required" in result.output
+
+
+def test_compare_command_persists_reference_comparison(
+    tmp_path,
+):
+    source = tmp_path / "compare-candidate.las"
+    _write_synthetic_front_wall(source)
+
+    output_root = tmp_path / "reports"
+
+    measured = runner.invoke(
+        app,
+        [
+            "measure",
+            str(source),
+            "--output-root",
+            str(output_root),
+            "--run-id",
+            "compare-run",
+            "--code-version",
+            "test",
+            "--depth",
+            "2.5",
+            "--depth-source",
+            "synthetic_test_depth",
+        ],
+    )
+
+    assert measured.exit_code == 0, measured.output
+
+    measurement_path = output_root / "compare-run" / "measurement.json"
+
+    compared = runner.invoke(
+        app,
+        [
+            "compare",
+            str(measurement_path),
+            "--reference-value",
+            "5.0",
+            "--reference-unit",
+            "cubic_units_unspecified",
+            "--reference-method",
+            "synthetic_reference",
+            "--reference-label",
+            "fixture_reference",
+            "--comparison-id",
+            "comparison-001",
+        ],
+    )
+
+    assert compared.exit_code == 0, compared.output
+    assert "Volume Comparison: comparison-001" in compared.output
+    assert "Signed error" in compared.output
+    assert "Absolute error" in compared.output
+    assert "Percent error" in compared.output
+    assert "synthetic_reference" in compared.output
+
+    comparison_path = output_root / "compare-run" / "comparisons" / "comparison-001.json"
+
+    assert comparison_path.exists()
+
+
+def test_compare_command_rejects_incompatible_units(
+    tmp_path,
+):
+    source = tmp_path / "compare-unit-candidate.las"
+    _write_synthetic_front_wall(source)
+
+    output_root = tmp_path / "reports"
+
+    measured = runner.invoke(
+        app,
+        [
+            "measure",
+            str(source),
+            "--output-root",
+            str(output_root),
+            "--run-id",
+            "compare-unit-run",
+            "--depth",
+            "2.5",
+            "--depth-source",
+            "synthetic_test_depth",
+        ],
+    )
+
+    assert measured.exit_code == 0, measured.output
+
+    measurement_path = output_root / "compare-unit-run" / "measurement.json"
+
+    compared = runner.invoke(
+        app,
+        [
+            "compare",
+            str(measurement_path),
+            "--reference-value",
+            "5.0",
+            "--reference-unit",
+            "m3",
+            "--reference-method",
+            "synthetic_reference",
+            "--comparison-id",
+            "comparison-unit-mismatch",
+        ],
+    )
+
+    assert compared.exit_code == 1
+    assert "units must match exactly" in compared.output
+
+    comparison_path = (
+        output_root / "compare-unit-run" / "comparisons" / "comparison-unit-mismatch.json"
+    )
+
+    assert not comparison_path.exists()
