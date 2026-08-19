@@ -184,3 +184,8 @@ cross-section, voxel, grid-2.5D and mesh methods against real data. Later work
 may include a real viewer app; API persistence (PostgreSQL/PostGIS via
 SQLAlchemy/Alembic), object storage, job queue; and ties to Campo Digital's
 commercial cubicación rules once specified.
+
+
+## Current technical findings
+
+- [Cubicación accuracy: current technical findings](docs/findings/cubicacion_accuracy_problem.md)
