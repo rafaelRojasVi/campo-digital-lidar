@@ -372,3 +372,285 @@ Ese será el primer paso que conecta directamente la nube de puntos con la futur
 [README del proyecto](../../README.md) · [Índice de documentación](../README.md) · [Hallazgos](../findings/cubicacion_accuracy_problem.md) · [Experimentos](../experiments) · [Decisiones](../decisions) · [Documentación en español](README.md) · [Preguntas Campo Digital](preguntas-campo-digital.md)
 
 <!-- DOC_NAV_END -->
+
+
+---
+
+## Estado actual: ruma aislada y geometría frontal reproducible
+
+Desde el análisis forense inicial se avanzó hasta una primera ruta geométrica reproducible sobre la ruma real.
+
+### ROI automática de la ruma
+
+Se construyó una selección automática de la estructura principal de madera.
+
+Resultado actual:
+
+~~~text
+puntos ROI candidata:
+4.074.894
+
+puntos ruma automática:
+1.342.183
+~~~
+
+La segmentación automática fue comparada geométricamente con una referencia manual realizada en CloudCompare.
+
+A una tolerancia geométrica de 0,10 unidades de origen:
+
+~~~text
+precision-like: 95,57%
+recall-like:    85,71%
+F1-like:        90,37%
+~~~
+
+Estas cifras representan cercanía geométrica entre selecciones.
+
+No representan todavía precisión final de cubicación.
+
+---
+
+## Hallazgo: no se observa una segunda pared coherente de madera
+
+Se investigó si la nube contenía una segunda cara opuesta de la ruma que permitiera obtener directamente su profundidad.
+
+Se analizaron:
+
+- perfiles transversales;
+- slices longitudinales;
+- limpieza de suelo;
+- extensión vertical por posición transversal;
+- vistas desde ambos lados de la nube.
+
+Existían grupos importantes de puntos aproximadamente a:
+
+~~~text
+T ≈ -5 a -6 unidades de origen
+~~~
+
+respecto de la cara visible.
+
+Sin embargo, la evidencia muestra que esa estructura corresponde principalmente a suelo, camino y otra geometría del entorno.
+
+No apareció una segunda pared vertical de madera persistente.
+
+### Consecuencia
+
+Actualmente no corresponde utilizar esa separación como profundidad de la ruma.
+
+Tampoco corresponde cerrar artificialmente la nube con una superficie posterior y llamar al resultado volumen físico medido.
+
+La profundidad debe mantenerse como una variable explícita hasta obtener evidencia adicional.
+
+---
+
+## Detección de extremos visibles de rollizos
+
+También se desarrolló una proyección frontal reproducible de la ruma.
+
+La proyección conserva la relación exacta entre:
+
+~~~text
+pixel 2D
+    ↕
+puntos originales del LAS
+~~~
+
+Esto permite detectar una estructura en imagen y posteriormente recuperar sus puntos 3D originales.
+
+Se probaron detectores clásicos de extremos de rollizos.
+
+El mejor detector balanceado actual utiliza votación radial basada en gradientes.
+
+En una región exhaustivamente etiquetada con 70 extremos visibles:
+
+~~~text
+tolerancia: 8 px
+
+precision: 66,7%
+recall:    65,7%
+F1:        66,2%
+~~~
+
+Una variante orientada a mayor recall obtuvo:
+
+~~~text
+precision: 61,7%
+recall:    71,4%
+F1:        66,2%
+~~~
+
+### Decisión
+
+La detección individual de rollizos queda conservada como capacidad secundaria.
+
+No continuará siendo optimizada por ahora porque todavía no resuelve la dimensión oculta necesaria para cubicación.
+
+---
+
+## Ruta principal actual: sección frontal de la ruma
+
+La cara de madera directamente observable sí permite obtener una sección longitudinal/vertical.
+
+La medición reproducible actual entrega:
+
+~~~text
+puntos utilizados:
+1.342.183
+
+largo longitudinal robusto:
+61,361422 unidades de origen
+
+altura mediana:
+3,688422 unidades de origen
+
+altura máxima:
+4,632758 unidades de origen
+
+área frontal:
+217,176317 unidades-de-origen²
+~~~
+
+Una integración trapezoidal independiente entrega:
+
+~~~text
+216,434772 unidades-de-origen²
+~~~
+
+lo que confirma que la integración numérica es consistente.
+
+---
+
+## Sensibilidad del área frontal
+
+Se repitió la medición usando:
+
+~~~text
+80
+120
+160
+240
+~~~
+
+divisiones longitudinales y tres definiciones distintas de borde vertical.
+
+El número de divisiones modifica el área aproximadamente un 1% o menos para una misma definición de borde.
+
+El mayor efecto proviene de decidir cuánto del extremo superior e inferior de la nube corresponde a la ruma.
+
+Rango observado:
+
+~~~text
+mínimo:
+202,767 unidades-de-origen²
+
+central:
+~217,467 unidades-de-origen²
+
+máximo:
+224,646 unidades-de-origen²
+~~~
+
+El rango total equivale aproximadamente a:
+
+~~~text
+10,06%
+~~~
+
+del valor mediano.
+
+Esto representa sensibilidad del método de extracción.
+
+No representa todavía incertidumbre física total.
+
+---
+
+## Modelo volumétrico actual
+
+Como la profundidad no está observada de manera confiable, el modelo actualmente permitido es:
+
+~~~text
+V(d) = A_frontal * d
+~~~
+
+donde:
+
+~~~text
+A_frontal = geometría medida directamente
+d         = profundidad explícita o validada externamente
+~~~
+
+La profundidad no se estima automáticamente desde esta nube.
+
+Ejemplo con:
+
+~~~text
+d = 5 unidades de origen
+~~~
+
+usando la configuración base:
+
+~~~text
+V = 1085,881584 unidades-de-origen³
+~~~
+
+Esto sigue siendo una medición geométrica por extrusión.
+
+No debe presentarse todavía como m³ ni como cubicación comercial validada.
+
+---
+
+## Implementación actual
+
+La medición frontal ya no existe solamente como experimento.
+
+Se implementó como código reutilizable:
+
+~~~text
+src/lidar_volume/front_cross_section.py
+~~~
+
+y está disponible mediante:
+
+~~~bash
+uv run lidar volume ARCHIVO.las
+~~~
+
+Sin profundidad explícita, el comando entrega solamente geometría observable.
+
+Con:
+
+~~~bash
+uv run lidar volume ARCHIVO.las --depth D
+~~~
+
+también calcula:
+
+~~~text
+A_frontal * D
+~~~
+
+La implementación reutilizable reproduce el experimento original con una diferencia relativa de aproximadamente:
+
+~~~text
+0,000146%
+~~~
+
+---
+
+## Información que todavía necesitamos de Campo Digital
+
+Para avanzar desde geometría reproducible hacia validación real de cubicación necesitamos:
+
+1. confirmar qué sensor produjo este LAS;
+2. confirmar CRS y unidades físicas;
+3. obtener la ruma/ROI exacta usada por Campo Digital;
+4. obtener el volumen de referencia de Pix4D o LiDAR360 para esa misma ruma;
+5. conocer el largo/profundidad utilizado operacionalmente;
+6. saber qué representa exactamente el volumen final:
+   - volumen geométrico de envolvente;
+   - volumen sólido de madera;
+   - volumen con correcciones;
+   - otra regla comercial.
+
+Hasta contar con esa referencia no corresponde afirmar precisión final en m³.
