@@ -1,5 +1,8 @@
 # Documentation index
 
+[Project README](../README.md) · [English](../README.md#english) · [Español](../README.md#espanol) · [Roadmap](../README.md#roadmap) · [Spanish docs](es/README.md)
+
+
 This directory contains the engineering and project documentation for the Campo Digital LiDAR timber-measurement PoC.
 
 ## Documentation principles

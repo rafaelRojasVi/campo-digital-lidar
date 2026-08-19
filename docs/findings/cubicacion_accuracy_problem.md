@@ -1087,3 +1087,13 @@ individual log-end detection experiment
 ~~~
 
 Only after those stages, plus receipt of Campo Digital's reference measurement and cubicación definition, should the project attempt to make a validated m³ accuracy claim.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../../README.md) · [Docs index](../README.md) · [Experiments](../experiments) · [Decisions](../decisions) · [Spanish docs](../es/README.md) · [Estado técnico](../es/estado-proyecto.md) · [Preguntas Campo Digital](../es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

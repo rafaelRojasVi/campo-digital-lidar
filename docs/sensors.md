@@ -31,3 +31,13 @@ Because all three sensors can emit LAS, `lidar_io.inspect_las` and the
 volume estimators are sensor-agnostic at the file level -- sensor-specific
 handling (if ever needed) would live in a per-sensor ingestion step, not
 in the core inspection/volume code.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../README.md) · [Docs index](README.md) · [Findings](findings/cubicacion_accuracy_problem.md) · [Experiments](experiments) · [Decisions](decisions) · [Spanish docs](es/README.md) · [Estado técnico](es/estado-proyecto.md) · [Preguntas Campo Digital](es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

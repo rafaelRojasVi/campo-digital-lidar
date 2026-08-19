@@ -132,3 +132,13 @@ Generic whole-cloud forensic work is now sufficiently mature to move toward the 
 ## Next step
 
 Isolate the visible timber stack reproducibly and begin front-face/log-end geometry experiments.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../../README.md) · [Docs index](../README.md) · [Findings](../findings/cubicacion_accuracy_problem.md) · [Experiments](.) · [Decisions](../decisions) · [Spanish docs](../es/README.md) · [Estado técnico](../es/estado-proyecto.md) · [Preguntas Campo Digital](../es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

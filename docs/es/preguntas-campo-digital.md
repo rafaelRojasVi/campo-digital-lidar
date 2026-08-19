@@ -35,3 +35,13 @@ Cuando una respuesta sea entregada explícitamente por Campo Digital:
 3. registrar la fuente o contexto si es relevante;
 4. actualizar la documentación técnica afectada;
 5. no borrar la pregunta original, porque forma parte de la trazabilidad del proyecto.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Navegación de documentación
+
+[README del proyecto](../../README.md) · [Índice de documentación](../README.md) · [Hallazgos](../findings/cubicacion_accuracy_problem.md) · [Experimentos](../experiments) · [Decisiones](../decisions) · [Documentación en español](README.md) · [Estado técnico](estado-proyecto.md)
+
+<!-- DOC_NAV_END -->

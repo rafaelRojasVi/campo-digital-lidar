@@ -36,3 +36,13 @@ attempt to interpret every possible VLR type.
 Computed via a **chunked streaming pass** (`laspy`'s `chunk_iterator`),
 not a full in-memory load, so this scales to files larger than available
 RAM.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../README.md) · [Docs index](README.md) · [Findings](findings/cubicacion_accuracy_problem.md) · [Experiments](experiments) · [Decisions](decisions) · [Spanish docs](es/README.md) · [Estado técnico](es/estado-proyecto.md) · [Preguntas Campo Digital](es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

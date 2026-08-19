@@ -54,3 +54,13 @@ Se pueden mantener términos técnicos habituales en inglés cuando aporten clar
 - CloudCompare.
 
 La prioridad es mantener el significado técnico correcto.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Navegación de documentación
+
+[README del proyecto](../../README.md) · [Índice de documentación](../README.md) · [Hallazgos](../findings/cubicacion_accuracy_problem.md) · [Experimentos](../experiments) · [Decisiones](../decisions) · [Estado técnico](estado-proyecto.md) · [Preguntas Campo Digital](preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

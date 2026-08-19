@@ -106,3 +106,13 @@ Proceed with the real LAS, but preserve explicit forensic safeguards:
 ## Next step
 
 Characterize acquisition timing and return-number structure.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../../README.md) · [Docs index](../README.md) · [Findings](../findings/cubicacion_accuracy_problem.md) · [Experiments](.) · [Decisions](../decisions) · [Spanish docs](../es/README.md) · [Estado técnico](../es/estado-proyecto.md) · [Preguntas Campo Digital](../es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

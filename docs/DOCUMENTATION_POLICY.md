@@ -288,7 +288,9 @@ At the end of a meaningful engineering session:
 5. create/update an ADR if a durable decision occurred;
 6. update Spanish stakeholder documentation if the information matters to Campo Digital;
 7. append a concise journal entry;
-8. review documentation diff before committing.
+8. review documentation diff before committing;
+9. run `python scripts/update_doc_nav.py` when documentation files or navigation targets are added, removed, moved, or renamed;
+10. run `python scripts/check_doc_links.py` and resolve broken local documentation links.
 
 Documentation automation must not automatically commit changes.
 
@@ -336,3 +338,13 @@ When asked to document the current work:
 - never rewrite source-code behavior from assumptions;
 - show the proposed documentation diff for review;
 - do not commit unless explicitly instructed.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../README.md) · [Docs index](README.md) · [Findings](findings/cubicacion_accuracy_problem.md) · [Experiments](experiments) · [Decisions](decisions) · [Spanish docs](es/README.md) · [Estado técnico](es/estado-proyecto.md) · [Preguntas Campo Digital](es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

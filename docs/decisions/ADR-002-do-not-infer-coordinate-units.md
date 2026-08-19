@@ -78,3 +78,13 @@ Rejected because useful geometry analysis can still proceed safely in source uni
 - `docs/datasets/v01_MG_23jun2026.md`
 - `docs/findings/cubicacion_accuracy_problem.md`
 - `docs/es/preguntas-campo-digital.md`
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../../README.md) · [Docs index](../README.md) · [Findings](../findings/cubicacion_accuracy_problem.md) · [Experiments](../experiments) · [Decisions](.) · [Spanish docs](../es/README.md) · [Estado técnico](../es/estado-proyecto.md) · [Preguntas Campo Digital](../es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

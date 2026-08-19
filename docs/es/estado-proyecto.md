@@ -362,3 +362,13 @@ Después:
 El primer experimento directo sobre el problema forestal será determinar si podemos identificar de manera estable los extremos circulares/elípticos visibles y estimar sus diámetros.
 
 Ese será el primer paso que conecta directamente la nube de puntos con la futura cubicación.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Navegación de documentación
+
+[README del proyecto](../../README.md) · [Índice de documentación](../README.md) · [Hallazgos](../findings/cubicacion_accuracy_problem.md) · [Experimentos](../experiments) · [Decisiones](../decisions) · [Documentación en español](README.md) · [Preguntas Campo Digital](preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

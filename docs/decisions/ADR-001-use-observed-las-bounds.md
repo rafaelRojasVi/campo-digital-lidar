@@ -86,3 +86,13 @@ Useful for validation, but the repository still needs its own deterministic beha
 - `docs/findings/cubicacion_accuracy_problem.md`
 - `src/lidar_io/inspect.py`
 - `tests/test_las_scale_offset.py`
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../../README.md) · [Docs index](../README.md) · [Findings](../findings/cubicacion_accuracy_problem.md) · [Experiments](../experiments) · [Decisions](.) · [Spanish docs](../es/README.md) · [Estado técnico](../es/estado-proyecto.md) · [Preguntas Campo Digital](../es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->
