@@ -17,10 +17,18 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from lidar_core.models import (
+    ReferenceMeasurement,
+    VolumeComparisonRecord,
+    VolumeUnit,
+)
 from lidar_core.testing import cube, cylinder, rectangular_prism
+from lidar_core.volume_comparison import compare_volume_result
 from lidar_io.analyze import analyze_las
+from lidar_io.comparison_store import write_comparison_record
 from lidar_io.inspect import inspect_las
 from lidar_io.measurement_pipeline import run_timber_measurement
+from lidar_io.run_store import read_measurement_run
 from lidar_volume.front_cross_section import (
     FrontCrossSectionConfig,
     estimate_front_cross_section,
@@ -724,10 +732,177 @@ def measure(
 
 
 @app.command()
-def compare(inputs: Annotated[list[str], typer.Argument()]) -> None:
-    """NOT YET IMPLEMENTED: multi-method/multi-run comparison CLI."""
-    console.print("[yellow]Not yet implemented.[/yellow]")
-    raise typer.Exit(code=2)
+def compare(
+    measurement_path: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to an existing measurement.json.",
+        ),
+    ],
+    reference_value: Annotated[
+        float,
+        typer.Option(
+            "--reference-value",
+            help="Explicit reference volume value.",
+        ),
+    ],
+    reference_unit: Annotated[
+        str,
+        typer.Option(
+            "--reference-unit",
+            help=(
+                "Reference volume unit. Must exactly match the estimate: "
+                "m3 or cubic_units_unspecified."
+            ),
+        ),
+    ],
+    reference_method: Annotated[
+        str,
+        typer.Option(
+            "--reference-method",
+            help=("Provenance/method for the reference, for example lidar360_client_report."),
+        ),
+    ],
+    comparison_id: Annotated[
+        str,
+        typer.Option(
+            "--comparison-id",
+            help="Stable identifier for the persisted comparison.",
+        ),
+    ],
+    reference_label: Annotated[
+        str,
+        typer.Option(
+            "--reference-label",
+            help="Human-readable reference label.",
+        ),
+    ] = "reference",
+    result_index: Annotated[
+        int,
+        typer.Option(
+            "--result-index",
+            help="VolumeResult index from the measurement run.",
+        ),
+    ] = 0,
+    reference_notes: Annotated[
+        str | None,
+        typer.Option(
+            "--reference-notes",
+            help="Optional notes about the reference measurement.",
+        ),
+    ] = None,
+) -> None:
+    """Compare one persisted volume estimate against an explicit reference."""
+
+    if not measurement_path.is_file():
+        console.print(f"[red]Error:[/red] measurement file not found: {measurement_path}")
+        raise typer.Exit(code=1)
+
+    try:
+        run = read_measurement_run(measurement_path)
+    except (OSError, ValueError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if result_index < 0 or result_index >= len(run.results):
+        console.print(
+            "[red]Error:[/red] "
+            f"--result-index {result_index} is out of range; "
+            f"run contains {len(run.results)} volume result(s)."
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        unit = VolumeUnit(reference_unit)
+    except ValueError as exc:
+        allowed = ", ".join(unit.value for unit in VolumeUnit)
+        console.print(
+            "[red]Error:[/red] invalid --reference-unit "
+            f"'{reference_unit}'. Expected one of: {allowed}"
+        )
+        raise typer.Exit(code=1) from exc
+
+    reference = ReferenceMeasurement(
+        label=reference_label,
+        value=reference_value,
+        unit=unit,
+        method=reference_method,
+        notes=reference_notes,
+    )
+
+    estimate = run.results[result_index]
+
+    try:
+        comparison = compare_volume_result(
+            estimate,
+            reference,
+        )
+
+        record = VolumeComparisonRecord(
+            comparison_id=comparison_id,
+            run_id=run.run_id,
+            estimate_result_index=result_index,
+            comparison=comparison,
+        )
+
+        output_root = measurement_path.parent.parent
+
+        comparison_path = write_comparison_record(
+            record,
+            output_root,
+        )
+    except (ValueError, FileExistsError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"Volume Comparison: {comparison_id}")
+    table.add_column("Field")
+    table.add_column("Value")
+
+    table.add_row("Run", run.run_id)
+    table.add_row("Estimate method", comparison.estimate_method)
+    table.add_row(
+        "Estimate",
+        f"{comparison.estimate_value:.6f} {comparison.unit.value}",
+    )
+    table.add_row(
+        "Reference",
+        f"{comparison.reference.value:.6f} {comparison.unit.value}",
+    )
+    table.add_row(
+        "Reference method",
+        comparison.reference.method,
+    )
+    table.add_row(
+        "Signed error",
+        f"{comparison.signed_error:.6f} {comparison.unit.value}",
+    )
+    table.add_row(
+        "Absolute error",
+        f"{comparison.absolute_error:.6f} {comparison.unit.value}",
+    )
+
+    if comparison.percent_error is not None:
+        table.add_row(
+            "Percent error",
+            f"{comparison.percent_error:.6f}%",
+        )
+        table.add_row(
+            "Absolute percent error",
+            f"{comparison.absolute_percent_error:.6f}%",
+        )
+    else:
+        table.add_row(
+            "Relative error",
+            "(undefined for zero-valued reference)",
+        )
+
+    table.add_row(
+        "Comparison JSON",
+        str(comparison_path),
+    )
+
+    console.print(table)
 
 
 if __name__ == "__main__":
