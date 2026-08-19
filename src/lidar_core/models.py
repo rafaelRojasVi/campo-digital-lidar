@@ -147,6 +147,28 @@ class ReturnAnalysis(BaseModel):
     intensity: NumericSummary | None = None
 
 
+class TimestampGroupAnalysis(BaseModel):
+    """Diagnostics for contiguous records sharing exactly the same GPS time."""
+
+    model_config = ConfigDict(frozen=True)
+
+    group_count: int
+    size_counts: dict[int, int] = Field(default_factory=dict)
+    max_group_size: int
+
+    two_record_groups: int
+    two_record_return_pattern_counts: dict[str, int] = Field(default_factory=dict)
+
+    two_record_r1_r2_groups: int
+    two_record_r1_r2_fraction: float | None = None
+
+    exact_pair_distance: NumericSummary | None = None
+    exact_pair_abs_delta_x: NumericSummary | None = None
+    exact_pair_abs_delta_y: NumericSummary | None = None
+    exact_pair_abs_delta_z: NumericSummary | None = None
+    exact_pair_abs_intensity_delta: NumericSummary | None = None
+
+
 class AcquisitionAnalysis(BaseModel):
     """Streaming diagnostics describing how a LAS point cloud was acquired/exported.
 
@@ -171,6 +193,19 @@ class AcquisitionAnalysis(BaseModel):
     gps_time_equal_steps: int | None = None
     gps_time_min_positive_step: float | None = None
     gps_time_max_positive_step: float | None = None
+
+    equal_time_adjacent_same_return_pairs: int | None = None
+    equal_time_adjacent_cross_return_pairs: int | None = None
+    equal_time_adjacent_r1_r2_pairs: int | None = None
+    equal_time_adjacent_r1_r2_fraction: float | None = None
+
+    paired_return_distance: NumericSummary | None = None
+    paired_return_abs_delta_x: NumericSummary | None = None
+    paired_return_abs_delta_y: NumericSummary | None = None
+    paired_return_abs_delta_z: NumericSummary | None = None
+    paired_return_abs_intensity_delta: NumericSummary | None = None
+
+    timestamp_groups: TimestampGroupAnalysis | None = None
 
     intensity: NumericSummary | None = None
     rgb: dict[str, NumericSummary] = Field(default_factory=dict)

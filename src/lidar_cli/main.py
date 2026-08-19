@@ -153,6 +153,102 @@ def analyze(
         f"max={fmt(result.gps_time_max_positive_step)}",
     )
 
+    table.add_row(
+        "Equal-time same-return",
+        str(result.equal_time_adjacent_same_return_pairs),
+    )
+    table.add_row(
+        "Equal-time cross-return",
+        str(result.equal_time_adjacent_cross_return_pairs),
+    )
+    table.add_row(
+        "Equal-time R1/R2",
+        (
+            f"{result.equal_time_adjacent_r1_r2_pairs} "
+            f"(fraction={fmt(result.equal_time_adjacent_r1_r2_fraction)})"
+        ),
+    )
+
+    if result.paired_return_distance is not None:
+        s = result.paired_return_distance
+        table.add_row(
+            "R1/R2 3D separation",
+            f"min={fmt(s.minimum)} mean={fmt(s.mean)} max={fmt(s.maximum)}",
+        )
+
+    for axis, summary in (
+        ("X", result.paired_return_abs_delta_x),
+        ("Y", result.paired_return_abs_delta_y),
+        ("Z", result.paired_return_abs_delta_z),
+    ):
+        if summary is not None:
+            table.add_row(
+                f"R1/R2 |delta {axis}|",
+                (f"min={fmt(summary.minimum)} mean={fmt(summary.mean)} max={fmt(summary.maximum)}"),
+            )
+
+    if result.paired_return_abs_intensity_delta is not None:
+        s = result.paired_return_abs_intensity_delta
+        table.add_row(
+            "R1/R2 |intensity delta|",
+            f"min={fmt(s.minimum)} mean={fmt(s.mean)} max={fmt(s.maximum)}",
+        )
+
+    if result.timestamp_groups is not None:
+        groups = result.timestamp_groups
+
+        table.add_row(
+            "Timestamp groups",
+            (
+                f"count={groups.group_count:,} "
+                f"max-size={groups.max_group_size} "
+                f"sizes={groups.size_counts}"
+            ),
+        )
+
+        table.add_row(
+            "2-record patterns",
+            str(groups.two_record_return_pattern_counts),
+        )
+
+        table.add_row(
+            "Exact 2-record R1/R2",
+            (
+                f"{groups.two_record_r1_r2_groups:,}/"
+                f"{groups.two_record_groups:,} "
+                f"(fraction={fmt(groups.two_record_r1_r2_fraction)})"
+            ),
+        )
+
+        if groups.exact_pair_distance is not None:
+            summary = groups.exact_pair_distance
+            table.add_row(
+                "Exact-pair 3D separation",
+                (f"min={fmt(summary.minimum)} mean={fmt(summary.mean)} max={fmt(summary.maximum)}"),
+            )
+
+        for axis, summary in (
+            ("X", groups.exact_pair_abs_delta_x),
+            ("Y", groups.exact_pair_abs_delta_y),
+            ("Z", groups.exact_pair_abs_delta_z),
+        ):
+            if summary is not None:
+                table.add_row(
+                    f"Exact-pair |delta {axis}|",
+                    (
+                        f"min={fmt(summary.minimum)} "
+                        f"mean={fmt(summary.mean)} "
+                        f"max={fmt(summary.maximum)}"
+                    ),
+                )
+
+        if groups.exact_pair_abs_intensity_delta is not None:
+            summary = groups.exact_pair_abs_intensity_delta
+            table.add_row(
+                "Exact-pair |intensity delta|",
+                (f"min={fmt(summary.minimum)} mean={fmt(summary.mean)} max={fmt(summary.maximum)}"),
+            )
+
     if result.intensity is not None:
         s = result.intensity
         table.add_row(
@@ -207,7 +303,7 @@ def analyze(
     if result.warnings:
         table.add_row(
             "[yellow]Warnings[/yellow]",
-            "\\n".join(result.warnings),
+            "\n".join(result.warnings),
         )
 
     console.print(table)

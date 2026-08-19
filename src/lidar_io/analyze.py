@@ -19,6 +19,7 @@ from lidar_core.models import (
     BoundingBox3D,
     NumericSummary,
     ReturnAnalysis,
+    TimestampGroupAnalysis,
 )
 
 _STREAM_CHUNK = 1_000_000
@@ -64,6 +65,226 @@ def _update_counter(counter: Counter[int], values: np.ndarray) -> None:
         counter[int(value)] += int(count)
 
 
+def _analyze_timestamp_groups(
+    source: Path,
+) -> TimestampGroupAnalysis | None:
+    """Analyze complete contiguous groups of records with identical GPS time.
+
+    A second streaming pass is intentional: group-boundary logic is kept
+    separate from the general acquisition diagnostics and still avoids
+    loading the complete cloud into memory.
+    """
+
+    group_count = 0
+    size_counts: Counter[int] = Counter()
+    max_group_size = 0
+
+    two_record_groups = 0
+    pattern_counts: Counter[str] = Counter()
+    two_record_r1_r2_groups = 0
+
+    distance_stats = _RunningStats()
+    abs_dx_stats = _RunningStats()
+    abs_dy_stats = _RunningStats()
+    abs_dz_stats = _RunningStats()
+    abs_intensity_delta_stats = _RunningStats()
+
+    pending_gps = np.empty(0, dtype=np.float64)
+    pending_returns = np.empty(0, dtype=np.uint8)
+    pending_x = np.empty(0, dtype=np.float64)
+    pending_y = np.empty(0, dtype=np.float64)
+    pending_z = np.empty(0, dtype=np.float64)
+    pending_intensity: np.ndarray | None = None
+
+    def consume_groups(
+        starts: np.ndarray,
+        ends: np.ndarray,
+        returns: np.ndarray,
+        x: np.ndarray,
+        y: np.ndarray,
+        z: np.ndarray,
+        intensity: np.ndarray | None,
+    ) -> None:
+        nonlocal group_count
+        nonlocal max_group_size
+        nonlocal two_record_groups
+        nonlocal two_record_r1_r2_groups
+
+        if starts.size == 0:
+            return
+
+        sizes = ends - starts
+
+        group_count += int(sizes.size)
+
+        unique_sizes, counts = np.unique(sizes, return_counts=True)
+        for size, count in zip(unique_sizes, counts, strict=True):
+            size_int = int(size)
+            count_int = int(count)
+            size_counts[size_int] += count_int
+            max_group_size = max(max_group_size, size_int)
+
+        pair_starts = starts[sizes == 2]
+        if pair_starts.size == 0:
+            return
+
+        two_record_groups += int(pair_starts.size)
+
+        left_returns = returns[pair_starts]
+        right_returns = returns[pair_starts + 1]
+
+        pattern_12 = (left_returns == 1) & (right_returns == 2)
+        pattern_21 = (left_returns == 2) & (right_returns == 1)
+        pattern_11 = (left_returns == 1) & (right_returns == 1)
+        pattern_22 = (left_returns == 2) & (right_returns == 2)
+
+        pattern_counts["1->2"] += int(pattern_12.sum())
+        pattern_counts["2->1"] += int(pattern_21.sum())
+        pattern_counts["1->1"] += int(pattern_11.sum())
+        pattern_counts["2->2"] += int(pattern_22.sum())
+
+        recognized = pattern_12 | pattern_21 | pattern_11 | pattern_22
+        pattern_counts["other"] += int((~recognized).sum())
+
+        r1_r2 = pattern_12 | pattern_21
+        pair_count = int(r1_r2.sum())
+
+        if pair_count == 0:
+            return
+
+        two_record_r1_r2_groups += pair_count
+
+        selected_starts = pair_starts[r1_r2]
+
+        dx = x[selected_starts + 1] - x[selected_starts]
+        dy = y[selected_starts + 1] - y[selected_starts]
+        dz = z[selected_starts + 1] - z[selected_starts]
+
+        distance_stats.update(np.sqrt(dx * dx + dy * dy + dz * dz))
+        abs_dx_stats.update(np.abs(dx))
+        abs_dy_stats.update(np.abs(dy))
+        abs_dz_stats.update(np.abs(dz))
+
+        if intensity is not None:
+            intensity_delta = intensity[selected_starts + 1] - intensity[selected_starts]
+            abs_intensity_delta_stats.update(np.abs(intensity_delta))
+
+    with laspy.open(source) as reader:
+        dim_names = set(reader.header.point_format.dimension_names)
+
+        if "gps_time" not in dim_names or "return_number" not in dim_names:
+            return None
+
+        has_intensity = "intensity" in dim_names
+
+        if has_intensity:
+            pending_intensity = np.empty(0, dtype=np.float64)
+
+        for points in reader.chunk_iterator(_STREAM_CHUNK):
+            if len(points) == 0:
+                continue
+
+            gps = np.asarray(points.gps_time, dtype=np.float64)
+
+            # Do not silently manufacture timestamp groups around invalid time
+            # records. The primary analyzer already reports non-finite GPS time.
+            if not np.all(np.isfinite(gps)):
+                return None
+
+            returns = np.asarray(points.return_number, dtype=np.uint8)
+            x = np.asarray(points.x, dtype=np.float64)
+            y = np.asarray(points.y, dtype=np.float64)
+            z = np.asarray(points.z, dtype=np.float64)
+
+            intensity = np.asarray(points.intensity, dtype=np.float64) if has_intensity else None
+
+            if pending_gps.size:
+                gps = np.concatenate((pending_gps, gps))
+                returns = np.concatenate((pending_returns, returns))
+                x = np.concatenate((pending_x, x))
+                y = np.concatenate((pending_y, y))
+                z = np.concatenate((pending_z, z))
+
+                if intensity is not None and pending_intensity is not None:
+                    intensity = np.concatenate((pending_intensity, intensity))
+
+            changes = np.flatnonzero(gps[1:] != gps[:-1]) + 1
+
+            if changes.size == 0:
+                pending_gps = gps
+                pending_returns = returns
+                pending_x = x
+                pending_y = y
+                pending_z = z
+                pending_intensity = intensity
+                continue
+
+            starts = np.concatenate(
+                (
+                    np.array([0], dtype=np.int64),
+                    changes.astype(np.int64),
+                )
+            )
+            ends = np.concatenate(
+                (
+                    changes.astype(np.int64),
+                    np.array([len(gps)], dtype=np.int64),
+                )
+            )
+
+            # The final group may continue in the next LAS chunk.
+            complete_starts = starts[:-1]
+            complete_ends = ends[:-1]
+
+            consume_groups(
+                complete_starts,
+                complete_ends,
+                returns,
+                x,
+                y,
+                z,
+                intensity,
+            )
+
+            tail_start = int(starts[-1])
+
+            pending_gps = gps[tail_start:]
+            pending_returns = returns[tail_start:]
+            pending_x = x[tail_start:]
+            pending_y = y[tail_start:]
+            pending_z = z[tail_start:]
+            pending_intensity = intensity[tail_start:] if intensity is not None else None
+
+    # Flush the final timestamp group.
+    if pending_gps.size:
+        consume_groups(
+            np.array([0], dtype=np.int64),
+            np.array([len(pending_gps)], dtype=np.int64),
+            pending_returns,
+            pending_x,
+            pending_y,
+            pending_z,
+            pending_intensity,
+        )
+
+    fraction = two_record_r1_r2_groups / two_record_groups if two_record_groups else None
+
+    return TimestampGroupAnalysis(
+        group_count=group_count,
+        size_counts=dict(sorted(size_counts.items())),
+        max_group_size=max_group_size,
+        two_record_groups=two_record_groups,
+        two_record_return_pattern_counts=dict(pattern_counts),
+        two_record_r1_r2_groups=two_record_r1_r2_groups,
+        two_record_r1_r2_fraction=fraction,
+        exact_pair_distance=distance_stats.summary(),
+        exact_pair_abs_delta_x=abs_dx_stats.summary(),
+        exact_pair_abs_delta_y=abs_dy_stats.summary(),
+        exact_pair_abs_delta_z=abs_dz_stats.summary(),
+        exact_pair_abs_intensity_delta=(abs_intensity_delta_stats.summary()),
+    )
+
+
 def analyze_las(path: str | Path) -> AcquisitionAnalysis:
     """Stream a LAS/LAZ file and characterize acquisition/export structure."""
 
@@ -105,6 +326,23 @@ def analyze_las(path: str | Path) -> AcquisitionAnalysis:
     gps_min_positive_step: float | None = None
     gps_max_positive_step: float | None = None
     gps_nonfinite_count = 0
+
+    equal_time_same_return_pairs = 0
+    equal_time_cross_return_pairs = 0
+    equal_time_r1_r2_pairs = 0
+
+    pair_distance_stats = _RunningStats()
+    pair_abs_dx_stats = _RunningStats()
+    pair_abs_dy_stats = _RunningStats()
+    pair_abs_dz_stats = _RunningStats()
+    pair_abs_intensity_delta_stats = _RunningStats()
+
+    previous_gps: float | None = None
+    previous_return_number: int | None = None
+    previous_x: float | None = None
+    previous_y: float | None = None
+    previous_z: float | None = None
+    previous_intensity: float | None = None
 
     with laspy.open(source) as reader:
         header = reader.header
@@ -177,6 +415,7 @@ def analyze_las(path: str | Path) -> AcquisitionAnalysis:
                     np.asarray(points.number_of_returns),
                 )
 
+            return_numbers: np.ndarray | None = None
             if has_return_number:
                 return_numbers = np.asarray(points.return_number)
                 _update_counter(return_number_counts, return_numbers)
@@ -215,6 +454,117 @@ def analyze_las(path: str | Path) -> AcquisitionAnalysis:
 
             if has_gps:
                 gps = np.asarray(points.gps_time, dtype=np.float64)
+
+                # -----------------------------------------------------------
+                # Equal-time adjacent return pairing.
+                #
+                # This deliberately says "adjacent pair", not "pulse pair".
+                # Exact equal GPS time + R1/R2 adjacency is evidence of
+                # pairing structure, but we do not assume sensor semantics.
+                # -----------------------------------------------------------
+
+                if return_numbers is not None:
+                    if (
+                        previous_gps is not None
+                        and previous_return_number is not None
+                        and previous_x is not None
+                        and previous_y is not None
+                        and previous_z is not None
+                        and np.isfinite(previous_gps)
+                        and np.isfinite(gps[0])
+                        and previous_gps == float(gps[0])
+                    ):
+                        current_return = int(return_numbers[0])
+
+                        if previous_return_number == current_return:
+                            equal_time_same_return_pairs += 1
+                        else:
+                            equal_time_cross_return_pairs += 1
+
+                        if {previous_return_number, current_return} == {1, 2}:
+                            equal_time_r1_r2_pairs += 1
+
+                            boundary_dx = float(x[0]) - previous_x
+                            boundary_dy = float(y[0]) - previous_y
+                            boundary_dz = float(z[0]) - previous_z
+
+                            pair_distance_stats.update(
+                                np.array(
+                                    [
+                                        np.sqrt(
+                                            boundary_dx * boundary_dx
+                                            + boundary_dy * boundary_dy
+                                            + boundary_dz * boundary_dz
+                                        )
+                                    ],
+                                    dtype=np.float64,
+                                )
+                            )
+                            pair_abs_dx_stats.update(np.array([abs(boundary_dx)], dtype=np.float64))
+                            pair_abs_dy_stats.update(np.array([abs(boundary_dy)], dtype=np.float64))
+                            pair_abs_dz_stats.update(np.array([abs(boundary_dz)], dtype=np.float64))
+
+                            if intensity is not None and previous_intensity is not None:
+                                pair_abs_intensity_delta_stats.update(
+                                    np.array(
+                                        [abs(float(intensity[0]) - previous_intensity)],
+                                        dtype=np.float64,
+                                    )
+                                )
+
+                    if len(gps) > 1:
+                        pair_mask = (
+                            np.isfinite(gps[:-1]) & np.isfinite(gps[1:]) & (gps[:-1] == gps[1:])
+                        )
+
+                        if np.any(pair_mask):
+                            left_return = return_numbers[:-1]
+                            right_return = return_numbers[1:]
+
+                            same_return = pair_mask & (left_return == right_return)
+                            cross_return = pair_mask & (left_return != right_return)
+                            r1_r2 = pair_mask & (
+                                ((left_return == 1) & (right_return == 2))
+                                | ((left_return == 2) & (right_return == 1))
+                            )
+
+                            equal_time_same_return_pairs += int(same_return.sum())
+                            equal_time_cross_return_pairs += int(cross_return.sum())
+                            equal_time_r1_r2_pairs += int(r1_r2.sum())
+
+                            if np.any(r1_r2):
+                                dx = x[1:] - x[:-1]
+                                dy = y[1:] - y[:-1]
+                                dz = z[1:] - z[:-1]
+
+                                selected_dx = dx[r1_r2]
+                                selected_dy = dy[r1_r2]
+                                selected_dz = dz[r1_r2]
+
+                                pair_distance_stats.update(
+                                    np.sqrt(
+                                        selected_dx * selected_dx
+                                        + selected_dy * selected_dy
+                                        + selected_dz * selected_dz
+                                    )
+                                )
+                                pair_abs_dx_stats.update(np.abs(selected_dx))
+                                pair_abs_dy_stats.update(np.abs(selected_dy))
+                                pair_abs_dz_stats.update(np.abs(selected_dz))
+
+                                if intensity is not None:
+                                    intensity_delta = intensity[1:] - intensity[:-1]
+                                    pair_abs_intensity_delta_stats.update(
+                                        np.abs(intensity_delta[r1_r2])
+                                    )
+
+                    previous_gps = float(gps[-1])
+                    previous_return_number = int(return_numbers[-1])
+                    previous_x = float(x[-1])
+                    previous_y = float(y[-1])
+                    previous_z = float(z[-1])
+                    previous_intensity = float(intensity[-1]) if intensity is not None else None
+
                 finite_mask = np.isfinite(gps)
                 gps_nonfinite_count += int((~finite_mask).sum())
                 finite_gps = gps[finite_mask]
@@ -318,6 +668,16 @@ def analyze_las(path: str | Path) -> AcquisitionAnalysis:
                 "it is not local surface density."
             )
 
+    if has_gps and has_return_number and gps_equal_steps:
+        pair_fraction = equal_time_r1_r2_pairs / gps_equal_steps
+        warnings.append(
+            "Equal-time R1/R2 statistics describe adjacent LAS records only; "
+            "they must not be interpreted as confirmed emitted-pulse pairs "
+            "without sensor/export provenance."
+        )
+    else:
+        pair_fraction = None
+
     warnings.append("Coordinate units and CRS are not inferred by acquisition analysis.")
 
     rgb: dict[str, NumericSummary] = {}
@@ -352,6 +712,15 @@ def analyze_las(path: str | Path) -> AcquisitionAnalysis:
             )
         )
 
+    timestamp_groups = _analyze_timestamp_groups(source) if has_gps and has_return_number else None
+
+    if timestamp_groups is not None and timestamp_groups.max_group_size > 2:
+        warnings.append(
+            "Some exact GPS timestamp groups contain more than two records; "
+            "adjacent equal-time R1/R2 records are therefore not equivalent "
+            "to complete two-record timestamp groups."
+        )
+
     return AcquisitionAnalysis(
         path=str(source),
         point_count=point_count,
@@ -367,6 +736,22 @@ def analyze_las(path: str | Path) -> AcquisitionAnalysis:
         gps_time_equal_steps=(gps_equal_steps if gps_summary is not None else None),
         gps_time_min_positive_step=gps_min_positive_step,
         gps_time_max_positive_step=gps_max_positive_step,
+        equal_time_adjacent_same_return_pairs=(
+            equal_time_same_return_pairs if has_gps and has_return_number else None
+        ),
+        equal_time_adjacent_cross_return_pairs=(
+            equal_time_cross_return_pairs if has_gps and has_return_number else None
+        ),
+        equal_time_adjacent_r1_r2_pairs=(
+            equal_time_r1_r2_pairs if has_gps and has_return_number else None
+        ),
+        equal_time_adjacent_r1_r2_fraction=pair_fraction,
+        paired_return_distance=pair_distance_stats.summary(),
+        paired_return_abs_delta_x=pair_abs_dx_stats.summary(),
+        paired_return_abs_delta_y=pair_abs_dy_stats.summary(),
+        paired_return_abs_delta_z=pair_abs_dz_stats.summary(),
+        paired_return_abs_intensity_delta=(pair_abs_intensity_delta_stats.summary()),
+        timestamp_groups=timestamp_groups,
         intensity=intensity_stats.summary() if has_intensity else None,
         rgb=rgb,
         scan_angle_rank=scan_angle_stats.summary() if has_scan_angle else None,

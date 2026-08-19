@@ -77,7 +77,7 @@ Observed result:
 ```text
 PDAL 2.10.2
 8/8 PDAL pipeline tests passed
-31/31 repository tests passed
+33/33 repository tests passed
 0 skipped
 ```
 
