@@ -45,11 +45,7 @@ def is_spanish_document(path: Path) -> bool:
 def build_navigation(path: Path) -> str:
     spanish = is_spanish_document(path)
     targets = TARGETS_ES if spanish else TARGETS_EN
-    heading = (
-        "### Navegación de documentación"
-        if spanish
-        else "### Documentation navigation"
-    )
+    heading = "### Navegación de documentación" if spanish else "### Documentation navigation"
 
     links: list[str] = []
 
@@ -59,20 +55,12 @@ def build_navigation(path: Path) -> str:
 
         links.append(f"[{label}]({relative_link(path, target)})")
 
-    return (
-        f"{START_MARKER}\n\n"
-        "---\n\n"
-        f"{heading}\n\n"
-        + " · ".join(links)
-        + f"\n\n{END_MARKER}"
-    )
+    return f"{START_MARKER}\n\n---\n\n{heading}\n\n" + " · ".join(links) + f"\n\n{END_MARKER}"
 
 
 def main() -> None:
     pattern = re.compile(
-        re.escape(START_MARKER)
-        + r".*?"
-        + re.escape(END_MARKER),
+        re.escape(START_MARKER) + r".*?" + re.escape(END_MARKER),
         flags=re.DOTALL,
     )
 

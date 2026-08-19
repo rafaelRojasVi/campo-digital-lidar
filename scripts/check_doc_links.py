@@ -45,17 +45,11 @@ for markdown_file in MARKDOWN_FILES:
         try:
             resolved.relative_to(ROOT.resolve())
         except ValueError:
-            errors.append(
-                f"{markdown_file.relative_to(ROOT)} -> "
-                f"{target}: escapes repository root"
-            )
+            errors.append(f"{markdown_file.relative_to(ROOT)} -> {target}: escapes repository root")
             continue
 
         if not resolved.exists():
-            errors.append(
-                f"{markdown_file.relative_to(ROOT)} -> "
-                f"{target}: target does not exist"
-            )
+            errors.append(f"{markdown_file.relative_to(ROOT)} -> {target}: target does not exist")
 
 if errors:
     print("Broken local documentation links:")
@@ -63,7 +57,4 @@ if errors:
         print(f"  - {error}")
     sys.exit(1)
 
-print(
-    f"Documentation links OK "
-    f"({len(MARKDOWN_FILES)} Markdown files checked)."
-)
+print(f"Documentation links OK ({len(MARKDOWN_FILES)} Markdown files checked).")
