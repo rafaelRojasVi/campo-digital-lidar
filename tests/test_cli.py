@@ -56,3 +56,25 @@ def test_crop_command(tmp_path):
     )
     assert result.exit_code == 0, result.output
     assert cropped.exists()
+
+
+def test_analyze_command(tmp_path):
+    out = tmp_path / "synth.las"
+    generated = runner.invoke(
+        app,
+        [
+            "generate-synthetic",
+            "cube",
+            str(out),
+            "--n-points",
+            "100",
+            "--seed",
+            "4",
+        ],
+    )
+    assert generated.exit_code == 0, generated.output
+
+    result = runner.invoke(app, ["analyze", str(out), "--json"])
+    assert result.exit_code == 0, result.output
+    assert '"point_count": 100' in result.output
+    assert '"gps_time_present": true' in result.output

@@ -103,7 +103,7 @@ micromamba activate pdal-cli
 ```
 
 The PDAL pipeline suite currently validates successfully (`8/8` tests),
-and the complete repository suite passes `28/28` with no skipped tests.
+and the complete repository suite passes `33/33` with no skipped tests.
 See `docs/tooling.md` for the exact installation, validation commands, and
 the known warning affecting the optional HDF/IceBridge reader plugins.
 
@@ -184,3 +184,8 @@ cross-section, voxel, grid-2.5D and mesh methods against real data. Later work
 may include a real viewer app; API persistence (PostgreSQL/PostGIS via
 SQLAlchemy/Alembic), object storage, job queue; and ties to Campo Digital's
 commercial cubicación rules once specified.
+
+
+## Current technical findings
+
+- [Cubicación accuracy: current technical findings](docs/findings/cubicacion_accuracy_problem.md)
