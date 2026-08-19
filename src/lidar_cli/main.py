@@ -589,6 +589,20 @@ def measure(
             help="Optional code/version identifier recorded in run provenance.",
         ),
     ] = None,
+    depth: Annotated[
+        float | None,
+        typer.Option(
+            "--depth",
+            help=("Explicit pile depth in source-coordinate units. Never inferred from the LAS."),
+        ),
+    ] = None,
+    depth_source: Annotated[
+        str | None,
+        typer.Option(
+            "--depth-source",
+            help=("Provenance for the explicit pile depth, for example client_measurement."),
+        ),
+    ] = None,
 ) -> None:
     """Run the observable timber-stack measurement pipeline."""
 
@@ -602,6 +616,8 @@ def measure(
             output_root,
             run_id=run_id,
             code_version=code_version,
+            pile_depth=depth,
+            depth_source=depth_source,
         )
     except (ValueError, FileExistsError) as exc:
         console.print(f"[red]Error:[/red] {exc}")
@@ -655,6 +671,32 @@ def measure(
             "Trapezoid area",
             (f"{run.front_cross_section.trapezoid_area:.6f} source-units²"),
         )
+
+    if run.results:
+        result = run.results[0]
+
+        table.add_row(
+            "Geometric volume",
+            f"{result.volume:.6f} {result.volume_unit.value}",
+        )
+        table.add_row(
+            "Volume method",
+            result.method,
+        )
+
+        pile_depth = result.parameters.get("pile_depth")
+        if pile_depth is not None:
+            table.add_row(
+                "Explicit pile depth",
+                f"{float(pile_depth):.6f} source units",
+            )
+
+        depth_provenance = result.parameters.get("depth_source")
+        if depth_provenance is not None:
+            table.add_row(
+                "Depth source",
+                str(depth_provenance),
+            )
 
     console.print(table)
 

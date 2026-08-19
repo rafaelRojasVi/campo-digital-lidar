@@ -237,3 +237,64 @@ def test_measure_command_missing_file():
 
     assert result.exit_code == 1
     assert "file not found" in result.output.lower()
+
+
+def test_measure_command_with_explicit_depth_reports_geometric_volume(
+    tmp_path,
+):
+    source = tmp_path / "candidate-depth.las"
+    _write_synthetic_front_wall(source)
+
+    output_root = tmp_path / "reports"
+
+    result = runner.invoke(
+        app,
+        [
+            "measure",
+            str(source),
+            "--output-root",
+            str(output_root),
+            "--run-id",
+            "cli-depth-run",
+            "--code-version",
+            "test",
+            "--depth",
+            "2.5",
+            "--depth-source",
+            "test_fixture",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Geometric volume" in result.output
+    assert "cubic_units_unspecified" in result.output
+    assert "Explicit pile depth" in result.output
+    assert "2.500000 source units" in result.output
+    assert "test_fixture" in result.output
+    assert "pile_depth_not_supplied" not in result.output
+
+    measurement_path = output_root / "cli-depth-run" / "measurement.json"
+
+    assert measurement_path.exists()
+
+
+def test_measure_command_requires_depth_source(
+    tmp_path,
+):
+    source = tmp_path / "candidate-depth-missing-source.las"
+    _write_synthetic_front_wall(source)
+
+    result = runner.invoke(
+        app,
+        [
+            "measure",
+            str(source),
+            "--output-root",
+            str(tmp_path / "reports"),
+            "--depth",
+            "2.5",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "depth_source is required" in result.output

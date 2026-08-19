@@ -124,3 +124,103 @@ def test_run_timber_measurement_persists_observable_geometry(
     persisted = read_measurement_run(output_path)
 
     assert persisted == run
+
+
+def test_run_timber_measurement_with_explicit_depth_persists_volume(
+    tmp_path,
+) -> None:
+    rng = np.random.default_rng(42)
+    point_count = 8_000
+
+    input_path = tmp_path / "synthetic-depth-wall.las"
+
+    header = laspy.LasHeader(
+        point_format=3,
+        version="1.2",
+    )
+    header.scales = np.array([0.001, 0.001, 0.001])
+
+    las = laspy.LasData(header)
+    las.x = rng.uniform(0.0, 12.0, point_count)
+    las.y = rng.normal(0.0, 0.08, point_count)
+    las.z = rng.uniform(0.5, 3.5, point_count)
+    las.write(str(input_path))
+
+    run, output_path = run_timber_measurement(
+        input_path,
+        tmp_path / "reports",
+        run_id="run-explicit-depth",
+        timber_config=TimberStackDetectionConfig(
+            longitudinal_bins=24,
+            transverse_bins=12,
+            vertical_bins=12,
+            min_longitudinal_coverage=0.10,
+            min_vertical_extent_fraction=0.10,
+            ignore_lowest_vertical_fraction=0.0,
+            pca_sample_size=10_000,
+            seed=42,
+        ),
+        cross_section_config=FrontCrossSectionConfig(
+            n_bins=24,
+            min_points_per_bin=20,
+        ),
+        code_version="test",
+        pile_depth=2.5,
+        depth_source="test_fixture",
+    )
+
+    assert run.front_cross_section is not None
+    assert len(run.results) == 1
+
+    result = run.results[0]
+
+    assert result.method == "front_cross_section_rectangle_extrusion"
+    assert result.volume == (run.front_cross_section.rectangle_area * 2.5)
+    assert result.volume_unit.value == "cubic_units_unspecified"
+    assert result.point_count_input == point_count
+    assert result.point_count_used > 0
+    assert result.parameters["pile_depth"] == 2.5
+    assert result.parameters["depth_source"] == "test_fixture"
+    assert result.parameters["commercial_cubicacion"] is False
+
+    warning_codes = {warning.code for warning in run.warnings}
+
+    assert "pile_depth_not_supplied" not in warning_codes
+    assert "crs_unconfirmed" in warning_codes
+    assert "linear_units_unconfirmed" in warning_codes
+
+    persisted = read_measurement_run(output_path)
+
+    assert persisted == run
+
+
+def test_run_timber_measurement_requires_depth_provenance(
+    tmp_path,
+) -> None:
+    import pytest
+
+    with pytest.raises(
+        ValueError,
+        match="depth_source is required",
+    ):
+        run_timber_measurement(
+            tmp_path / "unused.las",
+            tmp_path / "reports",
+            pile_depth=2.5,
+        )
+
+
+def test_run_timber_measurement_rejects_depth_source_without_depth(
+    tmp_path,
+) -> None:
+    import pytest
+
+    with pytest.raises(
+        ValueError,
+        match="depth_source requires pile_depth",
+    ):
+        run_timber_measurement(
+            tmp_path / "unused.las",
+            tmp_path / "reports",
+            depth_source="test_fixture",
+        )
