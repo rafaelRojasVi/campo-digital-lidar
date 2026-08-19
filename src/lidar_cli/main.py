@@ -57,11 +57,22 @@ def inspect(
     table.add_row("Offsets", str(meta.offsets))
     b = meta.bounds
     table.add_row(
-        "Bounds",
+        "Observed bounds",
         f"X[{b.min_x:.3f},{b.max_x:.3f}] Y[{b.min_y:.3f},{b.max_y:.3f}] "
         f"Z[{b.min_z:.3f},{b.max_z:.3f}]",
     )
-    table.add_row("Spans", f"dx={b.span_x:.3f} dy={b.span_y:.3f} dz={b.span_z:.3f}")
+
+    hb = meta.header_bounds
+    table.add_row(
+        "Header bounds",
+        f"X[{hb.min_x:.3f},{hb.max_x:.3f}] Y[{hb.min_y:.3f},{hb.max_y:.3f}] "
+        f"Z[{hb.min_z:.3f},{hb.max_z:.3f}]",
+    )
+    table.add_row("Header bounds match", str(meta.header_bounds_match))
+    table.add_row(
+        "Observed spans",
+        f"dx={b.span_x:.3f} dy={b.span_y:.3f} dz={b.span_z:.3f}",
+    )
     crs = meta.coordinate_metadata
     table.add_row(
         "CRS",
