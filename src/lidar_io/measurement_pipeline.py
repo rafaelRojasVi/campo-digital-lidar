@@ -37,6 +37,11 @@ from lidar_core.timber_stack import (
     detect_timber_stack,
 )
 from lidar_io.inspect import inspect_las
+from lidar_io.run_artifacts import (
+    write_front_height_profile_plot_artifact,
+    write_front_profile_artifact,
+    write_front_profile_plot_artifact,
+)
 from lidar_io.run_store import write_measurement_run
 from lidar_volume.front_cross_section import (
     FrontCrossSectionConfig,
@@ -64,6 +69,7 @@ def run_timber_measurement(
     """
 
     started_at = datetime.now(UTC)
+    resolved_run_id = run_id or new_run_id()
 
     metadata = inspect_las(
         input_path,
@@ -104,6 +110,23 @@ def run_timber_measurement(
     cross_section_result = estimate_front_cross_section(
         timber_xyz,
         config=resolved_cross_section_config,
+    )
+
+    run_directory = output_root / resolved_run_id
+
+    front_profile_artifact = write_front_profile_artifact(
+        cross_section_result,
+        run_directory,
+    )
+
+    front_profile_plot_artifact = write_front_profile_plot_artifact(
+        cross_section_result,
+        run_directory,
+    )
+
+    front_height_profile_plot_artifact = write_front_height_profile_plot_artifact(
+        cross_section_result,
+        run_directory,
     )
 
     warnings: list[MeasurementWarning] = []
@@ -152,7 +175,7 @@ def run_timber_measurement(
     )
 
     run = MeasurementRun(
-        run_id=run_id or new_run_id(),
+        run_id=resolved_run_id,
         source_path=str(input_path),
         source_sha256=metadata.sha256,
         status=MeasurementRunStatus.COMPLETED,
@@ -170,6 +193,11 @@ def run_timber_measurement(
             config=resolved_cross_section_config,
         ),
         warnings=warnings,
+        artifacts=[
+            front_profile_artifact,
+            front_profile_plot_artifact,
+            front_height_profile_plot_artifact,
+        ],
         provenance={
             "las_version": (f"{metadata.las_version_major}.{metadata.las_version_minor}"),
             "point_format_id": metadata.point_format_id,
