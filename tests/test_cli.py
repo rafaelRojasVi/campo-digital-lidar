@@ -184,3 +184,56 @@ def test_volume_missing_file():
 
     assert result.exit_code == 1
     assert "file not found" in result.output.lower()
+
+
+def test_measure_command_persists_structured_run(tmp_path):
+    source = tmp_path / "candidate.las"
+    _write_synthetic_front_wall(source)
+
+    output_root = tmp_path / "reports"
+
+    result = runner.invoke(
+        app,
+        [
+            "measure",
+            str(source),
+            "--output-root",
+            str(output_root),
+            "--run-id",
+            "cli-test-run",
+            "--code-version",
+            "test",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Measurement Run: cli-test-run" in result.output
+    assert "Selected timber points" in result.output
+    assert "Rectangle area" in result.output
+    assert "front_profile" in result.output
+    assert "front_profile_plot" in result.output
+    assert "front_height_profile_plot" in result.output
+    assert "pile_depth_not_supplied" in result.output
+
+    run_directory = output_root / "cli-test-run"
+
+    assert (run_directory / "measurement.json").exists()
+
+    assert (run_directory / "front_profile.json").exists()
+
+    assert (run_directory / "front_profile.png").exists()
+
+    assert (run_directory / "front_height_profile.png").exists()
+
+
+def test_measure_command_missing_file():
+    result = runner.invoke(
+        app,
+        [
+            "measure",
+            "/nonexistent/candidate.las",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "file not found" in result.output.lower()
