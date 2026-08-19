@@ -49,3 +49,13 @@ See `docs/tooling.md` -- summary: PDAL CLI was not installed on the
 bootstrap host, python-pdal bindings can conflict with system packages,
 and a subprocess wrapper degrades gracefully (clear error / pytest skip)
 when PDAL is absent, which a hard import dependency would not.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../README.md) · [Docs index](README.md) · [Findings](findings/cubicacion_accuracy_problem.md) · [Experiments](experiments) · [Decisions](decisions) · [Spanish docs](es/README.md) · [Estado técnico](es/estado-proyecto.md) · [Preguntas Campo Digital](es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

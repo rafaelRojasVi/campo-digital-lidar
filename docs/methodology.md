@@ -57,3 +57,13 @@ Every `VolumeResult` carries `method`, `parameters` (exact inputs used),
 and a `provenance` dict -- enough to reproduce or audit any single run.
 `volume_unit` defaults to `cubic_units_unspecified`; it is only set to
 `m3` when the caller explicitly confirms the source CRS/scale is metric.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../README.md) · [Docs index](README.md) · [Findings](findings/cubicacion_accuracy_problem.md) · [Experiments](experiments) · [Decisions](decisions) · [Spanish docs](es/README.md) · [Estado técnico](es/estado-proyecto.md) · [Preguntas Campo Digital](es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

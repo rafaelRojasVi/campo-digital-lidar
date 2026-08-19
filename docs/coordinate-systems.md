@@ -32,3 +32,13 @@ across all CRS definitions (e.g. US survey feet vs metres in some state
 plane systems). `CoordinateMetadata.horizontal_units` is only populated
 when explicitly determinable from the CRS definition -- it is left `None`
 otherwise rather than assumed to be metres.
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../README.md) · [Docs index](README.md) · [Findings](findings/cubicacion_accuracy_problem.md) · [Experiments](experiments) · [Decisions](decisions) · [Spanish docs](es/README.md) · [Estado técnico](es/estado-proyecto.md) · [Preguntas Campo Digital](es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->

@@ -219,3 +219,13 @@ open3d/pyvista are kept in an optional `geometry-extra` extra rather than
 the base dependency set: see the architecture/dependency notes for why
 (they are heavy binary wheels not needed for the currently-implemented
 numpy-only geometry ops).
+
+<!-- DOC_NAV_START -->
+
+---
+
+### Documentation navigation
+
+[Project README](../README.md) · [Docs index](README.md) · [Findings](findings/cubicacion_accuracy_problem.md) · [Experiments](experiments) · [Decisions](decisions) · [Spanish docs](es/README.md) · [Estado técnico](es/estado-proyecto.md) · [Preguntas Campo Digital](es/preguntas-campo-digital.md)
+
+<!-- DOC_NAV_END -->
