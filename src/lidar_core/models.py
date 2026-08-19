@@ -126,6 +126,75 @@ class LasMetadata(BaseModel):
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class NumericSummary(BaseModel):
+    """Streaming min/max/mean summary for one numeric LAS dimension."""
+
+    model_config = ConfigDict(frozen=True)
+
+    minimum: float
+    maximum: float
+    mean: float
+
+
+class ReturnAnalysis(BaseModel):
+    """Geometry and intensity summary for one LAS return number."""
+
+    model_config = ConfigDict(frozen=True)
+
+    return_number: int
+    point_count: int
+    bounds: BoundingBox3D
+    intensity: NumericSummary | None = None
+
+
+class AcquisitionAnalysis(BaseModel):
+    """Streaming diagnostics describing how a LAS point cloud was acquired/exported.
+
+    This is diagnostic metadata, not a reconstructed scanner trajectory and
+    not a timber-volume result.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    path: str
+    point_count: int
+    observed_bounds: BoundingBox3D | None = None
+
+    gps_time_present: bool
+    gps_time_first: float | None = None
+    gps_time_last: float | None = None
+    gps_time_min: float | None = None
+    gps_time_max: float | None = None
+    gps_time_span: float | None = None
+    gps_time_non_decreasing: bool | None = None
+    gps_time_backward_steps: int | None = None
+    gps_time_equal_steps: int | None = None
+    gps_time_min_positive_step: float | None = None
+    gps_time_max_positive_step: float | None = None
+
+    intensity: NumericSummary | None = None
+    rgb: dict[str, NumericSummary] = Field(default_factory=dict)
+    scan_angle_rank: NumericSummary | None = None
+
+    return_number_counts: dict[int, int] = Field(default_factory=dict)
+    number_of_returns_counts: dict[int, int] = Field(default_factory=dict)
+    point_source_id_counts: dict[int, int] = Field(default_factory=dict)
+    scan_direction_flag_counts: dict[int, int] = Field(default_factory=dict)
+    edge_of_flight_line_counts: dict[int, int] = Field(default_factory=dict)
+
+    return_summaries: list[ReturnAnalysis] = Field(default_factory=list)
+
+    xy_density_points_per_square_source_unit: float | None = Field(
+        default=None,
+        description=(
+            "Whole-cloud point count divided by observed XY bounding-box area. "
+            "This is only a coarse global statistic, not local surface density."
+        ),
+    )
+
+    warnings: list[str] = Field(default_factory=list)
+
+
 class CropBounds(BaseModel):
     """Explicit crop region. All bounds must be given in the same CRS/units
     as the source data; no implicit reprojection."""

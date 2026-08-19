@@ -103,7 +103,7 @@ micromamba activate pdal-cli
 ```
 
 The PDAL pipeline suite currently validates successfully (`8/8` tests),
-and the complete repository suite passes `28/28` with no skipped tests.
+and the complete repository suite passes `31/31` with no skipped tests.
 See `docs/tooling.md` for the exact installation, validation commands, and
 the known warning affecting the optional HDF/IceBridge reader plugins.
 
