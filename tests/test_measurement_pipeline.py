@@ -82,6 +82,37 @@ def test_run_timber_measurement_persists_observable_geometry(
 
     assert run.results == []
 
+    assert len(run.artifacts) == 3
+
+    artifacts = {artifact.kind: artifact for artifact in run.artifacts}
+
+    assert set(artifacts) == {
+        "front_profile",
+        "front_profile_plot",
+        "front_height_profile_plot",
+    }
+
+    profile = artifacts["front_profile"]
+    assert profile.path == "front_profile.json"
+    assert profile.media_type == "application/json"
+    assert (output_path.parent / profile.path).exists()
+
+    plot = artifacts["front_profile_plot"]
+    assert plot.path == "front_profile.png"
+    assert plot.media_type == "image/png"
+
+    plot_path = output_path.parent / plot.path
+    assert plot_path.exists()
+    assert plot_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+    height_plot = artifacts["front_height_profile_plot"]
+    assert height_plot.path == "front_height_profile.png"
+    assert height_plot.media_type == "image/png"
+
+    height_plot_path = output_path.parent / height_plot.path
+    assert height_plot_path.exists()
+    assert height_plot_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
     warning_codes = {warning.code for warning in run.warnings}
 
     assert "crs_unconfirmed" in warning_codes
