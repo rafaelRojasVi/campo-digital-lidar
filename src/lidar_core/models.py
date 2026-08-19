@@ -105,7 +105,16 @@ class LasMetadata(BaseModel):
     point_count: int
     scales: tuple[float, float, float]
     offsets: tuple[float, float, float]
-    bounds: BoundingBox3D
+    bounds: BoundingBox3D = Field(
+        description="Observed XYZ bounds recomputed from the actual point records."
+    )
+    header_bounds: BoundingBox3D = Field(description="XYZ bounds declared in the LAS header.")
+    header_bounds_match: bool = Field(
+        description=(
+            "Whether declared header bounds match observed point bounds "
+            "within coordinate-scale tolerance."
+        )
+    )
     coordinate_metadata: CoordinateMetadata
     dimensions: PointDimensions
     vlr_count: int

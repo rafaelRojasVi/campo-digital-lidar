@@ -91,7 +91,7 @@ def inspect_las(path: str | os.PathLike[str], compute_checksum: bool = True) -> 
 
     with laspy.open(p) as reader:
         header = reader.header
-        bounds = BoundingBox3D(
+        header_bounds = BoundingBox3D(
             min_x=header.mins[0],
             min_y=header.mins[1],
             min_z=header.mins[2],
@@ -112,23 +112,74 @@ def inspect_las(path: str | os.PathLike[str], compute_checksum: bool = True) -> 
 
         classification_counter: Counter[int] = Counter()
         return_number_counter: Counter[int] = Counter()
+
         has_class = dims.has_classification
         has_return = dims.has_return_number
-        if has_class or has_return:
-            for points in reader.chunk_iterator(_STREAM_CHUNK):
-                if has_class:
-                    classification_counter.update(
-                        Counter(np.asarray(points.classification, dtype=int).tolist())
-                    )
-                if has_return:
-                    return_number_counter.update(
-                        Counter(np.asarray(points.return_number, dtype=int).tolist())
-                    )
+
+        observed_min = np.array([np.inf, np.inf, np.inf], dtype=float)
+        observed_max = np.array([-np.inf, -np.inf, -np.inf], dtype=float)
+
+        for points in reader.chunk_iterator(_STREAM_CHUNK):
+            x = np.asarray(points.x, dtype=float)
+            y = np.asarray(points.y, dtype=float)
+            z = np.asarray(points.z, dtype=float)
+
+            if len(x):
+                observed_min = np.minimum(
+                    observed_min,
+                    np.array([x.min(), y.min(), z.min()], dtype=float),
+                )
+                observed_max = np.maximum(
+                    observed_max,
+                    np.array([x.max(), y.max(), z.max()], dtype=float),
+                )
+
+            if has_class:
+                classification_counter.update(
+                    Counter(np.asarray(points.classification, dtype=int).tolist())
+                )
+
+            if has_return:
+                return_number_counter.update(
+                    Counter(np.asarray(points.return_number, dtype=int).tolist())
+                )
 
         point_count = header.point_count
 
     if point_count == 0:
         warnings.append("Point count is zero.")
+        bounds = header_bounds
+        header_bounds_match = True
+    else:
+        bounds = BoundingBox3D(
+            min_x=float(observed_min[0]),
+            min_y=float(observed_min[1]),
+            min_z=float(observed_min[2]),
+            max_x=float(observed_max[0]),
+            max_y=float(observed_max[1]),
+            max_z=float(observed_max[2]),
+        )
+
+        tolerances = tuple(max(abs(float(scale)) * 2.0, 1e-12) for scale in header.scales)
+
+        comparisons = (
+            (header_bounds.min_x, bounds.min_x, tolerances[0]),
+            (header_bounds.max_x, bounds.max_x, tolerances[0]),
+            (header_bounds.min_y, bounds.min_y, tolerances[1]),
+            (header_bounds.max_y, bounds.max_y, tolerances[1]),
+            (header_bounds.min_z, bounds.min_z, tolerances[2]),
+            (header_bounds.max_z, bounds.max_z, tolerances[2]),
+        )
+
+        header_bounds_match = all(
+            abs(declared - observed) <= tolerance for declared, observed, tolerance in comparisons
+        )
+
+        if not header_bounds_match:
+            warnings.append(
+                "LAS header bounds differ from observed point bounds; "
+                "geometry uses observed bounds."
+            )
 
     return LasMetadata(
         path=str(p),
@@ -141,6 +192,8 @@ def inspect_las(path: str | os.PathLike[str], compute_checksum: bool = True) -> 
         scales=tuple(float(s) for s in header.scales),  # type: ignore[arg-type]
         offsets=tuple(float(o) for o in header.offsets),  # type: ignore[arg-type]
         bounds=bounds,
+        header_bounds=header_bounds,
+        header_bounds_match=header_bounds_match,
         coordinate_metadata=crs_meta,
         dimensions=dims,
         vlr_count=len(header.vlrs),
