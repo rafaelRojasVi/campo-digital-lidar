@@ -7,8 +7,11 @@ estimation.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from time import perf_counter
+
+from laspy.errors import LaspyException
 
 from lidar_core.dataset_robustness import (
     DatasetCapabilities,
@@ -133,7 +136,7 @@ def build_dataset_robustness_report(
 
 
 def build_dataset_robustness_matrix(
-    paths: list[str | Path],
+    paths: Sequence[str | Path],
     *,
     deep: bool = False,
     compute_checksum: bool = False,
@@ -154,7 +157,12 @@ def build_dataset_robustness_matrix(
                 deep=deep,
                 compute_checksum=compute_checksum,
             )
-        except (FileNotFoundError, ValueError, OSError) as exc:
+        except (
+            FileNotFoundError,
+            ValueError,
+            OSError,
+            LaspyException,
+        ) as exc:
             failures.append(
                 DatasetRobustnessFailure(
                     path=str(source),

@@ -268,3 +268,31 @@ def test_build_deep_matrix_propagates_profile(
 
     assert report.acquisition is not None
     assert report.rgb.usable_for_image_analysis is True
+
+
+def test_build_matrix_isolates_corrupt_las(
+    tmp_path,
+) -> None:
+    corrupt = tmp_path / "corrupt.las"
+    corrupt.write_bytes(b"this is not a LAS file")
+
+    from lidar_io.dataset_robustness import (
+        build_dataset_robustness_matrix,
+    )
+
+    matrix = build_dataset_robustness_matrix(
+        [corrupt],
+    )
+
+    assert matrix.total_datasets == 1
+    assert matrix.successful_datasets == 0
+    assert matrix.failed_datasets == 1
+
+    assert len(matrix.reports) == 0
+    assert len(matrix.failures) == 1
+
+    failure = matrix.failures[0]
+
+    assert failure.path == str(corrupt)
+    assert failure.error_type == "LaspyException"
+    assert "Invalid file signature" in failure.message
