@@ -1,0 +1,70 @@
+.point-cloud-preview {
+  position: relative;
+  width: 100%;
+  min-height: 540px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #101713;
+}
+
+.point-cloud-stage {
+  width: 100%;
+  height: 540px;
+}
+
+.point-cloud-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.point-cloud-overlay {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.point-cloud-overlay span {
+  padding: 5px 9px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 999px;
+  background: rgb(8 15 11 / 78%);
+  color: rgb(255 255 255 / 82%);
+  font-size: 0.75rem;
+  backdrop-filter: blur(7px);
+}
+
+.point-cloud-overlay .point-cloud-error {
+  border-color: rgb(255 120 120 / 35%);
+  color: #ffd4d4;
+}
+
+.point-cloud-help {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: rgb(8 15 11 / 72%);
+  color: rgb(255 255 255 / 58%);
+  font-size: 0.72rem;
+  pointer-events: none;
+}
+
+@media (max-width: 800px) {
+  .point-cloud-preview {
+    min-height: 420px;
+  }
+
+  .point-cloud-stage {
+    height: 420px;
+  }
+
+  .point-cloud-help {
+    display: none;
+  }
+}

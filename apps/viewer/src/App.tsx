@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import {
   artifactUrl,
@@ -8,6 +8,8 @@ import {
   type MeasurementRun,
   type VolumeComparisonRecord,
 } from './api'
+
+const PointCloudPreview = lazy(() => import('./PointCloudPreview'))
 
 function formatNumber(value: number | null | undefined, digits = 3): string {
   if (value === null || value === undefined) {
@@ -120,6 +122,30 @@ function App() {
     () => run?.warnings.filter((warning) => warning.severity === 'blocker') ?? [],
     [run],
   )
+
+  const pointCloudPreview = useMemo(() => {
+    if (!run) {
+      return null
+    }
+
+    const ply = run.artifacts.find(
+      (artifact) => artifact.kind === 'timber_stack_point_cloud_preview',
+    )
+
+    const manifest = run.artifacts.find(
+      (artifact) =>
+        artifact.kind === 'timber_stack_point_cloud_preview_manifest',
+    )
+
+    if (!ply || !manifest) {
+      return null
+    }
+
+    return {
+      ply,
+      manifest,
+    }
+  }, [run])
 
   return (
     <div className="app-shell">
@@ -263,6 +289,36 @@ function App() {
                 <small>reference validations</small>
               </article>
             </section>
+
+            {pointCloudPreview && (
+              <section className="panel">
+                <div className="section-heading">
+                  <h3>3D timber-stack inspection</h3>
+                  <span>read-only preview</span>
+                </div>
+
+                <p className="muted">
+                  Deterministically sampled geometry from the selected timber
+                  points. This preview is for inspection and QC only; it does
+                  not introduce a new volume estimate or commercial cubicación
+                  result.
+                </p>
+
+                <Suspense
+                  fallback={
+                    <div className="empty-state">
+                      <p>Loading 3D viewer…</p>
+                    </div>
+                  }
+                >
+                  <PointCloudPreview
+                    runId={run.run_id}
+                    plyPath={pointCloudPreview.ply.path}
+                    manifestPath={pointCloudPreview.manifest.path}
+                  />
+                </Suspense>
+              </section>
+            )}
 
             <div className="two-column">
               <section className="panel">

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import laspy
 import numpy as np
 
@@ -82,7 +84,7 @@ def test_run_timber_measurement_persists_observable_geometry(
 
     assert run.results == []
 
-    assert len(run.artifacts) == 3
+    assert len(run.artifacts) == 5
 
     artifacts = {artifact.kind: artifact for artifact in run.artifacts}
 
@@ -90,6 +92,8 @@ def test_run_timber_measurement_persists_observable_geometry(
         "front_profile",
         "front_profile_plot",
         "front_height_profile_plot",
+        "timber_stack_point_cloud_preview",
+        "timber_stack_point_cloud_preview_manifest",
     }
 
     profile = artifacts["front_profile"]
@@ -112,6 +116,29 @@ def test_run_timber_measurement_persists_observable_geometry(
     height_plot_path = output_path.parent / height_plot.path
     assert height_plot_path.exists()
     assert height_plot_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+    preview = artifacts["timber_stack_point_cloud_preview"]
+    assert preview.path == "timber_stack_preview.ply"
+    assert preview.media_type == "application/octet-stream"
+
+    preview_path = output_path.parent / preview.path
+    assert preview_path.exists()
+    assert preview_path.read_bytes().startswith(b"ply\n")
+
+    preview_manifest = artifacts["timber_stack_point_cloud_preview_manifest"]
+    assert preview_manifest.path == "timber_stack_preview.json"
+    assert preview_manifest.media_type == "application/json"
+
+    manifest_payload = json.loads(
+        (output_path.parent / preview_manifest.path).read_text(
+            encoding="utf-8",
+        )
+    )
+
+    assert manifest_payload["source_point_count"] == run.timber_stack.point_count_selected
+    assert manifest_payload["preview_point_count"] == run.timber_stack.point_count_selected
+    assert manifest_payload["coordinate_space"] == "rebased_source_coordinates"
+    assert manifest_payload["coordinate_units"] == "source_units"
 
     warning_codes = {warning.code for warning in run.warnings}
 

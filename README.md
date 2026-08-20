@@ -44,8 +44,8 @@ lidar_core    - domain models, geometry primitives, synthetic test fixtures
 lidar_io      - LAS forensic inspection (laspy) + PDAL subprocess pipelines
 lidar_volume  - volume estimator interface + implementations
 lidar_cli     - `lidar` Typer CLI
-apps/api      - FastAPI scaffold (/health only)
-apps/viewer   - placeholder, no app yet
+apps/api      - read-only FastAPI for persisted runs, comparisons, and registered artifacts
+apps/viewer   - React/Vite measurement console with lazy-loaded 3D point-cloud inspection
 ```
 
 ## Supported data
@@ -207,31 +207,33 @@ dataset evidence, or confirmed Campo Digital information.
 - document acquisition/export limitations
 - establish the first real-data forensic baseline
 
-### Phase C — Deterministic timber-stack ROI ← NEXT
+### Phase C — Deterministic timber-stack ROI ✅
 
-- identify the visible timber-stack region
-- define the ROI reproducibly in configuration/code
-- generate a local `data/interim/` timber crop
-- verify the crop visually in CloudCompare
-- avoid undocumented manual-only selection
+- visible timber-stack region isolated reproducibly
+- automatic selection implemented in configuration/code
+- local `data/interim/` candidate crop retained outside Git
+- automatic selection compared with a manual CloudCompare reference
+- selected timber geometry is available to downstream measurements
 
-### Phase D — Front-face and log-end geometry
+### Phase D — Front-face geometry and log-end experiment ✅ BASELINE
 
-- estimate the local orientation of the timber face
-- normalize the face into a stable coordinate frame
-- separate timber-end geometry from vegetation/background
-- detect full and partial log ends
-- fit circle/ellipse/robust diameter models
-- attach QC/uncertainty to detections
-- validate log count and diameter stability
+- stable local longitudinal/transverse measurement frame implemented
+- observable front cross-section measured reproducibly
+- front-profile and height-profile artifacts persisted
+- visible log-end detection and LAS-point backprojection prototyped
+- individual log-end detection retained as a secondary capability
+- hidden pile depth is explicitly treated as unobserved unless externally supplied
+- browser-safe 3D inspection artifact and read-only viewer implemented
 
-### Phase E — Cubicación and reference validation
+### Phase E — Cubicación and reference validation ← CURRENT
 
 - determine what Campo Digital defines as the target cubicación
 - obtain the same-pile reference measurement and ROI
 - confirm CRS and physical units
 - determine how log length / stack depth is provided
-- compare geometric methods against the accepted reference
+- distinguish gross stack-envelope volume from solid timber volume
+- evaluate solid-wood front cross-section / packing fraction where justified
+- compare compatible geometric methods against the accepted reference
 - quantify error and repeatability
 - reject unsupported m³ accuracy claims
 
@@ -250,8 +252,12 @@ Only after the geometric PoC is validated:
 - dashboard/viewer
 - integration with Campo Digital's commercial workflow
 
-The immediate engineering target is **Phase C: isolate the timber wall
-reproducibly and begin measuring the visible log-end geometry**.
+The current engineering target is **Phase E: make the measurement
+validation-ready against Campo Digital's accepted reference and commercial
+definition of cubicación**. While those external reference inputs are pending,
+the next internal experiment is to quantify observable solid-wood
+cross-sectional geometry without treating the gross stack envelope as solid
+timber volume.
 
 ## Documentation and current technical findings
 
@@ -334,29 +340,34 @@ La explicación completa se encuentra en:
 - pares R1/R2;
 - documentación de limitaciones y hallazgos.
 
-### Fase C — ROI reproducible de la ruma ← SIGUIENTE
+### Fase C — ROI reproducible de la ruma ✅
 
-- aislar la gran cara visible de madera;
-- guardar la selección como configuración/código;
-- generar un crop reproducible;
-- verificar visualmente en CloudCompare.
+- ruma visible aislada reproduciblemente;
+- selección automática implementada en configuración/código;
+- crop local mantenido fuera de Git;
+- comparación geométrica con referencia manual de CloudCompare;
+- geometría seleccionada disponible para las mediciones posteriores.
 
-### Fase D — Geometría de los extremos de rollizos
+### Fase D — Geometría frontal y experimento de extremos de rollizos ✅ BASELINE
 
-- orientar la cara de la ruma;
-- detectar extremos circulares/elípticos;
-- estimar diámetros;
-- contar rollizos;
-- identificar detecciones inciertas.
+- marco longitudinal/transversal estable;
+- sección frontal observable medida reproduciblemente;
+- perfiles y artefactos visuales persistidos;
+- detección de extremos visibles y backprojection a puntos LAS prototipada;
+- detección individual conservada como capacidad secundaria;
+- profundidad oculta mantenida explícitamente como variable no observada;
+- previsualización 3D de la ruma integrada al viewer de ingeniería.
 
-### Fase E — Cubicación y validación
+### Fase E — Cubicación y validación ← ACTUAL
 
 - confirmar la definición de cubicación de Campo Digital;
-- confirmar unidades;
-- obtener ground truth de la misma ruma;
-- incorporar largo/profundidad;
-- calcular error y repetibilidad;
-- comparar métodos.
+- confirmar CRS y unidades físicas;
+- obtener ground truth de exactamente la misma ruma y ROI;
+- determinar cómo se obtiene largo/profundidad;
+- distinguir volumen envolvente de la ruma de volumen sólido de madera;
+- evaluar sección frontal sólida / factor de llenado cuando exista sustento;
+- calcular error y repetibilidad contra una referencia compatible;
+- comparar métodos sin afirmar precisión en m³ antes de validarla.
 
 ### Fase F — Piloto y producto
 
