@@ -64,3 +64,78 @@ def test_observed_bounds_override_stale_header(tmp_las_path, las_writer):
 
     assert meta.header_bounds_match is False
     assert any("header bounds differ" in warning.lower() for warning in meta.warnings)
+
+
+def _write_crs_fixture(
+    path,
+    crs_input,
+) -> None:
+    import laspy
+    from pyproj import CRS
+
+    header = laspy.LasHeader(
+        point_format=6,
+        version="1.4",
+    )
+    header.add_crs(CRS.from_user_input(crs_input))
+
+    las = laspy.LasData(header)
+    las.x = [500000.0, 500001.0, 500002.0]
+    las.y = [4700000.0, 4700001.0, 4700002.0]
+    las.z = [100.0, 101.0, 102.0]
+    las.write(path)
+
+
+def test_inspect_extracts_metric_horizontal_units_from_crs(
+    tmp_path,
+):
+    source = tmp_path / "metric-crs.las"
+
+    _write_crs_fixture(
+        source,
+        "EPSG:26915",
+    )
+
+    meta = inspect_las(source)
+    coordinate = meta.coordinate_metadata
+
+    assert coordinate.is_explicit is True
+    assert coordinate.crs_epsg == 26915
+    assert coordinate.horizontal_units == "metre"
+
+
+def test_inspect_extracts_foot_horizontal_units_from_crs(
+    tmp_path,
+):
+    source = tmp_path / "foot-crs.las"
+
+    _write_crs_fixture(
+        source,
+        "EPSG:6499",
+    )
+
+    meta = inspect_las(source)
+    coordinate = meta.coordinate_metadata
+
+    assert coordinate.is_explicit is True
+    assert coordinate.crs_epsg == 6499
+    assert coordinate.horizontal_units == "foot"
+
+
+def test_compound_crs_preserves_horizontal_units_without_single_epsg(
+    tmp_path,
+):
+    source = tmp_path / "compound-crs.las"
+
+    _write_crs_fixture(
+        source,
+        "EPSG:6499+8228",
+    )
+
+    meta = inspect_las(source)
+    coordinate = meta.coordinate_metadata
+
+    assert coordinate.is_explicit is True
+    assert coordinate.crs_epsg is None
+    assert coordinate.horizontal_units == "foot"
+    assert coordinate.crs_wkt is not None
