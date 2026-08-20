@@ -280,10 +280,10 @@ def analyze(
                 f"min={fmt(s.minimum)} mean={fmt(s.mean)} max={fmt(s.maximum)}",
             )
 
-    if result.scan_angle_rank is not None:
-        s = result.scan_angle_rank
+    if result.scan_angle_degrees is not None:
+        s = result.scan_angle_degrees
         table.add_row(
-            "Scan angle rank",
+            "Scan angle (degrees)",
             f"min={fmt(s.minimum)} mean={fmt(s.mean)} max={fmt(s.maximum)}",
         )
 

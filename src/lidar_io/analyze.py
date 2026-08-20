@@ -303,7 +303,8 @@ def analyze_las(path: str | Path) -> AcquisitionAnalysis:
         "green": _RunningStats(),
         "blue": _RunningStats(),
     }
-    scan_angle_stats = _RunningStats()
+    scan_angle_rank_stats = _RunningStats()
+    scan_angle_degrees_stats = _RunningStats()
     gps_stats = _RunningStats()
 
     return_number_counts: Counter[int] = Counter()
@@ -352,7 +353,8 @@ def analyze_las(path: str | Path) -> AcquisitionAnalysis:
         has_intensity = "intensity" in dim_names
         has_return_number = "return_number" in dim_names
         has_number_of_returns = "number_of_returns" in dim_names
-        has_scan_angle = "scan_angle_rank" in dim_names
+        has_scan_angle_rank = "scan_angle_rank" in dim_names
+        has_scan_angle = "scan_angle" in dim_names
         has_point_source_id = "point_source_id" in dim_names
         has_scan_direction = "scan_direction_flag" in dim_names
         has_edge_of_flight_line = "edge_of_flight_line" in dim_names
@@ -388,8 +390,20 @@ def analyze_las(path: str | Path) -> AcquisitionAnalysis:
                 rgb_stats["green"].update(np.asarray(points.green, dtype=np.float64))
                 rgb_stats["blue"].update(np.asarray(points.blue, dtype=np.float64))
 
-            if has_scan_angle:
-                scan_angle_stats.update(np.asarray(points.scan_angle_rank, dtype=np.float64))
+            if has_scan_angle_rank:
+                legacy_scan_angle = np.asarray(
+                    points.scan_angle_rank,
+                    dtype=np.float64,
+                )
+                scan_angle_rank_stats.update(legacy_scan_angle)
+                scan_angle_degrees_stats.update(legacy_scan_angle)
+
+            elif has_scan_angle:
+                modern_scan_angle = np.asarray(
+                    points.scan_angle,
+                    dtype=np.float64,
+                )
+                scan_angle_degrees_stats.update(modern_scan_angle * 0.006)
 
             if has_point_source_id:
                 _update_counter(
@@ -754,7 +768,10 @@ def analyze_las(path: str | Path) -> AcquisitionAnalysis:
         timestamp_groups=timestamp_groups,
         intensity=intensity_stats.summary() if has_intensity else None,
         rgb=rgb,
-        scan_angle_rank=scan_angle_stats.summary() if has_scan_angle else None,
+        scan_angle_rank=(scan_angle_rank_stats.summary() if has_scan_angle_rank else None),
+        scan_angle_degrees=(
+            scan_angle_degrees_stats.summary() if has_scan_angle_rank or has_scan_angle else None
+        ),
         return_number_counts=dict(return_number_counts),
         number_of_returns_counts=dict(number_of_returns_counts),
         point_source_id_counts=dict(point_source_id_counts),

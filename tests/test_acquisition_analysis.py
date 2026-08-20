@@ -174,3 +174,79 @@ def test_timestamp_groups_survive_chunk_boundary(
     assert groups.exact_pair_distance.minimum == pytest.approx(1.0)
     assert groups.exact_pair_distance.mean == pytest.approx(1.0)
     assert groups.exact_pair_distance.maximum == pytest.approx(1.0)
+
+
+def test_legacy_scan_angle_rank_is_also_reported_in_degrees(
+    tmp_path,
+):
+    path = tmp_path / "legacy-scan-angle.las"
+
+    header = laspy.LasHeader(
+        point_format=3,
+        version="1.2",
+    )
+
+    las = laspy.LasData(header)
+    las.x = np.array([0.0, 1.0, 2.0])
+    las.y = np.zeros(3)
+    las.z = np.zeros(3)
+
+    las.gps_time = np.array([1.0, 2.0, 3.0])
+    las.return_number = np.ones(3, dtype=np.uint8)
+    las.number_of_returns = np.ones(3, dtype=np.uint8)
+
+    las.scan_angle_rank = np.array(
+        [-10, 0, 10],
+        dtype=np.int8,
+    )
+
+    las.write(path)
+
+    result = analyze_las(path)
+
+    assert result.scan_angle_rank is not None
+    assert result.scan_angle_rank.minimum == pytest.approx(-10.0)
+    assert result.scan_angle_rank.mean == pytest.approx(0.0)
+    assert result.scan_angle_rank.maximum == pytest.approx(10.0)
+
+    assert result.scan_angle_degrees is not None
+    assert result.scan_angle_degrees.minimum == pytest.approx(-10.0)
+    assert result.scan_angle_degrees.mean == pytest.approx(0.0)
+    assert result.scan_angle_degrees.maximum == pytest.approx(10.0)
+
+
+def test_las14_scan_angle_is_normalized_to_degrees(
+    tmp_path,
+):
+    path = tmp_path / "las14-scan-angle.las"
+
+    header = laspy.LasHeader(
+        point_format=6,
+        version="1.4",
+    )
+
+    las = laspy.LasData(header)
+    las.x = np.array([0.0, 1.0, 2.0])
+    las.y = np.zeros(3)
+    las.z = np.zeros(3)
+
+    las.gps_time = np.array([1.0, 2.0, 3.0])
+    las.return_number = np.ones(3, dtype=np.uint8)
+    las.number_of_returns = np.ones(3, dtype=np.uint8)
+
+    las.scan_angle = np.array(
+        [-1000, 0, 1000],
+        dtype=np.int16,
+    )
+
+    las.write(path)
+
+    result = analyze_las(path)
+
+    # LAS 1.4 formats 6-10 do not expose legacy scan_angle_rank.
+    assert result.scan_angle_rank is None
+
+    assert result.scan_angle_degrees is not None
+    assert result.scan_angle_degrees.minimum == pytest.approx(-6.0)
+    assert result.scan_angle_degrees.mean == pytest.approx(0.0)
+    assert result.scan_angle_degrees.maximum == pytest.approx(6.0)

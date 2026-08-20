@@ -210,6 +210,14 @@ class AcquisitionAnalysis(BaseModel):
     intensity: NumericSummary | None = None
     rgb: dict[str, NumericSummary] = Field(default_factory=dict)
     scan_angle_rank: NumericSummary | None = None
+    scan_angle_degrees: NumericSummary | None = Field(
+        default=None,
+        description=(
+            "Normalized scan-angle summary in degrees. "
+            "Legacy scan_angle_rank values are already whole-degree ranks; "
+            "LAS 1.4 scan_angle values are scaled by 0.006 degrees."
+        ),
+    )
 
     return_number_counts: dict[int, int] = Field(default_factory=dict)
     number_of_returns_counts: dict[int, int] = Field(default_factory=dict)
