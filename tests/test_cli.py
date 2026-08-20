@@ -412,3 +412,154 @@ def test_compare_command_rejects_incompatible_units(
     )
 
     assert not comparison_path.exists()
+
+
+def test_robustness_command_persists_successful_matrix(
+    tmp_path,
+):
+    source = tmp_path / "valid.las"
+    _write_synthetic_front_wall(source)
+
+    output = tmp_path / "robustness" / "matrix.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "robustness",
+            str(source),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert output.exists()
+
+    from lidar_io.dataset_robustness_store import (
+        read_dataset_robustness_matrix,
+    )
+
+    matrix = read_dataset_robustness_matrix(output)
+
+    assert matrix.total_datasets == 1
+    assert matrix.successful_datasets == 1
+    assert matrix.failed_datasets == 0
+    assert matrix.deep is False
+
+
+def test_robustness_command_writes_matrix_before_partial_failure_exit(
+    tmp_path,
+):
+    valid = tmp_path / "valid.las"
+    corrupt = tmp_path / "corrupt.las"
+    missing = tmp_path / "missing.las"
+
+    _write_synthetic_front_wall(valid)
+
+    corrupt.write_bytes(b"this is not a LAS file")
+
+    output = tmp_path / "robustness" / "matrix.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "robustness",
+            str(valid),
+            str(corrupt),
+            str(missing),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 3, result.output
+    assert output.exists()
+
+    from lidar_io.dataset_robustness_store import (
+        read_dataset_robustness_matrix,
+    )
+
+    matrix = read_dataset_robustness_matrix(output)
+
+    assert matrix.total_datasets == 3
+    assert matrix.successful_datasets == 1
+    assert matrix.failed_datasets == 2
+
+    assert {failure.error_type for failure in matrix.failures} == {
+        "FileNotFoundError",
+        "LaspyException",
+    }
+
+
+def test_robustness_command_refuses_existing_output(
+    tmp_path,
+):
+    source = tmp_path / "valid.las"
+    _write_synthetic_front_wall(source)
+
+    output = tmp_path / "matrix.json"
+
+    first = runner.invoke(
+        app,
+        [
+            "robustness",
+            str(source),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert first.exit_code == 0, first.output
+
+    second = runner.invoke(
+        app,
+        [
+            "robustness",
+            str(source),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert second.exit_code == 1
+    assert "already exists" in second.output
+
+
+def test_robustness_command_deep_checksum_and_overwrite(
+    tmp_path,
+):
+    source = tmp_path / "valid.las"
+    _write_synthetic_front_wall(source)
+
+    output = tmp_path / "matrix.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "robustness",
+            str(source),
+            "--output",
+            str(output),
+            "--deep",
+            "--checksum",
+            "--overwrite",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+
+    from lidar_io.dataset_robustness_store import (
+        read_dataset_robustness_matrix,
+    )
+
+    matrix = read_dataset_robustness_matrix(output)
+
+    assert matrix.deep is True
+    assert matrix.compute_checksum is True
+    assert matrix.successful_datasets == 1
+
+    report = matrix.reports[0]
+
+    assert report.acquisition is not None
+    assert report.metadata.sha256 is not None
+    assert len(report.metadata.sha256) == 64

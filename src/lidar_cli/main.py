@@ -26,6 +26,8 @@ from lidar_core.testing import cube, cylinder, rectangular_prism
 from lidar_core.volume_comparison import compare_volume_result
 from lidar_io.analyze import analyze_las
 from lidar_io.comparison_store import write_comparison_record
+from lidar_io.dataset_robustness import build_dataset_robustness_matrix
+from lidar_io.dataset_robustness_store import write_dataset_robustness_matrix
 from lidar_io.inspect import inspect_las
 from lidar_io.measurement_pipeline import run_timber_measurement
 from lidar_io.run_store import read_measurement_run
@@ -321,6 +323,103 @@ def analyze(
         )
 
     console.print(table)
+
+
+@app.command()
+def robustness(
+    paths: Annotated[
+        list[Path],
+        typer.Argument(help="One or more LAS/LAZ datasets to characterize."),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option(
+            "--output",
+            help="Path for the persisted robustness-matrix JSON artifact.",
+        ),
+    ],
+    deep: Annotated[
+        bool,
+        typer.Option(
+            "--deep",
+            help=("Also run streaming acquisition diagnostics. Inspection-only is the default."),
+        ),
+    ] = False,
+    checksum: Annotated[
+        bool,
+        typer.Option(
+            "--checksum",
+            help="Compute SHA256 where supported by the inspection layer.",
+        ),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Explicitly replace an existing output artifact.",
+        ),
+    ] = False,
+) -> None:
+    """Build and persist a multi-dataset LAS/LAZ robustness matrix."""
+
+    matrix = build_dataset_robustness_matrix(
+        paths,
+        deep=deep,
+        compute_checksum=checksum,
+    )
+
+    try:
+        output_path = write_dataset_robustness_matrix(
+            matrix,
+            output,
+            overwrite=overwrite,
+        )
+    except OSError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title="Dataset Robustness Matrix")
+    table.add_column("Field")
+    table.add_column("Value")
+
+    table.add_row(
+        "Profile",
+        "deep" if matrix.deep else "inspection-only",
+    )
+    table.add_row(
+        "Datasets",
+        str(matrix.total_datasets),
+    )
+    table.add_row(
+        "Successful",
+        str(matrix.successful_datasets),
+    )
+    table.add_row(
+        "Failed",
+        str(matrix.failed_datasets),
+    )
+    table.add_row(
+        "Runtime",
+        f"{matrix.total_runtime_seconds:.3f} s",
+    )
+    table.add_row(
+        "Output",
+        str(output_path),
+    )
+
+    if matrix.failures:
+        table.add_row(
+            "[yellow]Failures[/yellow]",
+            "\n".join(
+                (f"{failure.path}: {failure.error_type}: {failure.message}")
+                for failure in matrix.failures
+            ),
+        )
+
+    console.print(table)
+
+    if matrix.failed_datasets:
+        raise typer.Exit(code=3)
 
 
 @app.command()
