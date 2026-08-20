@@ -145,6 +145,7 @@ def test_run_timber_measurement_persists_observable_geometry(
     assert "crs_unconfirmed" in warning_codes
     assert "linear_units_unconfirmed" in warning_codes
     assert "pile_depth_not_supplied" in warning_codes
+    assert "visible_log_end_rgb_unavailable" in warning_codes
 
     assert output_path == tmp_path / "reports" / "run-synthetic-wall" / "measurement.json"
 
@@ -251,3 +252,135 @@ def test_run_timber_measurement_rejects_depth_source_without_depth(
             tmp_path / "reports",
             depth_source="test_fixture",
         )
+
+
+def test_run_timber_measurement_with_rgb_persists_visible_log_end_analysis(
+    tmp_path,
+) -> None:
+    rng = np.random.default_rng(123)
+
+    point_count = 8_000
+
+    input_path = tmp_path / "synthetic-rgb-wall.las"
+
+    header = laspy.LasHeader(
+        point_format=3,
+        version="1.2",
+    )
+    header.scales = np.array(
+        [
+            0.001,
+            0.001,
+            0.001,
+        ]
+    )
+
+    las = laspy.LasData(header)
+
+    las.x = rng.uniform(
+        0.0,
+        12.0,
+        point_count,
+    )
+    las.y = rng.normal(
+        0.0,
+        0.08,
+        point_count,
+    )
+    las.z = rng.uniform(
+        0.5,
+        3.5,
+        point_count,
+    )
+
+    las.red = rng.integers(
+        20,
+        220,
+        point_count,
+        dtype=np.uint16,
+    )
+    las.green = rng.integers(
+        20,
+        220,
+        point_count,
+        dtype=np.uint16,
+    )
+    las.blue = rng.integers(
+        20,
+        220,
+        point_count,
+        dtype=np.uint16,
+    )
+
+    las.write(str(input_path))
+
+    run, output_path = run_timber_measurement(
+        input_path,
+        tmp_path / "reports",
+        run_id="run-synthetic-rgb-wall",
+        timber_config=TimberStackDetectionConfig(
+            longitudinal_bins=24,
+            transverse_bins=12,
+            vertical_bins=12,
+            min_longitudinal_coverage=0.10,
+            min_vertical_extent_fraction=0.10,
+            ignore_lowest_vertical_fraction=0.0,
+            pca_sample_size=10_000,
+            seed=42,
+        ),
+        cross_section_config=FrontCrossSectionConfig(
+            n_bins=24,
+            min_points_per_bin=20,
+        ),
+        code_version="test",
+    )
+
+    assert run.status == MeasurementRunStatus.COMPLETED
+    assert len(run.artifacts) == 6
+
+    artifacts = {artifact.kind: artifact for artifact in run.artifacts}
+
+    assert "visible_log_end_candidate_analysis" in artifacts
+
+    artifact = artifacts["visible_log_end_candidate_analysis"]
+
+    assert artifact.path == "visible_log_end_candidates.json"
+    assert artifact.media_type == "application/json"
+
+    artifact_path = output_path.parent / artifact.path
+
+    assert artifact_path.exists()
+
+    payload = json.loads(
+        artifact_path.read_text(
+            encoding="utf-8",
+        )
+    )
+
+    assert payload["kind"] == "visible_log_end_candidate_analysis"
+
+    assert payload["coordinate_units"] == "source_units"
+
+    assert payload["rgb_provenance"]["normalization_mode"] == (
+        "eight_bit_payload_in_las_rgb_fields"
+    )
+
+    assert payload["rgb_provenance"]["normalization_denominator"] == 255.0
+
+    assert payload["rgb_provenance"]["radiometrically_calibrated"] is False
+
+    assert payload["semantics"]["confirmed_log_count"] is False
+
+    assert payload["semantics"]["validated_solid_wood_area"] is False
+
+    assert payload["semantics"]["timber_volume"] is False
+
+    assert payload["semantics"]["commercial_cubicacion"] is False
+
+    warning_codes = {warning.code for warning in run.warnings}
+
+    assert "visible_log_end_rgb_unavailable" not in warning_codes
+
+    persisted = read_measurement_run(output_path)
+
+    assert persisted == run

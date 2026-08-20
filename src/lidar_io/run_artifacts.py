@@ -8,11 +8,14 @@ MeasurementRun record.
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 
 from lidar_core.models import MeasurementArtifact
+from lidar_core.visible_log_end_analysis import VisibleLogEndAnalysisResult
+from lidar_io.las_rgb import NormalizedLasRgb
 from lidar_volume.front_cross_section import FrontCrossSectionEstimate
 
 FRONT_PROFILE_FILENAME = "front_profile.json"
@@ -249,5 +252,186 @@ def write_front_height_profile_plot_artifact(
         description=(
             "Observed timber-stack profile height computed directly as "
             "top envelope minus base envelope for each longitudinal bin."
+        ),
+    )
+
+
+VISIBLE_LOG_END_ANALYSIS_FILENAME = "visible_log_end_candidates.json"
+
+
+def _visible_log_end_relative_range_quantiles(
+    result: VisibleLogEndAnalysisResult,
+) -> dict[str, float | None]:
+    values = np.asarray(
+        [
+            association.relative_diameter_range
+            for association in result.resolved_summary.associations
+        ],
+        dtype=np.float64,
+    )
+
+    if len(values) == 0:
+        return {
+            "q50": None,
+            "q75": None,
+            "q90": None,
+            "q95": None,
+            "q99": None,
+            "max": None,
+        }
+
+    return {
+        "q50": float(np.quantile(values, 0.50)),
+        "q75": float(np.quantile(values, 0.75)),
+        "q90": float(np.quantile(values, 0.90)),
+        "q95": float(np.quantile(values, 0.95)),
+        "q99": float(np.quantile(values, 0.99)),
+        "max": float(values.max()),
+    }
+
+
+def write_visible_log_end_analysis_artifact(
+    result: VisibleLogEndAnalysisResult,
+    run_directory: Path,
+    *,
+    rgb_provenance: NormalizedLasRgb,
+) -> MeasurementArtifact:
+    """Persist experimental visible log-end candidate evidence as JSON.
+
+    The artifact records projected candidate geometry and cross-window
+    association evidence. It does not represent a confirmed log count,
+    validated solid-wood area, timber volume, or commercial cubicacion.
+    """
+
+    run_directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    path = run_directory / VISIBLE_LOG_END_ANALYSIS_FILENAME
+
+    observations: list[dict[str, object]] = []
+
+    for index, evidence in enumerate(result.observations):
+        area = evidence.candidate.area
+
+        observations.append(
+            {
+                "index": index,
+                "window_index": (result.observation_window_indices[index]),
+                "x_px": evidence.candidate.x_px,
+                "y_px": evidence.candidate.y_px,
+                "radius_px": area.radius_px,
+                "horizontal_units_per_pixel": (area.horizontal_units_per_pixel),
+                "vertical_units_per_pixel": (area.vertical_units_per_pixel),
+                "horizontal_radius_source_units": (area.horizontal_radius_source_units),
+                "vertical_radius_source_units": (area.vertical_radius_source_units),
+                "projected_area_source_units_squared": (area.projected_area_source_units_squared),
+                "equivalent_radius_source_units": (area.equivalent_radius_source_units),
+                "equivalent_diameter_source_units": (area.equivalent_diameter_source_units),
+                "visible_support_count": (evidence.visible_support_count),
+                "visible_source_indices": list(evidence.visible_source_indices),
+            }
+        )
+
+    associations: list[dict[str, object]] = []
+
+    for index, association in enumerate(result.resolved_summary.associations):
+        associations.append(
+            {
+                "index": index,
+                "member_indices": list(association.member_indices),
+                "observation_count": (association.observation_count),
+                "representative_equivalent_diameter_source_units": (
+                    association.representative_equivalent_diameter_source_units
+                ),
+                "projected_area_source_units_squared": (
+                    association.projected_area_source_units_squared
+                ),
+                "minimum_equivalent_diameter_source_units": (
+                    association.minimum_equivalent_diameter_source_units
+                ),
+                "maximum_equivalent_diameter_source_units": (
+                    association.maximum_equivalent_diameter_source_units
+                ),
+                "relative_diameter_range": (association.relative_diameter_range),
+                "visible_source_union_count": (association.visible_source_union_count),
+            }
+        )
+
+    payload = {
+        "schema_version": "1",
+        "kind": "visible_log_end_candidate_analysis",
+        "coordinate_units": "source_units",
+        "rgb_provenance": {
+            "source_dtype": rgb_provenance.source_dtype,
+            "payload_min": rgb_provenance.payload_min,
+            "payload_max": rgb_provenance.payload_max,
+            "normalization_denominator": (rgb_provenance.normalization_denominator),
+            "normalization_mode": (rgb_provenance.normalization_mode),
+            "radiometrically_calibrated": False,
+        },
+        "quantity": {
+            "name": ("association_resolved_projected_log_end_candidate_area"),
+            "unit": "source_units_squared",
+            "value": (result.resolved_summary.projected_area_sum_source_units_squared),
+        },
+        "semantics": {
+            "confirmed_log_count": False,
+            "validated_solid_wood_area": False,
+            "timber_volume": False,
+            "commercial_cubicacion": False,
+            "hidden_log_length_inferred": False,
+        },
+        "analysis_config": asdict(result.config),
+        "detector_config": asdict(result.detector_config),
+        "association_config": asdict(result.association_config),
+        "summary": {
+            "window_count": len(result.windows),
+            "observation_count": (result.resolved_summary.observation_count),
+            "supported_observation_count": (result.resolved_summary.supported_observation_count),
+            "unsupported_observation_count": len(
+                result.resolved_summary.unsupported_observation_indices
+            ),
+            "unsupported_observation_indices": list(
+                result.resolved_summary.unsupported_observation_indices
+            ),
+            "association_hypothesis_count": (result.resolved_summary.association_count),
+            "multi_observation_association_count": (
+                result.resolved_summary.multi_observation_association_count
+            ),
+            "representative_method": (result.resolved_summary.representative_method),
+            "projected_candidate_area_sum_source_units_squared": (
+                result.resolved_summary.projected_area_sum_source_units_squared
+            ),
+        },
+        "qc": {
+            "relative_diameter_range_quantiles": (
+                _visible_log_end_relative_range_quantiles(result)
+            ),
+        },
+        "windows": [asdict(window) for window in result.windows],
+        "observations": observations,
+        "associations": associations,
+    }
+
+    path.write_text(
+        json.dumps(
+            payload,
+            indent=2,
+            allow_nan=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    return MeasurementArtifact(
+        kind="visible_log_end_candidate_analysis",
+        path=VISIBLE_LOG_END_ANALYSIS_FILENAME,
+        media_type="application/json",
+        description=(
+            "Experimental visible log-end candidate geometry, "
+            "cross-window evidence association, and diameter QC "
+            "in source-coordinate units."
         ),
     )
