@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from math import pi
 
+import numpy as np
 import pytest
 
 from lidar_core.log_end_geometry import (
@@ -20,10 +21,27 @@ from lidar_core.visible_log_end_analysis import (
     VisibleLogEndAnalysisResult,
     VisibleLogEndWindowSummary,
 )
+from lidar_io.las_rgb import NormalizedLasRgb
 from lidar_io.run_artifacts import (
     VISIBLE_LOG_END_ANALYSIS_FILENAME,
     write_visible_log_end_analysis_artifact,
 )
+
+
+def _rgb_provenance() -> NormalizedLasRgb:
+    return NormalizedLasRgb(
+        rgb=np.array(
+            [
+                [0.1, 0.2, 0.3],
+            ],
+            dtype=np.float64,
+        ),
+        source_dtype="uint16",
+        payload_min=0,
+        payload_max=255,
+        normalization_denominator=255.0,
+        normalization_mode=("eight_bit_payload_in_las_rgb_fields"),
+    )
 
 
 def _analysis_result() -> VisibleLogEndAnalysisResult:
@@ -101,6 +119,7 @@ def test_write_visible_log_end_analysis_artifact(
     artifact = write_visible_log_end_analysis_artifact(
         result,
         tmp_path,
+        rgb_provenance=_rgb_provenance(),
     )
 
     assert artifact.kind == "visible_log_end_candidate_analysis"
@@ -119,6 +138,17 @@ def test_write_visible_log_end_analysis_artifact(
 
     assert payload["schema_version"] == "1"
     assert payload["coordinate_units"] == "source_units"
+
+    rgb_provenance = payload["rgb_provenance"]
+
+    assert rgb_provenance == {
+        "source_dtype": "uint16",
+        "payload_min": 0,
+        "payload_max": 255,
+        "normalization_denominator": 255.0,
+        "normalization_mode": ("eight_bit_payload_in_las_rgb_fields"),
+        "radiometrically_calibrated": False,
+    }
 
     assert payload["semantics"]["confirmed_log_count"] is False
 
@@ -198,6 +228,7 @@ def test_visible_log_end_artifact_handles_empty_analysis(
     artifact = write_visible_log_end_analysis_artifact(
         result,
         tmp_path,
+        rgb_provenance=_rgb_provenance(),
     )
 
     payload = json.loads(

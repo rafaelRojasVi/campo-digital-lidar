@@ -15,6 +15,7 @@ import numpy as np
 
 from lidar_core.models import MeasurementArtifact
 from lidar_core.visible_log_end_analysis import VisibleLogEndAnalysisResult
+from lidar_io.las_rgb import NormalizedLasRgb
 from lidar_volume.front_cross_section import FrontCrossSectionEstimate
 
 FRONT_PROFILE_FILENAME = "front_profile.json"
@@ -292,6 +293,8 @@ def _visible_log_end_relative_range_quantiles(
 def write_visible_log_end_analysis_artifact(
     result: VisibleLogEndAnalysisResult,
     run_directory: Path,
+    *,
+    rgb_provenance: NormalizedLasRgb,
 ) -> MeasurementArtifact:
     """Persist experimental visible log-end candidate evidence as JSON.
 
@@ -360,6 +363,14 @@ def write_visible_log_end_analysis_artifact(
         "schema_version": "1",
         "kind": "visible_log_end_candidate_analysis",
         "coordinate_units": "source_units",
+        "rgb_provenance": {
+            "source_dtype": rgb_provenance.source_dtype,
+            "payload_min": rgb_provenance.payload_min,
+            "payload_max": rgb_provenance.payload_max,
+            "normalization_denominator": (rgb_provenance.normalization_denominator),
+            "normalization_mode": (rgb_provenance.normalization_mode),
+            "radiometrically_calibrated": False,
+        },
         "quantity": {
             "name": ("association_resolved_projected_log_end_candidate_area"),
             "unit": "source_units_squared",
