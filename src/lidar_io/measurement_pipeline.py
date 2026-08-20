@@ -40,12 +40,17 @@ from lidar_core.timber_stack import (
     TimberStackDetectionConfig,
     detect_timber_stack,
 )
+from lidar_core.visible_log_end_analysis import (
+    analyze_visible_log_end_candidates,
+)
 from lidar_io.inspect import inspect_las
+from lidar_io.las_rgb import extract_normalized_las_rgb
 from lidar_io.point_cloud_preview import write_timber_stack_preview_artifacts
 from lidar_io.run_artifacts import (
     write_front_height_profile_plot_artifact,
     write_front_profile_artifact,
     write_front_profile_plot_artifact,
+    write_visible_log_end_analysis_artifact,
 )
 from lidar_io.run_store import write_measurement_run
 from lidar_volume.front_cross_section import (
@@ -98,6 +103,8 @@ def run_timber_measurement(
     )
 
     las = laspy.read(str(input_path))
+
+    normalized_rgb = extract_normalized_las_rgb(las)
 
     xyz = np.column_stack(
         [
@@ -211,7 +218,43 @@ def run_timber_measurement(
         run_directory,
     )
 
+    artifacts = [
+        front_profile_artifact,
+        front_profile_plot_artifact,
+        front_height_profile_plot_artifact,
+        timber_stack_preview_artifact,
+        timber_stack_preview_manifest_artifact,
+    ]
+
+    if normalized_rgb is not None:
+        timber_rgb = normalized_rgb.rgb[timber_result.mask]
+
+        visible_log_end_result = analyze_visible_log_end_candidates(
+            timber_xyz,
+            timber_rgb,
+        )
+
+        visible_log_end_artifact = write_visible_log_end_analysis_artifact(
+            visible_log_end_result,
+            run_directory,
+            rgb_provenance=normalized_rgb,
+        )
+
+        artifacts.append(visible_log_end_artifact)
+
     warnings: list[MeasurementWarning] = []
+
+    if normalized_rgb is None:
+        warnings.append(
+            MeasurementWarning(
+                code="visible_log_end_rgb_unavailable",
+                severity=MeasurementWarningSeverity.WARNING,
+                message=(
+                    "Usable RGB values were not available in the input LAS; "
+                    "visible log-end candidate analysis was not run."
+                ),
+            )
+        )
 
     coordinate_metadata = metadata.coordinate_metadata
 
@@ -277,13 +320,7 @@ def run_timber_measurement(
         ),
         results=volume_results,
         warnings=warnings,
-        artifacts=[
-            front_profile_artifact,
-            front_profile_plot_artifact,
-            front_height_profile_plot_artifact,
-            timber_stack_preview_artifact,
-            timber_stack_preview_manifest_artifact,
-        ],
+        artifacts=artifacts,
         provenance={
             "las_version": (f"{metadata.las_version_major}.{metadata.las_version_minor}"),
             "point_format_id": metadata.point_format_id,
