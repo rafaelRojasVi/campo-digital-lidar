@@ -49,11 +49,24 @@ def _extract_crs(las_reader_header: laspy.LasHeader) -> CoordinateMetadata:
     epsg = None
     with contextlib.suppress(Exception):
         epsg = crs.to_epsg()
+
+    horizontal_units = None
+    with contextlib.suppress(Exception):
+        axes = list(crs.axis_info)
+
+        if crs.is_projected and len(axes) >= 2:
+            first_unit = axes[0].unit_name
+            second_unit = axes[1].unit_name
+
+            if first_unit and second_unit and first_unit == second_unit:
+                horizontal_units = first_unit
+
     return CoordinateMetadata(
         crs_wkt=crs.to_wkt() if hasattr(crs, "to_wkt") else None,
         crs_epsg=epsg,
         crs_source="VLR/EVLR CRS (laspy parse_crs)",
         is_explicit=True,
+        horizontal_units=horizontal_units,
     )
 
 
