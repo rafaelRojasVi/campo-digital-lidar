@@ -12,6 +12,8 @@ from time import perf_counter
 
 from lidar_core.dataset_robustness import (
     DatasetCapabilities,
+    DatasetRobustnessFailure,
+    DatasetRobustnessMatrix,
     DatasetRobustnessReport,
     derive_rgb_payload_capability,
 )
@@ -127,4 +129,50 @@ def build_dataset_robustness_report(
         inspect_runtime_seconds=(inspect_runtime_seconds),
         acquisition_runtime_seconds=(acquisition_runtime_seconds),
         warnings=warnings,
+    )
+
+
+def build_dataset_robustness_matrix(
+    paths: list[str | Path],
+    *,
+    deep: bool = False,
+    compute_checksum: bool = False,
+) -> DatasetRobustnessMatrix:
+    """Build robustness reports for a corpus with per-dataset failure isolation."""
+
+    started = perf_counter()
+
+    reports: list[DatasetRobustnessReport] = []
+    failures: list[DatasetRobustnessFailure] = []
+
+    for path in paths:
+        source = Path(path)
+
+        try:
+            report = build_dataset_robustness_report(
+                source,
+                deep=deep,
+                compute_checksum=compute_checksum,
+            )
+        except (FileNotFoundError, ValueError, OSError) as exc:
+            failures.append(
+                DatasetRobustnessFailure(
+                    path=str(source),
+                    error_type=type(exc).__name__,
+                    message=str(exc),
+                )
+            )
+            continue
+
+        reports.append(report)
+
+    return DatasetRobustnessMatrix(
+        deep=deep,
+        compute_checksum=compute_checksum,
+        reports=reports,
+        failures=failures,
+        total_datasets=len(paths),
+        successful_datasets=len(reports),
+        failed_datasets=len(failures),
+        total_runtime_seconds=perf_counter() - started,
     )

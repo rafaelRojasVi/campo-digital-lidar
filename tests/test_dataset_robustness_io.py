@@ -175,3 +175,96 @@ def test_build_report_propagates_missing_file(
         build_dataset_robustness_report(
             tmp_path / "missing.las",
         )
+
+
+def test_build_matrix_collects_multiple_reports(
+    tmp_path,
+) -> None:
+    first = tmp_path / "first.las"
+    second = tmp_path / "second.las"
+
+    _write_rgb_fixture(first)
+    _write_rgb_fixture(second)
+
+    from lidar_io.dataset_robustness import (
+        build_dataset_robustness_matrix,
+    )
+
+    matrix = build_dataset_robustness_matrix(
+        [first, second],
+    )
+
+    assert matrix.total_datasets == 2
+    assert matrix.successful_datasets == 2
+    assert matrix.failed_datasets == 0
+
+    assert len(matrix.reports) == 2
+    assert matrix.failures == []
+
+    assert matrix.deep is False
+    assert matrix.compute_checksum is False
+    assert matrix.total_runtime_seconds >= 0.0
+
+
+def test_build_matrix_isolates_dataset_failures(
+    tmp_path,
+) -> None:
+    valid = tmp_path / "valid.las"
+    missing = tmp_path / "missing.las"
+    unsupported = tmp_path / "unsupported.xyz"
+
+    _write_rgb_fixture(valid)
+
+    unsupported.write_text(
+        "0 0 0\n",
+        encoding="utf-8",
+    )
+
+    from lidar_io.dataset_robustness import (
+        build_dataset_robustness_matrix,
+    )
+
+    matrix = build_dataset_robustness_matrix(
+        [
+            valid,
+            missing,
+            unsupported,
+        ],
+    )
+
+    assert matrix.total_datasets == 3
+    assert matrix.successful_datasets == 1
+    assert matrix.failed_datasets == 2
+
+    assert len(matrix.reports) == 1
+    assert len(matrix.failures) == 2
+
+    assert {failure.error_type for failure in matrix.failures} == {
+        "FileNotFoundError",
+        "ValueError",
+    }
+
+
+def test_build_deep_matrix_propagates_profile(
+    tmp_path,
+) -> None:
+    path = tmp_path / "fixture.las"
+
+    _write_rgb_fixture(path)
+
+    from lidar_io.dataset_robustness import (
+        build_dataset_robustness_matrix,
+    )
+
+    matrix = build_dataset_robustness_matrix(
+        [path],
+        deep=True,
+    )
+
+    assert matrix.deep is True
+    assert matrix.successful_datasets == 1
+
+    report = matrix.reports[0]
+
+    assert report.acquisition is not None
+    assert report.rgb.usable_for_image_analysis is True

@@ -131,3 +131,33 @@ def derive_rgb_payload_capability(
         normalization_denominator=denominator,
         normalization_mode=mode,
     )
+
+
+class DatasetRobustnessFailure(BaseModel):
+    """Failure recorded for one dataset without aborting the matrix."""
+
+    model_config = ConfigDict(frozen=True)
+
+    path: str
+    error_type: str
+    message: str
+
+
+class DatasetRobustnessMatrix(BaseModel):
+    """Results from applying one robustness profile to multiple datasets."""
+
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: str = "1"
+
+    deep: bool
+    compute_checksum: bool
+
+    reports: list[DatasetRobustnessReport]
+    failures: list[DatasetRobustnessFailure]
+
+    total_datasets: int
+    successful_datasets: int
+    failed_datasets: int
+
+    total_runtime_seconds: float
