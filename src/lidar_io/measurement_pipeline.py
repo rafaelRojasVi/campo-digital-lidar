@@ -41,6 +41,7 @@ from lidar_core.timber_stack import (
     detect_timber_stack,
 )
 from lidar_io.inspect import inspect_las
+from lidar_io.point_cloud_preview import write_timber_stack_preview_artifacts
 from lidar_io.run_artifacts import (
     write_front_height_profile_plot_artifact,
     write_front_profile_artifact,
@@ -201,6 +202,15 @@ def run_timber_measurement(
         run_directory,
     )
 
+    (
+        timber_stack_preview_artifact,
+        timber_stack_preview_manifest_artifact,
+    ) = write_timber_stack_preview_artifacts(
+        timber_xyz,
+        cross_section_result,
+        run_directory,
+    )
+
     warnings: list[MeasurementWarning] = []
 
     coordinate_metadata = metadata.coordinate_metadata
@@ -271,6 +281,8 @@ def run_timber_measurement(
             front_profile_artifact,
             front_profile_plot_artifact,
             front_height_profile_plot_artifact,
+            timber_stack_preview_artifact,
+            timber_stack_preview_manifest_artifact,
         ],
         provenance={
             "las_version": (f"{metadata.las_version_major}.{metadata.las_version_minor}"),
