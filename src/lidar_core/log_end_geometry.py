@@ -318,6 +318,8 @@ def candidate_support_overlap(
 def associate_projected_log_end_evidence(
     candidates: Sequence[ProjectedLogEndCandidateEvidence],
     config: CandidateEvidenceAssociationConfig | None = None,
+    *,
+    observation_group_ids: Sequence[int] | None = None,
 ) -> CandidateEvidenceAssociationSummary:
     """Associate candidate observations using shared source-point evidence.
 
@@ -338,7 +340,20 @@ def associate_projected_log_end_evidence(
 
     candidate_count = len(candidates)
 
+    resolved_group_ids: tuple[int, ...] | None = None
+
+    if observation_group_ids is not None:
+        if len(observation_group_ids) != candidate_count:
+            raise ValueError("observation_group_ids length must match candidates")
+
+        resolved_group_ids = tuple(int(group_id) for group_id in observation_group_ids)
+
     parent = list(range(candidate_count))
+
+    component_group_ids: list[set[int]] | None = None
+
+    if resolved_group_ids is not None:
+        component_group_ids = [{group_id} for group_id in resolved_group_ids]
 
     def find(index: int) -> int:
         while parent[index] != index:
@@ -351,8 +366,20 @@ def associate_projected_log_end_evidence(
         left_root = find(left_index)
         right_root = find(right_index)
 
-        if left_root != right_root:
-            parent[right_root] = left_root
+        if left_root == right_root:
+            return
+
+        if component_group_ids is not None:
+            left_groups = component_group_ids[left_root]
+            right_groups = component_group_ids[right_root]
+
+            if left_groups.intersection(right_groups):
+                return
+
+        parent[right_root] = left_root
+
+        if component_group_ids is not None:
+            component_group_ids[left_root].update(component_group_ids[right_root])
 
     supported_indices = [
         index for index, candidate in enumerate(candidates) if candidate.visible_support_count > 0
@@ -364,6 +391,12 @@ def associate_projected_log_end_evidence(
 
     for left_position, left_index in enumerate(supported_indices):
         for right_index in supported_indices[left_position + 1 :]:
+            if (
+                resolved_group_ids is not None
+                and resolved_group_ids[left_index] == resolved_group_ids[right_index]
+            ):
+                continue
+
             shared_count, overlap_fraction = candidate_support_overlap(
                 candidates[left_index],
                 candidates[right_index],

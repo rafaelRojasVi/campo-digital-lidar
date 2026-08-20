@@ -612,3 +612,55 @@ def test_resolver_rejects_mismatched_association_summary() -> None:
             (),
             association,
         )
+
+
+def test_candidate_association_can_exclude_same_observation_group() -> None:
+    candidates = (
+        _candidate_evidence(
+            tuple(range(0, 10)),
+            x_px=100.0,
+        ),
+        _candidate_evidence(
+            tuple(range(5, 15)),
+            x_px=105.0,
+        ),
+        _candidate_evidence(
+            tuple(range(5, 15)),
+            x_px=105.0,
+        ),
+    )
+
+    result = associate_projected_log_end_evidence(
+        candidates,
+        CandidateEvidenceAssociationConfig(
+            min_shared_source_points=3,
+            min_smaller_support_fraction=0.30,
+        ),
+        observation_group_ids=(
+            0,
+            0,
+            1,
+        ),
+    )
+
+    assert result.association_count == 2
+
+    member_sets = {association.member_indices for association in result.associations}
+
+    assert (0, 2) in member_sets
+    assert (1,) in member_sets
+
+
+def test_candidate_association_rejects_mismatched_observation_groups() -> None:
+    candidate = _candidate_evidence(
+        tuple(range(10)),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="observation_group_ids length",
+    ):
+        associate_projected_log_end_evidence(
+            (candidate,),
+            observation_group_ids=(),
+        )
