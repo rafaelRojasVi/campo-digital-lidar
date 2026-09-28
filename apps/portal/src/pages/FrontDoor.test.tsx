@@ -27,6 +27,17 @@ describe('FrontDoor', () => {
     expect(link).toHaveAttribute('href', '/api/auth/google/login')
   })
 
+  it('introduces the platform beside the sign-in panel, like the Transelec sign-in', async () => {
+    vi.mocked(api.getMe).mockResolvedValue({ ok: false, status: 401, error: 'no session' })
+    render(<FrontDoor />)
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Plataforma de gestión forestal' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Inicie sesión para continuar' }),
+    ).toBeInTheDocument()
+  })
+
   it('shows only the projects the user can open', async () => {
     vi.mocked(api.getMe).mockResolvedValue(me([{ product_key: 'transelect', role: 'viewer' }]))
     render(<FrontDoor />)
