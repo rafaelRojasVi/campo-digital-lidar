@@ -101,6 +101,21 @@ describe('App session lifecycle', () => {
     expect(screen.queryByText('Sesión requerida')).not.toBeInTheDocument()
   })
 
+  it('sends a signed-out visitor to the front door when the platform has one', async () => {
+    vi.stubEnv('VITE_PLATFORM_FRONT_DOOR', 'true')
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign })
+    vi.mocked(api.getMe).mockResolvedValue(UNAUTHENTICATED)
+    try {
+      render(<App initialPath={ROUTES.pendientes} />)
+      await waitFor(() => expect(assign).toHaveBeenCalledWith('/'))
+      expect(screen.queryByTestId('login-card')).not.toBeInTheDocument()
+    } finally {
+      vi.unstubAllEnvs()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('keeps a real platform outage distinct from being signed out', async () => {
     vi.mocked(api.getMe).mockResolvedValue({
       ok: false,

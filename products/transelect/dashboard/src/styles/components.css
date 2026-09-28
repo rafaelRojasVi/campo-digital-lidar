@@ -58,6 +58,24 @@
   white-space: nowrap;
 }
 
+/* Back to the Campo Digital project picker (unified platform builds only). */
+.project-switch {
+  flex-shrink: 0;
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: var(--r-control);
+  color: var(--ink-inverse);
+  font-size: var(--t-small);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+.project-switch:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
 /* ------------------------------------------------------------ shell nav */
 
 .topnav {

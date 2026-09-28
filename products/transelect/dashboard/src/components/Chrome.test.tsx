@@ -38,6 +38,25 @@ function nav() {
 }
 
 describe('AppHeader (TR-FUNC-041/046)', () => {
+  it('links back to the project picker only on the unified platform', () => {
+    vi.stubEnv('VITE_PLATFORM_FRONT_DOOR', 'true')
+    try {
+      renderWithRouter(
+        <AppHeader me={me} activeImport={null} currentPath={ROUTES.resumen} canPublish />,
+      )
+      expect(screen.getByRole('link', { name: 'Cambiar proyecto' })).toHaveAttribute('href', '/')
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('has no project picker link in a standalone build', () => {
+    renderWithRouter(
+      <AppHeader me={me} activeImport={null} currentPath={ROUTES.resumen} canPublish />,
+    )
+    expect(screen.queryByRole('link', { name: 'Cambiar proyecto' })).not.toBeInTheDocument()
+  })
+
   it('shows Campo Digital’s own logo, served from the bundle, with the brand as text', () => {
     const { container } = renderWithRouter(
       <AppHeader

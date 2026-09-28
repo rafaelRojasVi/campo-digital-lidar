@@ -20,6 +20,7 @@ import { AefPage } from './pages/AefPage'
 import { PendientesPage } from './pages/PendientesPage'
 import { ResumenPage } from './pages/ResumenPage'
 import { ROUTES, RouterProvider, isAdminRoute, resolveRoute, useRouter } from './router'
+import { PLATFORM_FRONT_DOOR_PATH, platformFrontDoorEnabled } from './runtime/frontDoor'
 import { demoSignInAvailable } from './runtime/environment'
 
 function Shell() {
@@ -128,10 +129,15 @@ function Shell() {
     }
 
     // 401 is not an error to report, it is the signed-out state: it gets the
-    // sign-in screen. Every other session failure (an unreachable platform,
-    // for instance) is still a real failure and keeps its own block, so a
-    // backend outage is never mistaken for "please sign in".
+    // sign-in screen, which on the unified platform is the front door. Every
+    // other session failure (an unreachable platform, for instance) is still
+    // a real failure and keeps its own block, so a backend outage is never
+    // mistaken for "please sign in".
     if (sessionFailure?.status === 401) {
+      if (platformFrontDoorEnabled()) {
+        window.location.assign(PLATFORM_FRONT_DOOR_PATH)
+        return null
+      }
       return <LoginCard demoAvailable={demoSignInAvailable()} onSignedIn={refreshSession} />
     }
 

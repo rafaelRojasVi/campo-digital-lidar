@@ -26,6 +26,7 @@ import { logout, transelecRole } from '../api'
 import { formatDateTime } from '../format'
 import { Link, ROUTES, useRouter, type Route } from '../router'
 import campoDigitalLogo from '../assets/campo-digital-logo.png'
+import { PLATFORM_FRONT_DOOR_PATH, platformFrontDoorEnabled } from '../runtime/frontDoor'
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',
@@ -169,6 +170,12 @@ export function AppHeader({
             Transelec
           </span>
         </Link>
+
+        {platformFrontDoorEnabled() && (
+          <a className="project-switch" href={PLATFORM_FRONT_DOOR_PATH}>
+            Cambiar proyecto
+          </a>
+        )}
 
         {signedIn && (
           <button

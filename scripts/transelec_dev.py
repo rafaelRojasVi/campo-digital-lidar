@@ -150,7 +150,7 @@ def start_frontend(api_port: int) -> tuple[int, int]:
     log(f"starting dashboard on 127.0.0.1:{port}…")
     process = spawn(STATE_DIR, "frontend", command, DASHBOARD_ROOT, port, marker, env)
 
-    if not wait_for_http(f"http://127.0.0.1:{port}/", 60):
+    if not wait_for_http(f"http://127.0.0.1:{port}/transelec/", 60):
         raise LauncherError(
             f"The dashboard did not start on port {port}. See {STATE_DIR / 'frontend.log'}"
         )
@@ -176,7 +176,7 @@ def command_up() -> int:
     api_port, _ = start_api()
     frontend_port, _ = start_frontend(api_port)
 
-    frontend_url = f"http://127.0.0.1:{frontend_port}/"
+    frontend_url = f"http://127.0.0.1:{frontend_port}/transelec/"
     log("ready:")
     log(f"  dashboard  {frontend_url}")
     log(f"  API        http://127.0.0.1:{api_port}/health")
