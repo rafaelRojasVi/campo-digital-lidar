@@ -1,3 +1,4 @@
+import campoDigitalLogo from '../assets/campo-digital-logo.png'
 import { formatDate, shortFingerprint } from '../lib/format.ts'
 import type { ForestrySnapshot, SnapshotSummary } from '../types.ts'
 
@@ -6,6 +7,11 @@ interface HeaderProps {
   summary: SnapshotSummary
 }
 
+// The brand mark is Campo Digital's own white logo (the same asset the
+// Transelec panel bundles, from campodigital.cl), drawn for this dark bar.
+// Its alt text carries the company name; the product and estate stay real
+// text beside it.
+//
 // The provenance block deliberately says "última ingesta": the API only
 // establishes ingestion order, never that this snapshot is the officially
 // current ("vigente") state of the estate.
@@ -13,15 +19,15 @@ export function Header({ snapshot, summary }: HeaderProps) {
   return (
     <header className="header">
       <div className="header__brand">
-        <span className="header__logo" aria-hidden="true">
-          <svg viewBox="0 0 32 32" width="26" height="26" role="presentation">
-            <rect width="32" height="32" rx="6" fill="#2f6b4f" />
-            <path d="M16 5l7 10h-4.4l4.9 7H8.5l4.9-7H9z" fill="#fcfcf9" />
-            <rect x="14.8" y="22" width="2.4" height="5" fill="#fcfcf9" />
-          </svg>
-        </span>
-        <div>
-          <p className="header__product">Campo Digital · Gestión Predial Forestal</p>
+        <img
+          className="header__logo"
+          src={campoDigitalLogo}
+          alt="Campo Digital"
+          width={93}
+          height={40}
+        />
+        <div className="header__context">
+          <p className="header__product">Gestión Predial Forestal</p>
           <h1 className="header__title">Patrimonio Degenfeld</h1>
         </div>
       </div>

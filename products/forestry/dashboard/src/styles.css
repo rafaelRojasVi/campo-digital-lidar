@@ -1,35 +1,52 @@
 /* Campo Digital · Gestión Predial Forestal
-   Purpose-built light theme for a desktop-first GIS product.
-   One radius scale (4px), one accent (pine green), restrained neutrals. */
+   Light theme for a desktop-first GIS product, on the Campo Digital palette
+   the Transelec panel uses (products/transelect/dashboard/src/styles/
+   tokens.css): same inks, grounds, lines and forest accent, so both products
+   read as one platform. Shape rule: controls 6px, surfaces 8px, chips pill. */
 
 :root {
-  --green-950: #163026;
-  --green-900: #1e3d31;
-  --green-700: #2f6b4f;
-  --green-600: #3a7d5d;
-  --green-tint: #eaf1ec;
+  /* Forest accent (Transelec --forest / --forest-deep / --forest-dark). */
+  --green-950: #0f3b2b;
+  --green-900: #15503a;
+  --green-700: #1e8055;
+  --green-600: #186b47;
+  --green-tint: #e7f1eb;
+  --green-line: #b9d6c5;
 
-  --paper: #f2f1ec;
-  --panel: #fdfdfb;
-  --panel-2: #f7f6f2;
-  --border: #dedcd3;
-  --border-strong: #c8c6bc;
+  --paper: #f4f5f2;
+  --panel: #fbfbfa;
+  --panel-2: #eef0ec;
+  --border: #dde1db;
+  --border-strong: #c3cabf;
 
-  --ink: #1b1a17;
-  --ink-2: #52514e;
-  --ink-3: #807e76;
+  --ink: #16211d;
+  --ink-2: #42524c;
+  --ink-3: #5d6c66;
+  --ink-inverse: #f2f6f3;
+  --ink-inverse-2: #b6ccc0;
 
-  --focus: #2a78d6;
-  --danger: #b4231f;
+  --focus: #0b6ea8;
+  --focus-ring: 0 0 0 3px rgb(11 110 168 / 0.22);
+  --danger: #96272b;
+  --flag-tint: #f8e9e3;
+  --flag-ink: #8a3a1f;
 
-  --radius: 4px;
+  --radius: 6px;
+  --radius-surface: 8px;
+  --shadow-raised: 0 1px 2px rgb(22 33 29 / 0.06);
+  --shadow-float: 0 8px 24px -8px rgb(22 33 29 / 0.22), 0 1px 2px rgb(22 33 29 / 0.06);
+  --shadow-overlay: 0 24px 64px -16px rgb(22 33 29 / 0.32);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
   --font:
-    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
-  --header-h: 52px;
+  color-scheme: light;
+
+  --header-h: 56px;
   --sidebar-w: 300px;
-  --inspector-w: 344px;
-  --panel-h: 288px;
+  --inspector-w: 360px;
+  --panel-h: 300px;
 }
 
 * {
@@ -66,7 +83,15 @@ button {
 
 :focus-visible {
   outline: 2px solid var(--focus);
-  outline-offset: 1px;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+  }
 }
 
 /* ---------- App frame ---------- */
@@ -90,10 +115,10 @@ button {
   overflow-y: auto;
   background: var(--panel);
   border-right: 1px solid var(--border);
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .app__sidebar-toggle {
@@ -112,43 +137,54 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
   min-height: var(--header-h);
-  padding: 6px 16px;
-  background: var(--green-900);
-  color: #f3f5f2;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--green-950);
+  background: linear-gradient(100deg, var(--green-950), var(--green-900));
+  color: var(--ink-inverse);
 }
 
 .header__brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
 .header__logo {
-  display: grid;
-  place-items: center;
+  display: block;
+  width: auto;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.header__context {
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 1px solid rgb(255 255 255 / 0.28);
 }
 
 .header__product {
   margin: 0;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  color: #b9cbc0;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-inverse-2);
 }
 
 .header__title {
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 650;
   line-height: 1.2;
-  color: #ffffff;
+  color: var(--ink-inverse);
+  white-space: nowrap;
 }
 
 .header__provenance {
   display: flex;
-  gap: 18px;
+  gap: 20px;
   margin: 0;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -159,30 +195,32 @@ button {
 }
 
 .header__provenance dt {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #9db4a7;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-inverse-2);
 }
 
 .header__provenance dd {
   margin: 0;
-  font-size: 12px;
-  color: #e8ece8;
+  font-size: 12.5px;
+  color: var(--ink-inverse);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .header__provenance code {
-  background: rgba(255, 255, 255, 0.08);
-  color: #d7ded8;
+  background: rgb(255 255 255 / 0.1);
+  color: var(--ink-inverse);
 }
 
 /* ---------- KPI strip ---------- */
 
 .kpis {
   display: flex;
-  gap: 0;
-  background: var(--panel);
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--paper);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
 }
@@ -190,34 +228,42 @@ button {
 .kpis__item {
   display: flex;
   /* Never shrink below content: the strip scrolls horizontally instead. */
-  flex: 0 0 auto;
+  flex: 1 0 auto;
   flex-direction: column;
-  padding: 8px 16px;
-  min-width: 132px;
-  border-right: 1px solid var(--border);
+  gap: 0;
+  padding: 7px 14px 8px;
+  min-width: 136px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-raised);
 }
 
 .kpis__item:last-child {
-  border-right: none;
+  border-right: 1px solid var(--border);
 }
 
 .kpis__value {
-  font-size: 17px;
-  font-weight: 650;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .kpis__label {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--ink-2);
   white-space: nowrap;
 }
 
 .kpis__detail {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--ink-3);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Fields & buttons ---------- */
@@ -225,11 +271,11 @@ button {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .field__label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ink-2);
 }
@@ -238,27 +284,52 @@ button {
   font: inherit;
   font-size: 13px;
   color: var(--ink);
-  background: #ffffff;
+  background: var(--panel);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 6px 8px;
+  min-height: 34px;
+  padding: 6px 10px;
   min-width: 0;
   width: 100%;
+  transition:
+    border-color 120ms var(--ease),
+    box-shadow 120ms var(--ease);
 }
 
 .field__control:hover {
   border-color: var(--ink-3);
 }
 
+.field__control:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: var(--focus-ring);
+}
+
+.field__control::placeholder {
+  color: var(--ink-3);
+}
+
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
   font-size: 13px;
   font-weight: 600;
-  color: #ffffff;
+  white-space: nowrap;
+  color: var(--ink-inverse);
   background: var(--green-700);
   border: 1px solid var(--green-700);
   border-radius: var(--radius);
-  padding: 6px 12px;
+  padding: 6px 14px;
   cursor: pointer;
+  box-shadow: var(--shadow-raised);
+  transition:
+    background-color 120ms var(--ease),
+    border-color 120ms var(--ease),
+    transform 120ms var(--ease);
 }
 
 .button:hover {
@@ -277,14 +348,14 @@ button {
 }
 
 .button--ghost {
-  color: var(--green-700);
-  background: transparent;
+  color: var(--ink);
+  background: var(--panel);
   border-color: var(--border-strong);
 }
 
 .button--ghost:hover {
-  background: var(--green-tint);
-  border-color: var(--green-700);
+  background: var(--panel-2);
+  border-color: var(--ink-3);
 }
 
 /* ---------- Filters panel ---------- */
@@ -292,20 +363,22 @@ button {
 .filters {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
 .filters__search {
-  padding: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
 }
 
 .filters__result {
   margin: 0;
   font-size: 12.5px;
   color: var(--ink-2);
-  background: var(--panel-2);
+  background: var(--green-tint);
+  border: 1px solid var(--green-line);
   border-radius: var(--radius);
-  padding: 6px 8px;
+  padding: 8px 10px;
 }
 
 .filters__result strong {
@@ -315,11 +388,12 @@ button {
 
 .filters__more-toggle {
   align-self: flex-start;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--green-700);
   background: none;
   border: none;
+  border-radius: var(--radius);
   padding: 2px 0;
   cursor: pointer;
 }
@@ -345,9 +419,9 @@ button {
 .legend {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   border-top: 1px solid var(--border);
-  padding-top: 12px;
+  padding-top: 16px;
 }
 
 .legend__list {
@@ -365,17 +439,18 @@ button {
   grid-template-areas:
     'swatch label ha'
     'swatch bar count';
-  column-gap: 8px;
-  row-gap: 2px;
+  column-gap: 10px;
+  row-gap: 3px;
   align-items: center;
   width: 100%;
-  padding: 5px 6px;
+  padding: 7px 8px;
   border-radius: var(--radius);
   font: inherit;
   text-align: left;
   color: inherit;
   background: none;
   border: 1px solid transparent;
+  transition: background-color 120ms var(--ease);
 }
 
 .legend__entry--button {
@@ -395,13 +470,14 @@ button {
   grid-area: swatch;
   width: 12px;
   height: 12px;
-  border-radius: 2px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 3px;
+  border: 1px solid rgb(22 33 29 / 0.18);
 }
 
 .legend__label {
   grid-area: label;
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -459,25 +535,33 @@ button {
 .map__controls {
   /* Left of center so an open inspector (right panel) never covers them. */
   position: absolute;
-  top: 10px;
-  left: 56px;
+  top: 12px;
+  left: 58px;
   z-index: 1000;
   display: flex;
   flex-direction: row;
-  gap: 6px;
-  align-items: flex-start;
+  gap: 2px;
+  align-items: center;
+  padding: 4px;
+  background: rgb(251 251 250 / 0.94);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(8px);
 }
 
 .map__control-button {
-  font-size: 12px;
+  min-height: 30px;
+  font-size: 12.5px;
   font-weight: 600;
+  white-space: nowrap;
   color: var(--ink);
-  background: #ffffff;
-  border: 1px solid var(--border-strong);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: var(--radius);
   padding: 5px 10px;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(27, 26, 23, 0.15);
+  transition: background-color 120ms var(--ease);
 }
 
 .map__control-button:hover {
@@ -494,10 +578,11 @@ button {
 }
 
 .map__empty p {
-  background: rgba(255, 255, 255, 0.94);
+  background: rgb(251 251 250 / 0.96);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px 16px;
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-float);
+  padding: 12px 18px;
   font-size: 13px;
   color: var(--ink-2);
 }
@@ -512,6 +597,23 @@ button {
   font-family: var(--font);
 }
 
+.leaflet-bar {
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--shadow-float) !important;
+  overflow: hidden;
+}
+
+.leaflet-bar a {
+  color: var(--ink) !important;
+  background: rgb(251 251 250 / 0.96) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+.leaflet-bar a:hover {
+  background: var(--panel-2) !important;
+}
+
 /* ---------- Data panel ---------- */
 
 .data-panel {
@@ -520,6 +622,7 @@ button {
   flex-direction: column;
   background: var(--panel);
   border-top: 1px solid var(--border);
+  box-shadow: 0 -6px 16px -12px rgb(22 33 29 / 0.25);
   height: var(--panel-h);
   min-height: 0;
 }
@@ -534,12 +637,12 @@ button {
   justify-content: space-between;
   gap: 8px;
   border-bottom: 1px solid var(--border);
-  padding: 0 8px;
+  padding: 0 12px;
 }
 
 .data-panel__tabs {
   display: flex;
-  gap: 2px;
+  gap: 4px;
 }
 
 .data-panel__tab {
@@ -549,9 +652,12 @@ button {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  padding: 9px 12px;
+  padding: 11px 12px 9px;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
+  transition:
+    color 120ms var(--ease),
+    border-color 120ms var(--ease);
 }
 
 .data-panel__tab:hover {
@@ -564,12 +670,13 @@ button {
 }
 
 .data-panel__collapse {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-2);
   background: none;
   border: none;
-  padding: 6px 8px;
+  border-radius: var(--radius);
+  padding: 6px 10px;
   cursor: pointer;
 }
 
@@ -598,7 +705,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 8px 12px;
   flex-wrap: wrap;
 }
 
@@ -637,13 +744,13 @@ button {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--panel-2);
+  background: var(--panel);
   text-align: left;
-  font-size: 11px;
-  font-weight: 650;
-  color: var(--ink-2);
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-strong);
   white-space: nowrap;
 }
 
@@ -661,8 +768,8 @@ button {
 }
 
 .table__grid td {
-  padding: 5px 10px;
-  border-bottom: 1px solid var(--panel-2);
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -674,12 +781,13 @@ button {
 }
 
 .table__grid tbody tr:hover {
-  background: var(--panel-2);
+  background: var(--paper);
 }
 
 .table__row--selected,
 .table__grid tbody tr.table__row--selected:hover {
   background: var(--green-tint);
+  box-shadow: inset 3px 0 0 var(--green-700);
 }
 
 .table__cell--num {
@@ -699,12 +807,12 @@ button {
 .table__flags {
   display: inline-grid;
   place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 9px;
-  background: #f8e8de;
-  color: #8a4415;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--flag-tint);
+  color: var(--flag-ink);
   font-size: 11px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
@@ -789,8 +897,8 @@ button {
 .comparison__pairs li {
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 2px 8px;
+  border-radius: 999px;
+  padding: 3px 10px;
   white-space: nowrap;
 }
 
@@ -802,7 +910,7 @@ button {
 
 .comparison__scroll {
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-surface);
 }
 
 .comparison__none {
@@ -838,12 +946,13 @@ button {
 
 .quality__item {
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px;
+  border-radius: var(--radius-surface);
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   background: var(--panel);
+  box-shadow: var(--shadow-raised);
 }
 
 .quality__item-head {
@@ -860,8 +969,8 @@ button {
 }
 
 .quality__item-count {
-  font-size: 15px;
-  font-weight: 650;
+  font-size: 18px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -893,7 +1002,7 @@ button {
   width: var(--inspector-w);
   background: var(--panel);
   border-left: 1px solid var(--border);
-  box-shadow: -4px 0 16px rgba(27, 26, 23, 0.12);
+  box-shadow: var(--shadow-overlay);
   display: flex;
   flex-direction: column;
 }
@@ -903,7 +1012,7 @@ button {
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px;
+  padding: 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -915,7 +1024,7 @@ button {
 
 .inspector__title {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 650;
   line-height: 1.25;
 }
@@ -951,19 +1060,17 @@ button {
 .inspector__body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
 .inspector__section h3 {
-  margin: 0 0 6px;
-  font-size: 11px;
+  margin: 0 0 8px;
+  font-size: 12px;
   font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .inspector__section dl {
@@ -974,7 +1081,8 @@ button {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 3px 0;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--panel-2);
 }
 
 .inspector__row dt {
@@ -1010,10 +1118,10 @@ button {
 
 .inspector__flags li {
   font-size: 11.5px;
-  background: #f8e8de;
-  color: #8a4415;
-  border-radius: var(--radius);
-  padding: 2px 8px;
+  background: var(--flag-tint);
+  color: var(--flag-ink);
+  border-radius: 999px;
+  padding: 3px 10px;
 }
 
 .inspector__attributes-toggle {
@@ -1059,8 +1167,9 @@ button {
 .status__card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 28px 32px;
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-float);
+  padding: 32px 36px;
   max-width: 420px;
   text-align: center;
   display: flex;
@@ -1114,7 +1223,7 @@ button {
   margin-left: 6px;
   border-radius: 9px;
   background: var(--green-700);
-  color: #ffffff;
+  color: var(--ink-inverse);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
@@ -1159,12 +1268,12 @@ button {
     font-size: 12.5px;
     font-weight: 600;
     color: var(--ink);
-    background: #ffffff;
-    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 6px 10px;
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(27, 26, 23, 0.15);
+    box-shadow: var(--shadow-float);
   }
 
   .app__sidebar {
@@ -1176,7 +1285,7 @@ button {
     width: min(320px, 88vw);
     transform: translateX(-102%);
     transition: transform 0.18s ease-out;
-    box-shadow: 4px 0 16px rgba(27, 26, 23, 0.14);
+    box-shadow: var(--shadow-overlay);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1196,8 +1305,17 @@ button {
   .header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
+    gap: 6px;
     padding: 8px 12px;
+  }
+
+  .header__logo {
+    height: 32px;
+  }
+
+  .kpis {
+    padding: 8px 12px;
+    gap: 8px;
   }
 
   .header__provenance {
@@ -1222,7 +1340,7 @@ button {
     max-height: 62%;
     border-left: none;
     border-top: 1px solid var(--border);
-    box-shadow: 0 -6px 18px rgba(27, 26, 23, 0.18);
+    box-shadow: var(--shadow-overlay);
   }
 
   :root {
