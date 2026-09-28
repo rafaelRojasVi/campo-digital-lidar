@@ -92,6 +92,11 @@ def guard_development_environment() -> None:
 
     os.chdir(REPO_ROOT)
 
+    # APP_ENV is required and fails closed if unset (see app.main); this
+    # launcher only ever runs locally, so default it the way the Transelec and
+    # LiDAR launchers do. The API subprocess inherits os.environ.
+    os.environ.setdefault("APP_ENV", "development")
+
     from app.config import get_settings
 
     settings = get_settings()
