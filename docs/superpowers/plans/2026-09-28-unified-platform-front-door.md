@@ -80,7 +80,11 @@ def _client(tmp_path: Path, *, portal: bool = True, transelec: bool = True) -> T
         return {"ok": "yes"}
 
     prefixed = (
-        [PrefixedDashboard("transelec", _build(tmp_path, "transelec", "transelec shell"), TRANSELEC_PAGES)]
+        [
+            PrefixedDashboard(
+                "transelec", _build(tmp_path, "transelec", "transelec shell"), TRANSELEC_PAGES
+            )
+        ]
         if transelec
         else []
     )
@@ -298,7 +302,9 @@ Add to `apps/api/tests/test_http_hardening.py`, next to `test_hashed_static_asse
 ```python
 def test_transelec_hashed_assets_stay_cacheable() -> None:
     response = _headers_app("production").get("/transelec/assets/index-abc.js")
-    assert "cache-control" not in response.headers or response.headers["cache-control"] != "no-store"
+    assert (
+        "cache-control" not in response.headers or response.headers["cache-control"] != "no-store"
+    )
 ```
 
 Mirror the exact assertion style of `test_hashed_static_assets_stay_cacheable`. Then in `apps/api/app/http_hardening.py` set:
