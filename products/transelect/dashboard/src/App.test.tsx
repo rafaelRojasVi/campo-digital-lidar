@@ -28,6 +28,7 @@ vi.mock('./api', async (importOriginal) => {
     getOwnerStatus: vi.fn(),
     getReport: vi.fn(),
     listRows: vi.fn(),
+    onUnauthorized: vi.fn(() => () => {}),
   }
 })
 
@@ -114,6 +115,36 @@ describe('App session lifecycle', () => {
       vi.unstubAllEnvs()
       vi.unstubAllGlobals()
     }
+  })
+
+  it('sends the browser to the front door when the session ends while in use', async () => {
+    vi.stubEnv('VITE_PLATFORM_FRONT_DOOR', 'true')
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign })
+    let sessionEnded: (() => void) | undefined
+    vi.mocked(api.onUnauthorized).mockImplementation((listener) => {
+      sessionEnded = listener
+      return () => {}
+    })
+    vi.mocked(api.getMe).mockResolvedValue({ ok: true, data: ADMIN })
+    try {
+      render(<App initialPath={ROUTES.resumen} />)
+      expect(await screen.findByTestId('shell-identity')).toBeInTheDocument()
+      expect(sessionEnded).toBeDefined()
+      sessionEnded?.()
+      expect(assign).toHaveBeenCalledWith('/')
+    } finally {
+      vi.unstubAllEnvs()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('leaves a mid-session 401 to the page itself in a standalone build', async () => {
+    vi.mocked(api.onUnauthorized).mockClear()
+    vi.mocked(api.getMe).mockResolvedValue({ ok: true, data: ADMIN })
+    render(<App initialPath={ROUTES.resumen} />)
+    expect(await screen.findByTestId('shell-identity')).toBeInTheDocument()
+    expect(api.onUnauthorized).not.toHaveBeenCalled()
   })
 
   it('keeps a real platform outage distinct from being signed out', async () => {

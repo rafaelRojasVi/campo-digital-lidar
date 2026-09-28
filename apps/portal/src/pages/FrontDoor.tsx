@@ -40,9 +40,15 @@ export function FrontDoor() {
     void getMe().then((result) => setState(sessionState(result)))
   }
 
+  const [signOutFailed, setSignOutFailed] = useState(false)
+
+  // The front door is the only place to sign out, so a failure must be said
+  // out loud: on a shared computer "nothing happened" reads as "signed out".
   const signOut = async () => {
+    setSignOutFailed(false)
     const result = await logout()
     if (result.ok) setState({ kind: 'signed-out' })
+    else setSignOutFailed(true)
   }
 
   return (
@@ -56,6 +62,11 @@ export function FrontDoor() {
         ) : null}
       </header>
       <main className="door__main">
+        {signOutFailed && state.kind === 'signed-in' ? (
+          <p className="door__error" role="alert">
+            No se pudo cerrar la sesión. Vuelve a intentarlo o cierra el navegador.
+          </p>
+        ) : null}
         {state.kind === 'loading' ? (
           <p className="door__muted" aria-live="polite">
             Verificando la sesión…

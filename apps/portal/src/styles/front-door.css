@@ -85,6 +85,17 @@
   line-height: 1.5;
 }
 
+.door__error {
+  margin: 0 0 24px;
+  padding: 10px 14px;
+  border: 1px solid #e3c2c3;
+  border-left: 3px solid #96272b;
+  border-radius: 6px;
+  background: #f6e5e5;
+  color: #6e1c20;
+  font-size: 14px;
+}
+
 .door__panel {
   max-width: 460px;
   padding: 32px;

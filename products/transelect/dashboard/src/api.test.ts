@@ -371,3 +371,36 @@ describe('sign-in and sign-out', () => {
     })
   })
 })
+
+describe('onUnauthorized (session ended while in use)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  function answer(status: number) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ detail: 'x' }), { status })),
+    )
+  }
+
+  it('tells the listener about any 401, not only the session check', async () => {
+    const { onUnauthorized, getActiveImport } = await import('./api')
+    const listener = vi.fn()
+    const stop = onUnauthorized(listener)
+    answer(401)
+    await getActiveImport()
+    expect(listener).toHaveBeenCalledTimes(1)
+    stop()
+  })
+
+  it('stays quiet on other answers and after unsubscribing', async () => {
+    const { onUnauthorized, getActiveImport } = await import('./api')
+    const listener = vi.fn()
+    const stop = onUnauthorized(listener)
+    answer(500)
+    await getActiveImport()
+    stop()
+    answer(401)
+    await getActiveImport()
+    expect(listener).not.toHaveBeenCalled()
+  })
+})

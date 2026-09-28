@@ -6,6 +6,7 @@ import {
   canPublish as canPublishFor,
   getActiveImport,
   getMe,
+  onUnauthorized,
   isTranselecAdmin,
 } from './api'
 import { AppHeader } from './components/AppHeader'
@@ -68,6 +69,23 @@ function Shell() {
       cancelled = true
     }
   }, [adoptSession])
+
+  // On the unified platform any 401 (the first session check, or a request
+  // made after the session expired or was ended in another tab) belongs to
+  // the front door, which owns sign-in.
+  useEffect(() => {
+    if (!platformFrontDoorEnabled()) return undefined
+    return onUnauthorized(() => window.location.assign(PLATFORM_FRONT_DOOR_PATH))
+  }, [])
+
+  // Signed out on arrival: stated on its own so it never depends on the
+  // listener above being registered before the session check answers.
+  const signedOutOnArrival = sessionFailure?.status === 401
+  useEffect(() => {
+    if (signedOutOnArrival && platformFrontDoorEnabled()) {
+      window.location.assign(PLATFORM_FRONT_DOOR_PATH)
+    }
+  }, [signedOutOnArrival])
 
   /**
    * Re-read the session, showing "Verificando la sesión…" while it is in
@@ -135,8 +153,12 @@ function Shell() {
     // mistaken for "please sign in".
     if (sessionFailure?.status === 401) {
       if (platformFrontDoorEnabled()) {
-        window.location.assign(PLATFORM_FRONT_DOOR_PATH)
-        return null
+        // The effect below performs the navigation; render stays pure.
+        return (
+          <div className="page">
+            <LoadingBlock label="Abriendo la entrada de Campo Digital…" lines={1} />
+          </div>
+        )
       }
       return <LoginCard demoAvailable={demoSignInAvailable()} onSignedIn={refreshSession} />
     }

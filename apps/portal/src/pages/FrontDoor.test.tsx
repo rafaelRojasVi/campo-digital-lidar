@@ -70,4 +70,13 @@ describe('FrontDoor', () => {
       expect(screen.getByRole('link', { name: 'Iniciar sesión con Google' })).toBeInTheDocument(),
     )
   })
+
+  it('says so when signing out fails, and keeps the session view', async () => {
+    vi.mocked(api.getMe).mockResolvedValue(me([{ product_key: 'transelect', role: 'viewer' }]))
+    vi.mocked(api.logout).mockResolvedValue({ ok: false, status: 503, error: 'down' })
+    render(<FrontDoor />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Cerrar sesión' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cerrar la sesión')
+    expect(screen.getByText('Hola, Javier Soto')).toBeInTheDocument()
+  })
 })
