@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import logo from '../assets/campo-digital-logo.png'
-import { GOOGLE_LOGIN_PATH, PRODUCT_CARDS } from '../data/productCards'
+import { MODULE_VISUALS } from '../components/visuals'
+import { GOOGLE_LOGIN_PATH, PRODUCT_CARDS, type ProductCard } from '../data/productCards'
 import { devLogin, getMe, logout, type ApiResult, type Me } from '../lib/platformApi'
 import '../styles/front-door.css'
 
@@ -139,27 +140,50 @@ function Projects({ me }: { me: Me }) {
         </p>
       ) : (
         <>
-          <p className="door__muted">Elige un proyecto.</p>
+          <p className="door__muted">Elige un proyecto para continuar.</p>
           <ul className="door__grid">
             {cards.map((card) => (
               <li key={card.key}>
-                {card.href !== null ? (
-                  <a className="door__card" href={card.href}>
-                    <span className="door__card-title">{card.title}</span>
-                    <span className="door__card-text">{card.description}</span>
-                  </a>
-                ) : (
-                  <div className="door__card door__card--soon" aria-disabled="true">
-                    <span className="door__card-title">{card.title}</span>
-                    <span className="door__card-text">{card.description}</span>
-                    <span className="door__soon">Próximamente</span>
-                  </div>
-                )}
+                <ProjectCard card={card} />
               </li>
             ))}
           </ul>
         </>
       )}
     </section>
+  )
+}
+
+function ProjectCard({ card }: { card: ProductCard }) {
+  const Visual = MODULE_VISUALS[card.accent]
+  const body = (
+    <>
+      {/* Identity mark only: the title and description carry the meaning. */}
+      <span className="door__card-visual" aria-hidden="true">
+        <Visual />
+      </span>
+      <span className="door__card-body">
+        <span className="door__card-title">{card.title}</span>
+        <span className="door__card-text">{card.description}</span>
+        {card.href !== null ? (
+          <span className="door__card-cta">
+            Abrir <span aria-hidden="true">→</span>
+          </span>
+        ) : (
+          <span className="door__soon">Próximamente</span>
+        )}
+      </span>
+    </>
+  )
+
+  const className = `door__card door__card--${card.accent}`
+  return card.href !== null ? (
+    <a className={className} href={card.href}>
+      {body}
+    </a>
+  ) : (
+    <div className={`${className} door__card--soon`} aria-disabled="true">
+      {body}
+    </div>
   )
 }

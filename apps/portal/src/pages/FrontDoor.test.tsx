@@ -102,4 +102,14 @@ describe('FrontDoor', () => {
       vi.unstubAllEnvs()
     }
   })
+
+  it('marks an open project with "Abrir" and keeps its illustration decorative', async () => {
+    vi.mocked(api.getMe).mockResolvedValue(me([{ product_key: 'transelect', role: 'viewer' }]))
+    const { container } = render(<FrontDoor />)
+    const card = await screen.findByRole('link', { name: /Transelec/ })
+    expect(card).toHaveTextContent('Abrir')
+    expect(card.querySelector('svg')).not.toBeNull()
+    expect(screen.queryByRole('img', { name: /Identidad visual/ })).not.toBeInTheDocument()
+    expect(container.querySelector('[aria-hidden="true"] svg')).not.toBeNull()
+  })
 })
