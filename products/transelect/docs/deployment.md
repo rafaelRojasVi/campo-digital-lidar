@@ -11,9 +11,11 @@ Container packaging: **built and locally verified** (this document).
   outside. Railway HTTP logs from 2026-09-26 show a Campo Digital user
   signing in with Google and uploading, validating and publishing a
   workbook, all answered `200`.
-- Railway auto-deploy is off, so deploys are manual.
-- **OPEN QUESTION:** are Postgres backups and `/data` volume snapshots
-  enabled on Railway? Nobody has verified this from the repository side.
+- Railway auto-deploy is off, so deploys are manual. Since 2026-09-28 the
+  service deploys from `main`.
+- **DECISION (2026-09-28):** no backups. The Hobby plan has no scheduled
+  backups (Pro only), and Rafael accepted the risk: published workbook data
+  can be rebuilt by re-importing, grants and audit history cannot.
 
 Read first, and treat as authoritative over this document if they disagree:
 
@@ -59,6 +61,38 @@ it only serves Transelec's frontend. **LIMITATION**: this makes the image
 large (~1.06 GB at the time of writing) and rebuilds on any LiDAR dependency
 bump. Splitting the composition root by product is a reasonable future
 optimization, not attempted here.
+
+## URL layout (unified platform)
+
+**DECISION (2026-09-28):** one origin serves the Campo Digital front door
+and each hosted product
+([design](../../../docs/superpowers/specs/2026-09-28-unified-platform-design.md)):
+
+| Path | Serves | Built with |
+|---|---|---|
+| `/` | Front door (`apps/portal`): Google sign-in, project picker | `VITE_CAMPO_ENV=production` |
+| `/transelec/...` | Transelec dashboard (Vite `base` `/transelec/`) | `VITE_PLATFORM_FRONT_DOOR=true` |
+| `/api/...` | Platform API | n/a |
+
+- `app.dashboard_static.mount_dashboards` serves both builds. The portal
+  build comes from `CAMPO_PORTAL_DIST` (default `apps/portal/dist`), and
+  Transelec's from `CAMPO_TRANSELEC_DASHBOARD_DIST` (default
+  `products/transelect/dashboard/dist`).
+- Only exact Transelec page paths get Transelec's shell, with or without a
+  trailing slash. Any other unknown top-level path gets the front door.
+  `/api`, `/health`, `/docs` and the other reserved segments answer `404`.
+- `/assets/` and `/transelec/assets/` are the only cacheable paths.
+- A signed-out visit to any Transelec page is sent to `/`. The Google
+  callback lands on `/`, with no `next=` parameter.
+- On the platform, Transelec's right-hand bar button is **Proyectos**, back
+  to the front door, which owns "Cerrar sesión".
+- **FACT (2026-09-28):** the image built from this branch, run with
+  `APP_ENV=production`, answers `200` for `/`, `/transelec`, `/transelec/`
+  and `/transelec/pendientes`. It answers `404` for `/docs`,
+  `/api/forestry/snapshots` and unknown `/transelec/...` paths.
+- **LIMITATION:** the image does not contain `products/forestry/src`.
+  Rodales can go online only once the image includes it (step 3 of the
+  design).
 
 ## Auth
 

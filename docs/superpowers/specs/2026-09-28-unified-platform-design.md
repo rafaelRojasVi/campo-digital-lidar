@@ -1,7 +1,10 @@
 # Unified Campo Digital platform: one sign-in, then choose a project
 
-Date: 2026-09-28. Status: approved in conversation with Rafael (design), written
-for review before the implementation plan.
+Date: 2026-09-28. Status: approved in conversation with Rafael. Step 1 (front
+door) is implemented on `feat/unified-platform` and not yet deployed
+([plan](../plans/2026-09-28-unified-platform-front-door.md)). On the platform,
+Transelec's bar button is "Proyectos", back to the front door, in place of
+"Cerrar sesión": a separate link did not fit the admin bar at laptop widths.
 
 ## Goal
 
