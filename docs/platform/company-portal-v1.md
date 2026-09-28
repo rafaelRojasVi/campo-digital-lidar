@@ -200,6 +200,28 @@ used as an iframe `src` or an "open in new tab" target
 (`apps/portal/src/lib/safeUrl.ts`); a malformed or hand-edited runtime file
 degrades to "unavailable" rather than being trusted.
 
+## Production mode: the unified platform's front door
+
+**DECISION (2026-09-28):** the portal is also the production front door of
+the unified platform
+([design](../superpowers/specs/2026-09-28-unified-platform-design.md)).
+Built with `VITE_CAMPO_ENV=production` (by the Dockerfile), it renders only
+`FrontDoor`:
+
+- The signed-out state offers "Iniciar sesión con Google" (`/api/auth/google/login`).
+- A signed-in user sees one card for each product they hold a grant for.
+  The card links to that product on the same origin (Transelec at
+  `/transelec/`). A product that is not online yet shows as "Próximamente".
+- "Cerrar sesión" lives here.
+- A non-`401` failure of `/api/auth/me` shows a retry instead of a sign-in
+  prompt.
+
+Production uses navigation, not iframes: the platform CSP sets
+`frame-ancestors 'none'`, and one origin shares the session cookie. The
+local and staging iframe modes described above are unchanged. The favicon
+is now a file (`public/favicon.svg`): the platform CSP (`img-src 'self'`)
+blocks the previous `data:` URI.
+
 ## What remains before production
 
 - Authentication/session entry point (none exists).

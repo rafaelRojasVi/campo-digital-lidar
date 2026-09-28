@@ -372,3 +372,23 @@ test.describe('the signed-out shell', () => {
     await expect(page.getByRole('button', { name: 'Secciones' })).toHaveCount(0)
   })
 })
+
+test.describe('the shell bar at laptop widths', () => {
+  // An administrator has the most sections and the version chip; nothing in
+  // the bar may be drawn over anything else at common laptop widths.
+  for (const width of [1280, 1366, 1440]) {
+    test(`nothing overlaps at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await stubPlatform(page)
+      await page.goto('/transelec')
+      await expect(page.getByTestId('kpi-row')).toBeVisible()
+
+      const links = nav(page).getByRole('link')
+      const last = await links.nth((await links.count()) - 1).boundingBox()
+      const side = await page.locator('.shell-side').boundingBox()
+      expect(last).not.toBeNull()
+      expect(side).not.toBeNull()
+      expect(last!.x + last!.width).toBeLessThanOrEqual(side!.x)
+    })
+  }
+})

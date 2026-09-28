@@ -15,8 +15,13 @@ describe('getCampoEnvironment', () => {
     expect(getCampoEnvironment()).toBe('staging')
   })
 
-  it('treats any other value as local rather than trusting it', () => {
+  it('recognises the unified platform production build', () => {
     vi.stubEnv('VITE_CAMPO_ENV', 'production')
+    expect(getCampoEnvironment()).toBe('production')
+  })
+
+  it('treats any other value as local rather than trusting it', () => {
+    vi.stubEnv('VITE_CAMPO_ENV', 'prod')
     expect(getCampoEnvironment()).toBe('local')
   })
 })

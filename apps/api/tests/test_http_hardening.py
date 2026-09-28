@@ -330,6 +330,10 @@ def _headers_app(app_env: str) -> TestClient:
     def asset() -> PlainTextResponse:
         return PlainTextResponse("console.log(1)")
 
+    @app.get("/transelec/assets/index-abc.js")
+    def transelec_asset() -> PlainTextResponse:
+        return PlainTextResponse("console.log(2)")
+
     @app.get("/explicit")
     def explicit() -> JSONResponse:
         return JSONResponse({}, headers={"Cache-Control": "max-age=60"})
@@ -364,6 +368,13 @@ def test_dashboard_policy_allows_only_same_origin_resources() -> None:
 
 def test_hashed_static_assets_stay_cacheable() -> None:
     response = _headers_app("production").get("/assets/index-abc.js")
+
+    assert "cache-control" not in response.headers
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_transelec_hashed_assets_stay_cacheable() -> None:
+    response = _headers_app("production").get("/transelec/assets/index-abc.js")
 
     assert "cache-control" not in response.headers
     assert response.headers["x-content-type-options"] == "nosniff"

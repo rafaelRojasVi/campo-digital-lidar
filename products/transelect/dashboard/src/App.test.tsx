@@ -28,6 +28,7 @@ vi.mock('./api', async (importOriginal) => {
     getOwnerStatus: vi.fn(),
     getReport: vi.fn(),
     listRows: vi.fn(),
+    onUnauthorized: vi.fn(() => () => {}),
   }
 })
 
@@ -99,6 +100,51 @@ describe('App session lifecycle', () => {
     expect(screen.getByRole('button', { name: ADMIN_LABEL })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: VIEWER_LABEL })).toBeInTheDocument()
     expect(screen.queryByText('Sesión requerida')).not.toBeInTheDocument()
+  })
+
+  it('sends a signed-out visitor to the front door when the platform has one', async () => {
+    vi.stubEnv('VITE_PLATFORM_FRONT_DOOR', 'true')
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign })
+    vi.mocked(api.getMe).mockResolvedValue(UNAUTHENTICATED)
+    try {
+      render(<App initialPath={ROUTES.pendientes} />)
+      await waitFor(() => expect(assign).toHaveBeenCalledWith('/'))
+      expect(screen.queryByTestId('login-card')).not.toBeInTheDocument()
+    } finally {
+      vi.unstubAllEnvs()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('sends the browser to the front door when the session ends while in use', async () => {
+    vi.stubEnv('VITE_PLATFORM_FRONT_DOOR', 'true')
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign })
+    let sessionEnded: (() => void) | undefined
+    vi.mocked(api.onUnauthorized).mockImplementation((listener) => {
+      sessionEnded = listener
+      return () => {}
+    })
+    vi.mocked(api.getMe).mockResolvedValue({ ok: true, data: ADMIN })
+    try {
+      render(<App initialPath={ROUTES.resumen} />)
+      expect(await screen.findByTestId('shell-identity')).toBeInTheDocument()
+      expect(sessionEnded).toBeDefined()
+      sessionEnded?.()
+      expect(assign).toHaveBeenCalledWith('/')
+    } finally {
+      vi.unstubAllEnvs()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('leaves a mid-session 401 to the page itself in a standalone build', async () => {
+    vi.mocked(api.onUnauthorized).mockClear()
+    vi.mocked(api.getMe).mockResolvedValue({ ok: true, data: ADMIN })
+    render(<App initialPath={ROUTES.resumen} />)
+    expect(await screen.findByTestId('shell-identity')).toBeInTheDocument()
+    expect(api.onUnauthorized).not.toHaveBeenCalled()
   })
 
   it('keeps a real platform outage distinct from being signed out', async () => {

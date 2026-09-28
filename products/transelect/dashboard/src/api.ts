@@ -632,21 +632,40 @@ function forgetCsrfToken(): void {
   csrfToken = null
 }
 
+const unauthorizedListeners = new Set<() => void>()
+
+/**
+ * Be told whenever any request answers 401: the session ended while the
+ * page was open (expired, or signed out in another tab). The unified
+ * platform uses it to send the browser back to the front door. Returns the
+ * unsubscribe function.
+ */
+export function onUnauthorized(listener: () => void): () => void {
+  unauthorizedListeners.add(listener)
+  return () => {
+    unauthorizedListeners.delete(listener)
+  }
+}
+
+function observe(response: Response): Response {
+  rememberServerClock(response)
+  if (response.status === 401) {
+    for (const listener of unauthorizedListeners) listener()
+  }
+  return response
+}
+
 async function send(path: string, init: RequestInit | undefined): Promise<Response> {
   const method = (init?.method ?? 'GET').toUpperCase()
   if (SAFE_METHODS.has(method)) {
-    const response = await fetch(path, { credentials: 'include', ...init })
-    rememberServerClock(response)
-    return response
+    return observe(await fetch(path, { credentials: 'include', ...init }))
   }
 
   const token = await ensureCsrfToken()
   const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) }
   if (token !== null) headers[token.headerName] = token.token
 
-  const response = await fetch(path, { credentials: 'include', ...init, headers })
-  rememberServerClock(response)
-  return response
+  return observe(await fetch(path, { credentials: 'include', ...init, headers }))
 }
 
 async function readError(response: Response): Promise<string> {

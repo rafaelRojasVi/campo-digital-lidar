@@ -47,10 +47,18 @@ interface RouterContextValue {
 
 const RouterContext = createContext<RouterContextValue | undefined>(undefined)
 
+// Vite's base serves the app at "/transelec/"; one trailing slash is dropped
+// so that entry resolves like "/transelec" and every route compares cleanly.
 function splitLocation(value: string): { pathname: string; search: string } {
   const index = value.indexOf('?')
-  if (index === -1) return { pathname: value, search: '' }
-  return { pathname: value.slice(0, index), search: value.slice(index) }
+  const rawPath = index === -1 ? value : value.slice(0, index)
+  const search = index === -1 ? '' : value.slice(index)
+  const pathname = rawPath.length > 1 && rawPath.endsWith('/') ? rawPath.slice(0, -1) : rawPath
+  return { pathname, search }
+}
+
+function currentLocation(): { pathname: string; search: string } {
+  return splitLocation(`${window.location.pathname}${window.location.search}`)
 }
 
 export function RouterProvider({
@@ -61,14 +69,11 @@ export function RouterProvider({
   initialPath?: string
 }) {
   const [location, setLocation] = useState(() =>
-    initialPath !== undefined
-      ? splitLocation(initialPath)
-      : { pathname: window.location.pathname, search: window.location.search },
+    initialPath !== undefined ? splitLocation(initialPath) : currentLocation(),
   )
 
   useEffect(() => {
-    const onPopState = () =>
-      setLocation({ pathname: window.location.pathname, search: window.location.search })
+    const onPopState = () => setLocation(currentLocation())
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])

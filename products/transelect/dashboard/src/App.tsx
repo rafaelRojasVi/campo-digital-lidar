@@ -6,6 +6,7 @@ import {
   canPublish as canPublishFor,
   getActiveImport,
   getMe,
+  onUnauthorized,
   isTranselecAdmin,
 } from './api'
 import { AppHeader } from './components/AppHeader'
@@ -20,6 +21,7 @@ import { AefPage } from './pages/AefPage'
 import { PendientesPage } from './pages/PendientesPage'
 import { ResumenPage } from './pages/ResumenPage'
 import { ROUTES, RouterProvider, isAdminRoute, resolveRoute, useRouter } from './router'
+import { PLATFORM_FRONT_DOOR_PATH, platformFrontDoorEnabled } from './runtime/frontDoor'
 import { demoSignInAvailable } from './runtime/environment'
 
 function Shell() {
@@ -67,6 +69,23 @@ function Shell() {
       cancelled = true
     }
   }, [adoptSession])
+
+  // On the unified platform any 401 (the first session check, or a request
+  // made after the session expired or was ended in another tab) belongs to
+  // the front door, which owns sign-in.
+  useEffect(() => {
+    if (!platformFrontDoorEnabled()) return undefined
+    return onUnauthorized(() => window.location.assign(PLATFORM_FRONT_DOOR_PATH))
+  }, [])
+
+  // Signed out on arrival: stated on its own so it never depends on the
+  // listener above being registered before the session check answers.
+  const signedOutOnArrival = sessionFailure?.status === 401
+  useEffect(() => {
+    if (signedOutOnArrival && platformFrontDoorEnabled()) {
+      window.location.assign(PLATFORM_FRONT_DOOR_PATH)
+    }
+  }, [signedOutOnArrival])
 
   /**
    * Re-read the session, showing "Verificando la sesión…" while it is in
@@ -128,10 +147,19 @@ function Shell() {
     }
 
     // 401 is not an error to report, it is the signed-out state: it gets the
-    // sign-in screen. Every other session failure (an unreachable platform,
-    // for instance) is still a real failure and keeps its own block, so a
-    // backend outage is never mistaken for "please sign in".
+    // sign-in screen, which on the unified platform is the front door. Every
+    // other session failure (an unreachable platform, for instance) is still
+    // a real failure and keeps its own block, so a backend outage is never
+    // mistaken for "please sign in".
     if (sessionFailure?.status === 401) {
+      if (platformFrontDoorEnabled()) {
+        // The effect below performs the navigation; render stays pure.
+        return (
+          <div className="page">
+            <LoadingBlock label="Abriendo la entrada de Campo Digital…" lines={1} />
+          </div>
+        )
+      }
       return <LoginCard demoAvailable={demoSignInAvailable()} onSignedIn={refreshSession} />
     }
 

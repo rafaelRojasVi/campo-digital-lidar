@@ -22,7 +22,6 @@ apps/api/tests
 apps/api/integration_tests
 products/lidar/tests
 products/transelect/tests
-apps/portal
 *.md
 !README.md
 .coverage

@@ -12,7 +12,15 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
 
 from app.config import get_settings
-from app.dashboard_static import mount_dashboard
+from app.dashboard_static import (
+    DEFAULT_PORTAL_DIST,
+    DEFAULT_TRANSELEC_DIST,
+    PORTAL_DIST_ENV,
+    TRANSELEC_DIST_ENV,
+    PrefixedDashboard,
+    dist_dir_from_environment,
+    mount_dashboards,
+)
 from app.database import (
     DatabaseUnavailableError,
     check_database_connection,
@@ -260,11 +268,11 @@ app.include_router(google_auth_router, prefix="/api")
 app.include_router(session_router, prefix="/api")
 app.include_router(transelec_router, prefix="/api")
 
-# Serves the built Transelec dashboard from this same process when a
-# production build is present (see app.dashboard_static) — a no-op in local
-# dev and in every test/CI environment, where no products/transelect/
-# dashboard/dist directory exists. Must stay last: it registers a catch-all
-# route that would otherwise shadow the routers registered above.
+# Serves the built frontends from this same process when production builds
+# are present (see app.dashboard_static): the Campo Digital front door at "/"
+# and Transelec under "/transelec/". A no-op in local dev and in every
+# test/CI environment, where no dist directories exist. Must stay last: it
+# registers a catch-all route that would otherwise shadow the routers above.
 TRANSELEC_SPA_PAGE_PATHS = frozenset(
     {
         "transelec",
@@ -280,8 +288,20 @@ TRANSELEC_SPA_PAGE_PATHS = frozenset(
     }
 )
 
-mount_dashboard(
+_transelec_dist = dist_dir_from_environment(TRANSELEC_DIST_ENV, DEFAULT_TRANSELEC_DIST)
+
+mount_dashboards(
     app,
+    root_dist=dist_dir_from_environment(PORTAL_DIST_ENV, DEFAULT_PORTAL_DIST),
+    # TRANSELEC_SPA_PAGE_PATHS must match ROUTES in
+    # products/transelect/dashboard/src/router.tsx (enforced by
+    # test_dashboard_static.py): the frontend's own page paths, which share
+    # the "transelec" first segment with the real API prefix.
+    prefixed=(
+        [PrefixedDashboard("transelec", _transelec_dist, TRANSELEC_SPA_PAGE_PATHS)]
+        if _transelec_dist is not None
+        else []
+    ),
     reserved_root_segments=frozenset(
         {
             "health",
@@ -292,15 +312,10 @@ mount_dashboard(
             "transelec",
             "api",
             # Reserved even where unmounted (production), so they 404
-            # instead of falling through to index.html.
+            # instead of falling through to the portal.
             "docs",
             "redoc",
             "openapi.json",
         }
     ),
-    # Must match ROUTES in products/transelect/dashboard/src/router.tsx
-    # (enforced by test_dashboard_static.py) — these are the frontend's own
-    # page paths, not backend endpoints, but they share the "transelec"
-    # first segment with the real API prefix.
-    spa_page_paths=TRANSELEC_SPA_PAGE_PATHS,
 )

@@ -1,0 +1,216 @@
+/* The unified platform's front door, on the Campo Digital palette the
+   Transelec and Rodales dashboards use (products/transelect/dashboard/src/
+   styles/tokens.css). Shape rule: controls 6px, cards 8px, pills round. */
+
+.door {
+  --door-ink: #16211d;
+  --door-ink-2: #42524c;
+  --door-ink-inverse: #f2f6f3;
+  --door-ground: #f4f5f2;
+  --door-surface: #fbfbfa;
+  --door-line: #dde1db;
+  --door-forest: #1e8055;
+  --door-forest-deep: #15503a;
+  --door-forest-dark: #0f3b2b;
+  --door-forest-tint: #e7f1eb;
+  --door-focus: #0b6ea8;
+  --door-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  min-height: 100dvh;
+  background: var(--door-ground);
+  color: var(--door-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+.door :focus-visible {
+  outline: 2px solid var(--door-focus);
+  outline-offset: 2px;
+}
+
+.door__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 56px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--door-forest-dark);
+  background: linear-gradient(100deg, var(--door-forest-dark), var(--door-forest-deep));
+}
+
+.door__logo {
+  display: block;
+  width: auto;
+  height: 44px;
+}
+
+.door__signout {
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--door-ink-inverse);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms var(--door-ease);
+}
+
+.door__signout:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.door__main {
+  max-width: 960px;
+  margin: 56px auto;
+  padding: 0 16px;
+}
+
+.door h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.door__muted {
+  margin: 0 0 24px;
+  color: var(--door-ink-2);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.door__error {
+  margin: 0 0 24px;
+  padding: 10px 14px;
+  border: 1px solid #e3c2c3;
+  border-left: 3px solid #96272b;
+  border-radius: 6px;
+  background: #f6e5e5;
+  color: #6e1c20;
+  font-size: 14px;
+}
+
+.door__panel {
+  max-width: 460px;
+  padding: 32px;
+  border: 1px solid var(--door-line);
+  border-radius: 8px;
+  background: var(--door-surface);
+  box-shadow:
+    0 8px 24px -8px rgb(22 33 29 / 0.18),
+    0 1px 2px rgb(22 33 29 / 0.06);
+}
+
+.door__primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 18px;
+  border: 1px solid var(--door-forest);
+  border-radius: 6px;
+  background: var(--door-forest);
+  color: var(--door-ink-inverse);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms var(--door-ease);
+}
+
+.door__primary:hover {
+  border-color: var(--door-forest-deep);
+  background: var(--door-forest-deep);
+}
+
+.door__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.door__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  min-height: 132px;
+  padding: 20px;
+  border: 1px solid var(--door-line);
+  border-radius: 8px;
+  background: var(--door-surface);
+  box-shadow: 0 1px 2px rgb(22 33 29 / 0.06);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 120ms var(--door-ease),
+    transform 120ms var(--door-ease);
+}
+
+a.door__card:hover {
+  border-color: var(--door-forest);
+  transform: translateY(-1px);
+}
+
+.door__card-title {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.door__card-text {
+  color: var(--door-ink-2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.door__card--soon {
+  opacity: 0.7;
+}
+
+.door__soon {
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--door-forest-tint);
+  color: var(--door-forest-deep);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .door__card,
+  .door__primary,
+  .door__signout {
+    transition: none;
+  }
+
+  a.door__card:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .door__bar {
+    padding: 0 16px;
+  }
+
+  .door__main {
+    margin: 32px auto;
+  }
+
+  .door__panel {
+    padding: 24px;
+  }
+}

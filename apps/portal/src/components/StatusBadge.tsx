@@ -10,6 +10,11 @@ const LABELS: Record<CampoEnvironment, Record<ModuleStatus, string>> = {
     available: 'Disponible',
     unavailable: 'No desplegado en este entorno',
   },
+  // Never rendered: production shows the front door only (App.tsx).
+  production: {
+    available: 'Disponible',
+    unavailable: 'No desplegado en este entorno',
+  },
 }
 
 export function StatusBadge({
