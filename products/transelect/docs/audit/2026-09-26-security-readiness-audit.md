@@ -136,6 +136,9 @@ Severity reflects this deployment: one client, an authenticated
 - **`/docs`, `/redoc` and `/openapi.json` are public in production.** They
   expose the route list, not data. Disabling them is a product decision; see
   the open questions.
+  - **DECISION (2026-09-28):** they are disabled under `APP_ENV=production`,
+    because production users need only the dashboard. Other environments
+    keep them. See [deployment](../deployment.md#http-hardening).
 - **Uvicorn access logs record the callback query string**, which includes
   the one-time authorization `code`. The code is single-use and bound to the
   PKCE verifier, which never leaves the server.
@@ -214,8 +217,8 @@ Severity reflects this deployment: one client, an authenticated
 
 ## Open questions
 
-- Should `/docs`, `/redoc` and `/openapi.json` be disabled under
-  `APP_ENV=production`?
+- ~~Should `/docs`, `/redoc` and `/openapi.json` be disabled under
+  `APP_ENV=production`?~~ Yes, decided 2026-09-28 (see above).
 - Should CSV exports be audited as an access event?
 - Is the Google OAuth client *Internal* to the Workspace? This was not
   verified. It is not required for security, because `hd` is enforced

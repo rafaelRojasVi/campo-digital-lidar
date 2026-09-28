@@ -90,10 +90,17 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             await _execution_backend.stop()
 
 
+# Swagger UI, ReDoc and the OpenAPI schema describe every route to anonymous
+# callers; production users only need the dashboard, so it serves none of them.
+_SERVE_API_DOCS = APP_ENV != "production"
+
 app = FastAPI(
     title="Campo Digital LiDAR API",
     version="0.2.0",
     lifespan=_lifespan,
+    docs_url="/docs" if _SERVE_API_DOCS else None,
+    redoc_url="/redoc" if _SERVE_API_DOCS else None,
+    openapi_url="/openapi.json" if _SERVE_API_DOCS else None,
 )
 
 # Multipart framing (boundaries, part headers, the product_key field) on top
@@ -268,7 +275,20 @@ TRANSELEC_SPA_PAGE_PATHS = frozenset(
 mount_dashboard(
     app,
     reserved_root_segments=frozenset(
-        {"health", "ready", "runs", "ingesta", "auth", "transelec", "api"}
+        {
+            "health",
+            "ready",
+            "runs",
+            "ingesta",
+            "auth",
+            "transelec",
+            "api",
+            # Reserved even where unmounted (production), so they 404
+            # instead of falling through to index.html.
+            "docs",
+            "redoc",
+            "openapi.json",
+        }
     ),
     # Must match ROUTES in products/transelect/dashboard/src/router.tsx
     # (enforced by test_dashboard_static.py) — these are the frontend's own
