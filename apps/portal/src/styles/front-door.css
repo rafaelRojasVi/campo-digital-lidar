@@ -1,6 +1,8 @@
 /* The unified platform's front door, on the Campo Digital palette the
    Transelec and Rodales dashboards use (products/transelect/dashboard/src/
-   styles/tokens.css). Shape rule: controls 6px, cards 8px, pills round. */
+   styles/tokens.css). Shape rule: controls 6px, panels and project cards
+   12px, pills round. Each card keeps its product's identity tint
+   (--cd-* in theme.css) on the illustration band only. */
 
 .door {
   --door-ink: #16211d;
@@ -64,7 +66,7 @@
 }
 
 .door__main {
-  max-width: 960px;
+  max-width: 1040px;
   margin: 56px auto;
   padding: 0 16px;
 }
@@ -96,11 +98,89 @@
   font-size: 14px;
 }
 
+.door__signin {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 64px;
+  align-items: center;
+  min-height: calc(100dvh - 56px - 112px);
+}
+
+.door__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 56ch;
+}
+
+.door__eyebrow {
+  margin: 0;
+  color: #5d6c66;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.door .door__intro h1 {
+  margin: 0;
+  font-size: 36px;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+}
+
+.door__lead {
+  margin: 0;
+  color: var(--door-ink-2);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.door__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--door-line);
+  color: #5d6c66;
+  font-size: 14px;
+  list-style: none;
+}
+
+.door__facts li {
+  position: relative;
+  padding-left: 14px;
+}
+
+.door__facts li::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 0;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: #c3cabf;
+}
+
+.door__panel h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.door__primary--block {
+  width: 100%;
+}
+
 .door__panel {
   max-width: 460px;
+  width: 100%;
+  justify-self: end;
   padding: 32px;
   border: 1px solid var(--door-line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--door-surface);
   box-shadow:
     0 8px 24px -8px rgb(22 33 29 / 0.18),
@@ -131,10 +211,46 @@
   background: var(--door-forest-deep);
 }
 
+.door__demo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--door-line);
+}
+
+.door__demo .door__muted {
+  margin: 0;
+  font-size: 13px;
+}
+
+.door__secondary {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid #c3cabf;
+  border-radius: 6px;
+  background: var(--door-surface);
+  color: var(--door-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms var(--door-ease);
+}
+
+.door__secondary:hover {
+  background: #eef0ec;
+}
+
+.door .door__hello {
+  font-size: 30px;
+}
+
 .door__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -143,39 +259,109 @@
 .door__card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   height: 100%;
-  min-height: 132px;
-  padding: 20px;
+  overflow: hidden;
   border: 1px solid var(--door-line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--door-surface);
   box-shadow: 0 1px 2px rgb(22 33 29 / 0.06);
   color: inherit;
   text-decoration: none;
   transition:
-    border-color 120ms var(--door-ease),
-    transform 120ms var(--door-ease);
+    border-color 160ms var(--door-ease),
+    box-shadow 160ms var(--door-ease),
+    transform 160ms var(--door-ease);
 }
 
-a.door__card:hover {
-  border-color: var(--door-forest);
-  transform: translateY(-1px);
+.door__card-visual {
+  display: block;
+  height: 148px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--door-line);
+}
+
+.door__card--transelec .door__card-visual {
+  background: var(--cd-transelec-soft);
+}
+
+.door__card--forestal .door__card-visual {
+  background: var(--cd-forestal-soft);
+}
+
+.door__card--lidar .door__card-visual {
+  background: var(--cd-lidar-soft);
+}
+
+.door__card-visual svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: transform 240ms var(--door-ease);
+}
+
+.door__card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px 20px;
 }
 
 .door__card-title {
-  font-size: 18px;
-  font-weight: 650;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .door__card-text {
   color: var(--door-ink-2);
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
-.door__card--soon {
-  opacity: 0.7;
+.door__card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 12px;
+  color: var(--door-forest);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.door__card-cta span {
+  transition: transform 160ms var(--door-ease);
+}
+
+a.door__card:hover {
+  border-color: var(--door-forest);
+  box-shadow:
+    0 12px 28px -12px rgb(22 33 29 / 0.28),
+    0 1px 2px rgb(22 33 29 / 0.06);
+  transform: translateY(-2px);
+}
+
+a.door__card:hover .door__card-visual svg {
+  transform: scale(1.04);
+}
+
+a.door__card:hover .door__card-cta span {
+  transform: translateX(3px);
+}
+
+a.door__card:active {
+  transform: translateY(0);
+}
+
+.door__card--soon .door__card-visual {
+  filter: grayscale(0.6);
+  opacity: 0.75;
+}
+
+.door__card--soon .door__card-title,
+.door__card--soon .door__card-text {
+  color: var(--door-ink-2);
 }
 
 .door__soon {
@@ -191,13 +377,35 @@ a.door__card:hover {
 
 @media (prefers-reduced-motion: reduce) {
   .door__card,
+  .door__card-visual svg,
+  .door__card-cta span,
   .door__primary,
+  .door__secondary,
   .door__signout {
     transition: none;
   }
 
-  a.door__card:hover {
+  a.door__card:hover,
+  a.door__card:hover .door__card-visual svg,
+  a.door__card:hover .door__card-cta span {
     transform: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .door__signin {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    min-height: 0;
+  }
+
+  .door__panel {
+    justify-self: stretch;
+    max-width: none;
+  }
+
+  .door .door__intro h1 {
+    font-size: 28px;
   }
 }
 

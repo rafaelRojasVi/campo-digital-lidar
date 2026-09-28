@@ -6,7 +6,7 @@ import { FrontDoor } from './FrontDoor'
 
 vi.mock('../lib/platformApi', async (importOriginal) => {
   const actual = await importOriginal<typeof api>()
-  return { ...actual, getMe: vi.fn(), logout: vi.fn() }
+  return { ...actual, getMe: vi.fn(), logout: vi.fn(), devLogin: vi.fn() }
 })
 
 const me = (grants: api.ProductGrant[]): api.ApiResult<api.Me> => ({
@@ -25,6 +25,17 @@ describe('FrontDoor', () => {
     render(<FrontDoor />)
     const link = await screen.findByRole('link', { name: 'Iniciar sesión con Google' })
     expect(link).toHaveAttribute('href', '/api/auth/google/login')
+  })
+
+  it('introduces the platform beside the sign-in panel, like the Transelec sign-in', async () => {
+    vi.mocked(api.getMe).mockResolvedValue({ ok: false, status: 401, error: 'no session' })
+    render(<FrontDoor />)
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Plataforma de gestión forestal' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Inicie sesión para continuar' }),
+    ).toBeInTheDocument()
   })
 
   it('shows only the projects the user can open', async () => {
@@ -78,5 +89,38 @@ describe('FrontDoor', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Cerrar sesión' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cerrar la sesión')
     expect(screen.getByText('Hola, Javier Soto')).toBeInTheDocument()
+  })
+
+  it('offers the seeded demo identities only in the Vite dev server', async () => {
+    vi.mocked(api.getMe).mockResolvedValueOnce({ ok: false, status: 401, error: 'no session' })
+    vi.mocked(api.devLogin).mockResolvedValue(me([{ product_key: 'transelect', role: 'viewer' }]))
+    render(<FrontDoor />)
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Ver como Javier (solo lectura)' }),
+    )
+    expect(api.devLogin).toHaveBeenCalledWith('dev-viewer')
+    expect(await screen.findByText('Hola, Javier Soto')).toBeInTheDocument()
+  })
+
+  it('compiles the demo identities out of every build', async () => {
+    vi.stubEnv('DEV', false)
+    try {
+      vi.mocked(api.getMe).mockResolvedValue({ ok: false, status: 401, error: 'no session' })
+      render(<FrontDoor />)
+      await screen.findByRole('link', { name: 'Iniciar sesión con Google' })
+      expect(screen.queryByRole('button', { name: /demostración|solo lectura/ })).not.toBeInTheDocument()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('marks an open project with "Abrir" and keeps its illustration decorative', async () => {
+    vi.mocked(api.getMe).mockResolvedValue(me([{ product_key: 'transelect', role: 'viewer' }]))
+    const { container } = render(<FrontDoor />)
+    const card = await screen.findByRole('link', { name: /Transelec/ })
+    expect(card).toHaveTextContent('Abrir')
+    expect(card.querySelector('svg')).not.toBeNull()
+    expect(screen.queryByRole('img', { name: /Identidad visual/ })).not.toBeInTheDocument()
+    expect(container.querySelector('[aria-hidden="true"] svg')).not.toBeNull()
   })
 })

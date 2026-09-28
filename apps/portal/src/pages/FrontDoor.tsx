@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import logo from '../assets/campo-digital-logo.png'
-import { GOOGLE_LOGIN_PATH, PRODUCT_CARDS } from '../data/productCards'
-import { getMe, logout, type ApiResult, type Me } from '../lib/platformApi'
+import { MODULE_VISUALS } from '../components/visuals'
+import { GOOGLE_LOGIN_PATH, PRODUCT_CARDS, type ProductCard } from '../data/productCards'
+import { devLogin, getMe, logout, type ApiResult, type Me } from '../lib/platformApi'
 import '../styles/front-door.css'
 
 type State =
@@ -42,6 +43,10 @@ export function FrontDoor() {
 
   const [signOutFailed, setSignOutFailed] = useState(false)
 
+  const signInAsDemo = async (identityKey: string) => {
+    setState(sessionState(await devLogin(identityKey)))
+  }
+
   // The front door is the only place to sign out, so a failure must be said
   // out loud: on a shared computer "nothing happened" reads as "signed out".
   const signOut = async () => {
@@ -64,7 +69,7 @@ export function FrontDoor() {
       <main className="door__main">
         {signOutFailed && state.kind === 'signed-in' ? (
           <p className="door__error" role="alert">
-            No se pudo cerrar la sesión. Vuelve a intentarlo o cierra el navegador.
+            No se pudo cerrar la sesión. Vuelva a intentarlo o cierre el navegador.
           </p>
         ) : null}
         {state.kind === 'loading' ? (
@@ -73,20 +78,57 @@ export function FrontDoor() {
           </p>
         ) : null}
         {state.kind === 'signed-out' ? (
-          <section className="door__panel" aria-labelledby="door-title">
-            <h1 id="door-title">Plataforma Campo Digital</h1>
-            <p className="door__muted">
-              Ingresa con tu cuenta de Campo Digital para ver tus proyectos.
-            </p>
-            <a className="door__primary" href={GOOGLE_LOGIN_PATH}>
-              Iniciar sesión con Google
-            </a>
-          </section>
+          <div className="door__signin">
+            <div className="door__intro">
+              <p className="door__eyebrow">Campo Digital</p>
+              <h1>Plataforma de gestión forestal</h1>
+              <p className="door__lead">
+                Seguimiento de planes de manejo, rodales y mediciones en un solo lugar, con una
+                sola cuenta de Campo Digital.
+              </p>
+              <ul className="door__facts">
+                <li>Cada persona ve solo los proyectos que tiene asignados.</li>
+                <li>El acceso lo decide el servidor a partir de los permisos de su cuenta.</li>
+              </ul>
+            </div>
+
+            <section className="door__panel" aria-labelledby="door-signin-title">
+              <h2 id="door-signin-title">Inicie sesión para continuar</h2>
+              <p className="door__muted">
+                Use su cuenta de Google de Campo Digital (@campodigital.cl).
+              </p>
+              <a className="door__primary door__primary--block" href={GOOGLE_LOGIN_PATH}>
+                Iniciar sesión con Google
+              </a>
+              {/* Vite replaces import.meta.env.DEV with false in every build, so
+                  these seeded identities exist only in the local dev server;
+                  the API also mounts /auth/dev-login only in development. */}
+              {import.meta.env.DEV ? (
+                <div className="door__demo">
+                  <p className="door__muted">Solo en desarrollo local:</p>
+                  <button
+                    type="button"
+                    className="door__secondary"
+                    onClick={() => void signInAsDemo('dev-admin')}
+                  >
+                    Entrar como administrador de demostración
+                  </button>
+                  <button
+                    type="button"
+                    className="door__secondary"
+                    onClick={() => void signInAsDemo('dev-viewer')}
+                  >
+                    Ver como Javier (solo lectura)
+                  </button>
+                </div>
+              ) : null}
+            </section>
+          </div>
         ) : null}
         {state.kind === 'unreachable' ? (
           <section className="door__panel" role="alert">
             <h1>No se pudo contactar la plataforma</h1>
-            <p className="door__muted">Revisa tu conexión y vuelve a intentarlo.</p>
+            <p className="door__muted">Revise su conexión y vuelva a intentarlo.</p>
             <button type="button" className="door__primary" onClick={retry}>
               Reintentar
             </button>
@@ -109,31 +151,54 @@ function Projects({ me }: { me: Me }) {
       </h1>
       {cards.length === 0 ? (
         <p className="door__muted">
-          Tu cuenta no tiene proyectos asignados. Pide acceso a un administrador de Campo Digital.
+          Su cuenta no tiene proyectos asignados. Pida acceso a un administrador de Campo Digital.
         </p>
       ) : (
         <>
-          <p className="door__muted">Elige un proyecto.</p>
+          <p className="door__muted">Elija un proyecto para continuar.</p>
           <ul className="door__grid">
             {cards.map((card) => (
               <li key={card.key}>
-                {card.href !== null ? (
-                  <a className="door__card" href={card.href}>
-                    <span className="door__card-title">{card.title}</span>
-                    <span className="door__card-text">{card.description}</span>
-                  </a>
-                ) : (
-                  <div className="door__card door__card--soon" aria-disabled="true">
-                    <span className="door__card-title">{card.title}</span>
-                    <span className="door__card-text">{card.description}</span>
-                    <span className="door__soon">Próximamente</span>
-                  </div>
-                )}
+                <ProjectCard card={card} />
               </li>
             ))}
           </ul>
         </>
       )}
     </section>
+  )
+}
+
+function ProjectCard({ card }: { card: ProductCard }) {
+  const Visual = MODULE_VISUALS[card.accent]
+  const body = (
+    <>
+      {/* Identity mark only: the title and description carry the meaning. */}
+      <span className="door__card-visual" aria-hidden="true">
+        <Visual />
+      </span>
+      <span className="door__card-body">
+        <span className="door__card-title">{card.title}</span>
+        <span className="door__card-text">{card.description}</span>
+        {card.href !== null ? (
+          <span className="door__card-cta">
+            Abrir <span aria-hidden="true">→</span>
+          </span>
+        ) : (
+          <span className="door__soon">Próximamente</span>
+        )}
+      </span>
+    </>
+  )
+
+  const className = `door__card door__card--${card.accent}`
+  return card.href !== null ? (
+    <a className={className} href={card.href}>
+      {body}
+    </a>
+  ) : (
+    <div className={`${className} door__card--soon`} aria-disabled="true">
+      {body}
+    </div>
   )
 }
