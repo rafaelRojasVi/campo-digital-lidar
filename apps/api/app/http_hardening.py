@@ -205,7 +205,7 @@ _DOCS_PATHS = frozenset({"/docs", "/docs/oauth2-redirect", "/redoc"})
 
 # Content-hashed build output (index-<hash>.js); safe to cache, and never
 # carries client data.
-_CACHEABLE_PATH_PREFIXES = ("/assets/",)
+_CACHEABLE_PATH_PREFIXES = ("/assets/", "/transelec/assets/")
 
 # A year, per common HSTS deployment guidance. No `preload`: that is a
 # registry submission with its own consequences, not a header default.
