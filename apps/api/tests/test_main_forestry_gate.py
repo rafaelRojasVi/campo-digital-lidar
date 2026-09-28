@@ -1,5 +1,6 @@
 """The forestry read API has no authentication yet, so ``app.main`` mounts it
-only under ``APP_ENV=development``. The same app is deployed to production.
+only in ``development`` and CI's ``test``, never in the deployed staging and
+production environments.
 
 Runs ``app.main`` in a subprocess because ``APP_ENV`` is read at import time.
 """
@@ -34,10 +35,11 @@ def _forestry_mounted(app_env: str) -> bool:
     return result.stdout.strip() == "True"
 
 
-def test_development_mounts_the_forestry_api() -> None:
-    assert _forestry_mounted("development") is True
+@pytest.mark.parametrize("app_env", ["development", "test"])
+def test_undeployed_environments_mount_the_forestry_api(app_env: str) -> None:
+    assert _forestry_mounted(app_env) is True
 
 
-@pytest.mark.parametrize("app_env", ["test", "staging", "production"])
+@pytest.mark.parametrize("app_env", ["staging", "production"])
 def test_other_environments_do_not_mount_the_forestry_api(app_env: str) -> None:
     assert _forestry_mounted(app_env) is False

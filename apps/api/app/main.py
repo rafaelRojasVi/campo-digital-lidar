@@ -231,14 +231,16 @@ app.include_router(session_router)
 # inside the /auth/dev-login handler as defense in depth.
 if APP_ENV == "development":
     from app.routers.dev_auth import router as dev_auth_router
-    from app.routers.forestry import router as forestry_router
 
     app.include_router(dev_auth_router)
     app.include_router(dev_auth_router, prefix="/api")
 
-    # The forestry read API has no authentication or product grant yet, and
-    # this app is the one deployed to production; until it gets both, it
-    # exists only in local development.
+# The forestry read API has no authentication or product grant yet, and this
+# app is the one deployed to staging and production; until it gets both, it
+# exists only where nothing is deployed (local development and CI's "test").
+if APP_ENV in ("development", "test"):
+    from app.routers.forestry import router as forestry_router
+
     app.include_router(forestry_router)
 
 # Second mount under /api for the routers a browser bundle actually calls at
