@@ -23,7 +23,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Me, TranselecActiveImport } from '../api'
 import { logout, transelecRole } from '../api'
-import { formatDateTime } from '../format'
+import { formatDate, formatDateTime } from '../format'
 import { Link, ROUTES, useRouter, type Route } from '../router'
 import campoDigitalLogo from '../assets/campo-digital-logo.png'
 import { PLATFORM_FRONT_DOOR_PATH, platformFrontDoorEnabled } from '../runtime/frontDoor'
@@ -171,11 +171,6 @@ export function AppHeader({
           </span>
         </Link>
 
-        {platformFrontDoorEnabled() && (
-          <a className="project-switch" href={PLATFORM_FRONT_DOOR_PATH}>
-            Cambiar proyecto
-          </a>
-        )}
 
         {signedIn && (
           <button
@@ -215,7 +210,7 @@ export function AppHeader({
               title={`Publicada ${formatDateTime(activeImport.published_at)}`}
             >
               <b>Versión activa #{activeImport.import_id}</b>
-              <span>Publicada {formatDateTime(activeImport.published_at)}</span>
+              <span>Publicada {formatDate(activeImport.published_at)}</span>
             </span>
           ) : null}
           {signedIn && !activeImport && (
@@ -231,7 +226,19 @@ export function AppHeader({
             </span>
           )}
 
-          {me && onSignedOut && (
+          {/* On the unified platform the front door owns the session: this
+              button goes back to the project picker, where "Cerrar sesión"
+              lives, instead of adding a sixth control to a full bar. */}
+          {me && platformFrontDoorEnabled() && (
+            <a
+              className="project-switch"
+              href={PLATFORM_FRONT_DOOR_PATH}
+              title="Cambiar de proyecto o cerrar sesión"
+            >
+              Proyectos
+            </a>
+          )}
+          {me && onSignedOut && !platformFrontDoorEnabled() && (
             <SessionControl
               label={demoMode ? 'Cambiar usuario' : 'Cerrar sesión'}
               onSignedOut={onSignedOut}

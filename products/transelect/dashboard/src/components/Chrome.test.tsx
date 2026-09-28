@@ -42,9 +42,17 @@ describe('AppHeader (TR-FUNC-041/046)', () => {
     vi.stubEnv('VITE_PLATFORM_FRONT_DOOR', 'true')
     try {
       renderWithRouter(
-        <AppHeader me={me} activeImport={null} currentPath={ROUTES.resumen} canPublish />,
+        <AppHeader
+          me={me}
+          activeImport={null}
+          currentPath={ROUTES.resumen}
+          canPublish
+          onSignedOut={() => {}}
+        />,
       )
-      expect(screen.getByRole('link', { name: 'Cambiar proyecto' })).toHaveAttribute('href', '/')
+      expect(screen.getByRole('link', { name: 'Proyectos' })).toHaveAttribute('href', '/')
+      // The front door owns sign-out on the unified platform.
+      expect(screen.queryByRole('button', { name: 'Cerrar sesión' })).not.toBeInTheDocument()
     } finally {
       vi.unstubAllEnvs()
     }
@@ -54,7 +62,7 @@ describe('AppHeader (TR-FUNC-041/046)', () => {
     renderWithRouter(
       <AppHeader me={me} activeImport={null} currentPath={ROUTES.resumen} canPublish />,
     )
-    expect(screen.queryByRole('link', { name: 'Cambiar proyecto' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Proyectos' })).not.toBeInTheDocument()
   })
 
   it('shows Campo Digital’s own logo, served from the bundle, with the brand as text', () => {

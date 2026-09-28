@@ -1391,7 +1391,21 @@
 
 /* ========================================================= breakpoints */
 
-@media (max-width: 1023px) {
+/*
+ * The bar's widest state (an administrator: six sections, the version chip,
+ * the identity and, on the unified platform, "Proyectos") needs ~1,210px.
+ * The chip shows the publish date (the time is in its title). Below 1440px
+ * the role label goes; below 1280px the sections fold into the "Secciones"
+ * menu. Pinned by
+ * tests/e2e/navigation.spec.ts "the shell bar at laptop widths".
+ */
+@media (max-width: 1439px) {
+  .identity-role {
+    display: none;
+  }
+}
+
+@media (max-width: 1279px) {
   .topnav-toggle {
     display: inline-flex;
     align-items: center;
@@ -1431,7 +1445,9 @@
   .topnav a[aria-current='page']::after {
     display: none;
   }
+}
 
+@media (max-width: 1023px) {
   .identity,
   .version-chip span {
     display: none;
