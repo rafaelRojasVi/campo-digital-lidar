@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import logo from '../assets/campo-digital-logo.png'
 import { GOOGLE_LOGIN_PATH, PRODUCT_CARDS } from '../data/productCards'
-import { getMe, logout, type ApiResult, type Me } from '../lib/platformApi'
+import { devLogin, getMe, logout, type ApiResult, type Me } from '../lib/platformApi'
 import '../styles/front-door.css'
 
 type State =
@@ -42,6 +42,10 @@ export function FrontDoor() {
 
   const [signOutFailed, setSignOutFailed] = useState(false)
 
+  const signInAsDemo = async (identityKey: string) => {
+    setState(sessionState(await devLogin(identityKey)))
+  }
+
   // The front door is the only place to sign out, so a failure must be said
   // out loud: on a shared computer "nothing happened" reads as "signed out".
   const signOut = async () => {
@@ -81,6 +85,28 @@ export function FrontDoor() {
             <a className="door__primary" href={GOOGLE_LOGIN_PATH}>
               Iniciar sesión con Google
             </a>
+            {/* Vite replaces import.meta.env.DEV with false in every build, so
+                these seeded identities exist only in the local dev server;
+                the API also mounts /auth/dev-login only in development. */}
+            {import.meta.env.DEV ? (
+              <div className="door__demo">
+                <p className="door__muted">Solo en desarrollo local:</p>
+                <button
+                  type="button"
+                  className="door__secondary"
+                  onClick={() => void signInAsDemo('dev-admin')}
+                >
+                  Entrar como administrador de demostración
+                </button>
+                <button
+                  type="button"
+                  className="door__secondary"
+                  onClick={() => void signInAsDemo('dev-viewer')}
+                >
+                  Ver como Javier (solo lectura)
+                </button>
+              </div>
+            ) : null}
           </section>
         ) : null}
         {state.kind === 'unreachable' ? (

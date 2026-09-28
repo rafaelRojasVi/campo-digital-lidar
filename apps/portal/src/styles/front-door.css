@@ -131,6 +131,38 @@
   background: var(--door-forest-deep);
 }
 
+.door__demo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--door-line);
+}
+
+.door__demo .door__muted {
+  margin: 0;
+  font-size: 13px;
+}
+
+.door__secondary {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid #c3cabf;
+  border-radius: 6px;
+  background: var(--door-surface);
+  color: var(--door-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms var(--door-ease);
+}
+
+.door__secondary:hover {
+  background: #eef0ec;
+}
+
 .door__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

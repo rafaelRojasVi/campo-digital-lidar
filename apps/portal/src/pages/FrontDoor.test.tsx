@@ -6,7 +6,7 @@ import { FrontDoor } from './FrontDoor'
 
 vi.mock('../lib/platformApi', async (importOriginal) => {
   const actual = await importOriginal<typeof api>()
-  return { ...actual, getMe: vi.fn(), logout: vi.fn() }
+  return { ...actual, getMe: vi.fn(), logout: vi.fn(), devLogin: vi.fn() }
 })
 
 const me = (grants: api.ProductGrant[]): api.ApiResult<api.Me> => ({
@@ -78,5 +78,28 @@ describe('FrontDoor', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Cerrar sesión' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cerrar la sesión')
     expect(screen.getByText('Hola, Javier Soto')).toBeInTheDocument()
+  })
+
+  it('offers the seeded demo identities only in the Vite dev server', async () => {
+    vi.mocked(api.getMe).mockResolvedValueOnce({ ok: false, status: 401, error: 'no session' })
+    vi.mocked(api.devLogin).mockResolvedValue(me([{ product_key: 'transelect', role: 'viewer' }]))
+    render(<FrontDoor />)
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Ver como Javier (solo lectura)' }),
+    )
+    expect(api.devLogin).toHaveBeenCalledWith('dev-viewer')
+    expect(await screen.findByText('Hola, Javier Soto')).toBeInTheDocument()
+  })
+
+  it('compiles the demo identities out of every build', async () => {
+    vi.stubEnv('DEV', false)
+    try {
+      vi.mocked(api.getMe).mockResolvedValue({ ok: false, status: 401, error: 'no session' })
+      render(<FrontDoor />)
+      await screen.findByRole('link', { name: 'Iniciar sesión con Google' })
+      expect(screen.queryByRole('button', { name: /demostración|solo lectura/ })).not.toBeInTheDocument()
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })
