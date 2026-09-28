@@ -148,6 +148,39 @@ Scope:
 Do not invent workflow states, approval semantics, or business entities that
 have not been established.
 
+Current implementation status (2026-08-29):
+
+- **FACT** — the first real Forestry source snapshot (Degenfeld estate
+  shapefile family) has a forensic evidence record in
+  `products/forestry/docs/source-evidence-v1.md`;
+- **FACT** — a structural Source Contract V1 (family completeness, declared
+  CRS/encoding, DBF schema, record-count integrity, fingerprinting) is
+  implemented in `forestry_ingestion.shapefile_contract` with synthetic-fixture
+  tests;
+- **FACT** — Ingestion Substrate V1 is implemented
+  (`products/forestry/docs/ingestion-substrate-v1.md`): immutable,
+  idempotent PostGIS persistence of contract-valid snapshots (migration
+  `0003`, schema `forestry`) with snapshot-local feature identity,
+  faithful geometry storage under EPSG:32718, quality-flag evidence, and
+  service-level read projections — verified read-only against the real
+  Degenfeld snapshot;
+- **FACT** — Read API V1 is implemented
+  (`products/forestry/docs/read-api-v1.md`): a read-only factual HTTP
+  projection under `/api/forestry` (snapshot list/summary, source predio
+  and use distributions, literal source-field comparison, paginated and
+  filterable feature listing, feature detail, GeoJSON-encoded geometry in
+  the source CRS) — verified read-only against the real Degenfeld snapshot;
+  it establishes no canonical identity, workflow, or current-state
+  semantics;
+- **OPEN QUESTION (integration)** — Alembic revision `0003` also exists on
+  the unmerged Transelec hosted-pilot branch; whichever product branch is
+  integrated second must be re-revisioned so `main` keeps a single Alembic
+  head (see `products/forestry/docs/read-api-v1.md`, Integration concerns);
+- **LIMITATION** — canonical entities (predio/rodal/polygon identity across
+  snapshots), workflow semantics, and the dashboard remain open pending
+  stakeholder answers
+  (`products/forestry/docs/es/preguntas-campo-digital.md`).
+
 Exit condition:
 
 Forestry source data can be ingested reproducibly into an evidence-backed

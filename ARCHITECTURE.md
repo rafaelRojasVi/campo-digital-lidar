@@ -27,14 +27,8 @@ Materialized product roots are created only when product-owned implementation
 exists. Currently:
 
     products/lidar/
-
-Future Forestry and Transelec implementation belongs under:
-
     products/forestry/
     products/transelect/
-
-Their absence from the current tree does not change the bounded-context
-ownership rule.
 
 ## Shared API
 

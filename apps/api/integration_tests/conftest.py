@@ -10,9 +10,14 @@ import pytest
 from sqlalchemy import Connection, Engine
 
 API_ROOT = Path(__file__).resolve().parents[1]
+FORESTRY_TESTS_ROOT = API_ROOT.parents[1] / "products" / "forestry" / "tests"
 
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
+
+# Synthetic Forestry family builders are shared with the Forestry unit tests.
+if str(FORESTRY_TESTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(FORESTRY_TESTS_ROOT))
 
 from app.config import Settings  # noqa: E402
 from app.database import build_engine  # noqa: E402

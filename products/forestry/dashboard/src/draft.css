@@ -1,0 +1,328 @@
+/* Local-only boundary simulation. Source geometry remains immutable. */
+
+/*
+ * Editing is a focused map task. The normal source inspector is useful before
+ * entering a draft, but on narrow screens it occupies the same right-hand
+ * workspace as the draft tools. While a draft exists, remove the inspector
+ * from layout so the map expands and the editor stays fully usable. As soon as
+ * the draft is discarded, the inspector returns automatically because the
+ * selected source feature is still selected.
+ */
+.app__body:has(.draft-edit) > .inspector {
+  display: none;
+}
+
+.map__control-button--draft {
+  color: #7a4a00;
+  background: #fff7df;
+  border-color: #e2b94d;
+}
+
+.map__control-button--draft:hover:not(:disabled) {
+  background: #ffefbd;
+}
+
+.map__control-button--draft:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.draft-edit {
+  position: absolute;
+  right: 12px;
+  bottom: 32px;
+  z-index: 1001;
+  width: min(384px, calc(100% - 24px));
+  max-height: calc(100% - 96px);
+  overflow-y: auto;
+  padding: 14px;
+  color: var(--ink);
+  background: rgb(251 251 250 / 0.97);
+  /* Amber marks local draft mode (Transelec --st-progress family). */
+  border: 1px solid #d5ad43;
+  border-top: 3px solid #cf9000;
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(8px);
+}
+
+.draft-edit__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.draft-edit--collapsed {
+  width: min(300px, calc(100% - 24px));
+}
+
+.draft-edit--collapsed .draft-edit__heading {
+  margin-bottom: 8px;
+}
+
+.draft-edit__collapse {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--ink-2);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.draft-edit__collapse:hover {
+  color: var(--ink);
+  border-color: #b58a29;
+}
+
+.draft-edit__heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.draft-edit__heading strong {
+  font-size: 14px;
+}
+
+.draft-edit__heading span {
+  color: var(--ink-2);
+  font-size: 11.5px;
+}
+
+.draft-edit__badge {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  color: #6b4300 !important;
+  background: #fff0b9;
+  border: 1px solid #e2b94d;
+  border-radius: 999px;
+  font-size: 10px !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.draft-edit__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.draft-edit__metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.draft-edit__metrics > div:last-child {
+  grid-column: 1 / -1;
+}
+
+.draft-edit__metrics span {
+  color: var(--ink-3);
+  font-size: 10.5px;
+}
+
+.draft-edit__metrics strong {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.draft-edit p {
+  margin: 9px 0;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.draft-edit__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.draft-tool {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--ink-2);
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.draft-tool:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--panel-2);
+  border-color: #b58a29;
+}
+
+.draft-tool--active {
+  color: #6b4300;
+  background: #fff0b9;
+  border-color: #d5ad43;
+}
+
+.draft-tool:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.draft-edit__simplify {
+  margin-top: 9px;
+  padding: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.draft-edit__simplify-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink-3);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.draft-edit__simplify-levels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.draft-edit__simplify-summary {
+  margin: 8px 0 0 !important;
+  color: var(--ink-2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.draft-edit__point-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 7px;
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.draft-edit__point-summary strong {
+  color: var(--ink-2);
+}
+
+.draft-edit__status {
+  margin: 8px 0 0 !important;
+  padding: 7px 8px;
+  color: #6b4300 !important;
+  background: #fff8e5;
+  border: 1px solid #ecd48c;
+  border-radius: var(--radius);
+}
+
+.draft-edit__note {
+  margin: 8px 0 !important;
+}
+
+.draft-edit__cut-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.draft-edit__cut-actions .button {
+  flex: 1 1 auto;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.draft-edit__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.draft-edit__actions .button {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.draft-vertex {
+  display: grid !important;
+  place-items: center;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.draft-vertex span {
+  display: block;
+  width: 11px;
+  height: 11px;
+  background: #ffffff;
+  border: 2px solid #d58f00;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(27, 26, 23, 0.4);
+}
+
+.draft-vertex:hover span {
+  width: 13px;
+  height: 13px;
+  border-color: #8c5c00;
+}
+
+.map--cutting .map__canvas,
+.map--cutting .leaflet-interactive {
+  cursor: crosshair !important;
+}
+
+.map--cutting .draft-vertex {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  .draft-edit {
+    right: 8px;
+    bottom: 26px;
+    width: calc(100% - 16px);
+    max-height: calc(100% - 80px);
+  }
+
+  .draft-edit__metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .draft-edit__metrics > div:last-child {
+    grid-column: auto;
+  }
+
+  .draft-edit__tools {
+    flex-direction: column;
+  }
+
+  .draft-edit__point-summary {
+    flex-direction: column;
+    gap: 2px;
+  }
+}

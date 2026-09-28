@@ -235,6 +235,14 @@ if APP_ENV == "development":
     app.include_router(dev_auth_router)
     app.include_router(dev_auth_router, prefix="/api")
 
+# The forestry read API has no authentication or product grant yet, and this
+# app is the one deployed to staging and production; until it gets both, it
+# exists only where nothing is deployed (local development and CI's "test").
+if APP_ENV in ("development", "test"):
+    from app.routers.forestry import router as forestry_router
+
+    app.include_router(forestry_router)
+
 # Second mount under /api for the routers a browser bundle actually calls at
 # that prefix (see products/transelect/dashboard/src/api.ts). Every frontend
 # on this platform is built once against a same-origin `/api/*` convention

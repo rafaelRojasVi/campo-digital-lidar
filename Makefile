@@ -1,4 +1,4 @@
-.PHONY: setup lint format format-check typecheck test test-api docs-check architecture-check secret-check dependency-audit check db-test-up db-test-reset db-test-down migration-check persistence-check lidar-dev lidar-status lidar-stop transelec-dev transelec-status transelec-stop campo-demo campo-status campo-stop ensure-platform-db platform-local platform-worker platform-worker-concurrency
+.PHONY: setup lint format format-check typecheck test test-api docs-check architecture-check secret-check dependency-audit check db-test-up db-test-reset db-test-down migration-check persistence-check lidar-dev lidar-status lidar-stop transelec-dev transelec-status transelec-stop campo-demo campo-status campo-stop ensure-platform-db platform-local platform-worker platform-worker-concurrency forestry-dev forestry-status forestry-stop forestry-frontend-check
 
 N ?= 2
 
@@ -127,3 +127,14 @@ platform-worker-concurrency: ensure-platform-db
 	done; \
 	wait
 
+forestry-dev:
+	uv run --extra api python scripts/forestry_dev.py up
+
+forestry-status:
+	uv run --extra api python scripts/forestry_dev.py status
+
+forestry-stop:
+	uv run --extra api python scripts/forestry_dev.py stop
+
+forestry-frontend-check:
+	cd products/forestry/dashboard && npm run lint && npm run build && npm test

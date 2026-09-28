@@ -6,8 +6,12 @@ Active platform contract.
 
 Source provenance storage, V1 read-only filesystem discovery/fingerprinting,
 and persistence of discovered provenance observations are implemented.
-Classification, validation, product ingestion, and artifact handling remain
-future slices.
+
+The first product adapter is implemented: Forestry ingests contract-valid
+shapefile snapshots into product-specific PostGIS tables that reference the
+shared immutable source snapshot
+(`products/forestry/docs/ingestion-substrate-v1.md`). Classification,
+generic validation stages, and artifact handling remain future slices.
 
 ## Purpose
 

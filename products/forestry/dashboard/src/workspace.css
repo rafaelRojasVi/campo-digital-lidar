@@ -1,0 +1,203 @@
+/* Forestry Dashboard V1.1 workspace refinements.
+   Kept separate from the V1 stylesheet so this UX pass stays easy to review/revert. */
+
+.app__sidebar {
+  transition:
+    width 160ms ease,
+    flex-basis 160ms ease,
+    padding 160ms ease;
+}
+
+.app__sidebar--collapsed {
+  width: 0;
+  flex-basis: 0;
+  padding: 0;
+  gap: 0;
+  border-right: 0;
+  overflow: hidden;
+}
+
+.app--map-focus .header,
+.app--map-focus .kpis,
+.app--map-focus .app__sidebar,
+.app--map-focus .data-panel {
+  display: none;
+}
+
+.app--map-focus .app__body {
+  flex: 1 1 auto;
+}
+
+.map__controls {
+  flex-wrap: wrap;
+  max-width: calc(100% - 72px);
+}
+
+.map__basemap-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 4px 0 10px;
+  color: var(--ink-2);
+  background: transparent;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.map__basemap-select {
+  min-width: 94px;
+  padding: 2px 22px 2px 5px;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 0;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.map__control-button--focus[aria-pressed='true'] {
+  color: var(--ink-inverse);
+  background: var(--green-700);
+  border-color: var(--green-700);
+}
+
+.active-filters {
+  position: absolute;
+  top: 60px;
+  left: 58px;
+  right: 12px;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: calc(100% - 68px);
+  padding: 5px 7px;
+  background: rgb(251 251 250 / 0.94);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(8px);
+}
+
+.active-filters__label {
+  flex: 0 0 auto;
+  padding: 0 3px;
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.active-filters__chips {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.active-filters__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  max-width: 250px;
+  padding: 3px 7px;
+  color: var(--green-900);
+  background: var(--green-tint);
+  border: 1px solid var(--green-line);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.active-filters__chip span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-filters__chip:hover {
+  border-color: var(--green-700);
+  background: #d6e9dd;
+}
+
+.active-filters__clear {
+  flex: 0 0 auto;
+  padding: 3px 5px;
+  color: var(--ink-2);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.active-filters__clear:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .app__sidebar--collapsed {
+    width: auto;
+    flex-basis: auto;
+  }
+
+  .map__controls {
+    top: 8px;
+    left: 50px;
+    right: 8px;
+    max-width: none;
+    gap: 4px;
+  }
+
+  .map__control-button,
+  .map__basemap-control {
+    font-size: 11px;
+  }
+
+  .map__control-button {
+    padding: 5px 7px;
+  }
+
+  .map__basemap-control > span {
+    display: none;
+  }
+
+  .map__basemap-select {
+    min-width: 84px;
+  }
+
+  .active-filters {
+    top: 78px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+  }
+
+  .active-filters__label,
+  .active-filters__clear {
+    display: none;
+  }
+
+  .app--map-focus .app__sidebar-toggle {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app__sidebar {
+    transition: none;
+  }
+}

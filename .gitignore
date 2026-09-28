@@ -65,6 +65,9 @@ products/lidar/dashboard/public/local-demo/
 .env.*
 !.env.example
 
+# Forestry local demo launcher state (PIDs, ports, logs)
+.forestry-dev/
+
 # Local multi-product demo launcher state (PIDs, logs) - machine-specific
 .lidar-dev/
 .campo-demo/

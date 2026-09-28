@@ -60,6 +60,7 @@ packages = [
   "products/lidar/src/lidar_volume",
   "products/lidar/src/lidar_cli",
   "products/transelect/src/transelec_ingestion",
+  "products/forestry/src/forestry_ingestion",
 ]
 
 [dependency-groups]
@@ -76,14 +77,14 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["products/lidar/src", "products/lidar/tests", "products/transelect/src", "products/transelect/tests", "apps"]
+src = ["products/lidar/src", "products/lidar/tests", "products/transelect/src", "products/transelect/tests", "products/forestry/src", "products/forestry/tests", "apps"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
 python_version = "3.12"
-mypy_path = "products/lidar/src:products/transelect/src"
+mypy_path = "products/lidar/src:products/transelect/src:products/forestry/src"
 explicit_package_bases = true
 ignore_missing_imports = true
 warn_unused_ignores = true
@@ -91,9 +92,9 @@ disallow_untyped_defs = false
 exclude = ["products/lidar/notebooks", "external"]
 
 [tool.pytest.ini_options]
-testpaths = ["products/lidar/tests", "products/transelect/tests", "apps/api/tests", "tests"]
+testpaths = ["products/lidar/tests", "products/transelect/tests", "products/forestry/tests", "apps/api/tests", "tests"]
 pythonpath = ["."]
 addopts = "-ra"
 
 [tool.coverage.run]
-source = ["products/lidar/src", "products/transelect/src"]
+source = ["products/lidar/src", "products/transelect/src", "products/forestry/src"]

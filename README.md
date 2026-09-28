@@ -52,7 +52,8 @@ Forestry GIS product for:
 - GIS and Excel export
 - client reporting
 
-Status: architecture/domain foundation.
+Status: Source Evidence V1 and Source Contract V1 established from the first
+real estate snapshot. See `products/forestry/README.md`.
 
 ### Transelec
 
