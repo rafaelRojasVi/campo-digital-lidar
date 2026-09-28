@@ -1,6 +1,6 @@
 # Panel Transelec: mejoras de uso y preguntas pendientes (26-09-2026)
 
-Estas mejoras están preparadas en el PR #59. Aún no están publicadas en Railway y esta revisión no publica ninguna planilla. El registro técnico está en [la bitácora del cambio](../design/2026-09-26-dashboard-usability-pass.md).
+Estas mejoras están en el PR #59. Desde el 28-09-2026 está verificado que funcionan en Railway (ver [estado del piloto](2026-09-28-piloto-en-uso.md)). Esta revisión no publicó ninguna planilla. El registro técnico está en [la bitácora del cambio](../design/2026-09-26-dashboard-usability-pass.md).
 
 ## Qué cambia en el panel
 

@@ -3,9 +3,17 @@
 ## Status
 
 Container packaging: **built and locally verified** (this document).
-No managed infrastructure has been provisioned. This document describes how
-to build and run the image locally; it does not itself provision or expose
-anything.
+
+- **FACT (2026-09-28):** Railway production
+  (`campo-digital-platform-production.up.railway.app`) serves the
+  `feat/transelec-ux-rearchitecture-v1` tip `829099a` (PRs #59 and #60).
+  The served bundle name and the #60 security headers were checked from
+  outside. Railway HTTP logs from 2026-09-26 show a Campo Digital user
+  signing in with Google and uploading, validating and publishing a
+  workbook, all answered `200`.
+- Railway auto-deploy is off, so deploys are manual.
+- **OPEN QUESTION:** are Postgres backups and `/data` volume snapshots
+  enabled on Railway? Nobody has verified this from the repository side.
 
 Read first, and treat as authoritative over this document if they disagree:
 
@@ -112,6 +120,10 @@ Both are wired in `app.main`.
   - Staging and production add HSTS.
   - The dashboard needs no inline script or style and no third-party origin.
     If a change to it adds one, the CSP in that module has to change with it.
+- **No API docs in production.** Under `APP_ENV=production`, `app.main`
+  mounts neither `/docs`, `/redoc` nor `/openapi.json`, and the SPA fallback
+  answers them `404` rather than `index.html`. Every other environment keeps
+  them (`apps/api/tests/test_main_docs_exposure.py`).
 
 See the [2026-09-26 security readiness audit](audit/2026-09-26-security-readiness-audit.md)
 for the evidence behind both.
