@@ -1,0 +1,145 @@
+/*
+ * Design tokens.
+ *
+ * Every colour, size, duration and easing the application uses is named here
+ * and nowhere else. A component file that needs a new value adds a token
+ * rather than a literal, which is what keeps the four sections looking like
+ * one product instead of four pages that happen to share a stylesheet.
+ *
+ * The status colours are not a taste decision. The three that appear as
+ * adjacent marks inside one chart — --st-approved, --st-progress, --st-late —
+ * were run through the dataviz skill's palette validator
+ * (scripts/validate_palette.js, light mode, surface #fbfbfa, --pairs all)
+ * rather than judged by eye. The recorded result, and why --st-rejected is
+ * excluded from that set, is in
+ * products/transelect/docs/design/2026-09-13-frontend-ux-rearchitecture-v1.md.
+ *
+ * Both warnings that run carries are discharged by secondary encoding the
+ * composition bar always ships: a surface gap between segments, direct
+ * labels, a legend, and the same numbers as text. Colour never carries a
+ * status on its own anywhere in this application.
+ */
+
+:root {
+  /* One theme, declared rather than left to the browser to guess, so native
+   * controls (select, checkbox, scrollbars) render against a light ground.
+   * There is deliberately no dark theme: this is an internal operational tool
+   * with a hard print requirement and one controlled viewing context. */
+  color-scheme: light;
+
+  /* ---------------------------------------------------------------- ink */
+  --ink: #16211d;
+  --ink-2: #42524c;
+  /* Darkened from #6b7a74 (3.8–4.1:1) so hint text, the most common small
+   * text in the app, clears WCAG AA 4.5:1 on every ground it sits on:
+   * ground, surface, sunken, info, warn, approved and late tints. */
+  --ink-3: #5d6c66;
+  --ink-inverse: #f2f6f3;
+  --ink-inverse-2: #b6ccc0;
+
+  /* ------------------------------------------------------------ surface */
+  --ground: #f4f5f2;
+  --surface: #fbfbfa;
+  --sunken: #eef0ec;
+  --line: #dde1db;
+  --line-strong: #c3cabf;
+
+  /* -------------------------------------------------------------- brand */
+  --forest: #1e8055;
+  --forest-deep: #15503a;
+  --forest-dark: #0f3b2b;
+  --forest-tint: #e7f1eb;
+
+  /* ------------------------------------------------------------- status */
+  --st-approved: #1e8055;
+  --st-progress: #cf9000;
+  --st-late: #b8492a;
+  --st-rejected: #96272b;
+  --st-struck: #7d8a84;
+  --st-none: #b9c1bb;
+
+  --st-approved-tint: #e7f1eb;
+  --st-progress-tint: #faf0d9;
+  /* Amber for text: --st-progress is 2.6:1 on the surface; this is 5.8:1 or more on every ground. */
+  --st-progress-ink: #7a5600;
+  --st-late-tint: #f8e9e3;
+  --st-rejected-tint: #f6e5e5;
+  --st-struck-tint: #eceeeb;
+
+  /* --------------------------------------------------------------- feed */
+  --focus: #0b6ea8;
+  --info-tint: #e6eef4;
+  --info-line: #9fc0d6;
+
+  /* ------------------------------------------------------------ spacing */
+  --s-1: 2px;
+  --s-2: 4px;
+  --s-3: 8px;
+  --s-4: 12px;
+  --s-5: 16px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 48px;
+  --s-9: 64px;
+
+  /* -------------------------------------------------------------- shape */
+  --r-control: 3px;
+  --r-surface: 6px;
+  --r-pill: 999px;
+
+  /* ------------------------------------------------------------ shadows */
+  --shadow-raised: 0 1px 2px rgb(22 33 29 / 0.05);
+  --shadow-float: 0 8px 24px -8px rgb(22 33 29 / 0.18);
+  --shadow-overlay: 0 24px 64px -16px rgb(22 33 29 / 0.32);
+
+  /* --------------------------------------------------------------- type */
+  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  --t-hero: 30px;
+  --t-title: 22px;
+  --t-section: 17px;
+  --t-body: 14px;
+  --t-small: 13px;
+  --t-micro: 11px;
+
+  --measure: 78ch;
+
+  /* ------------------------------------------------------------- motion */
+  --d-fast: 120ms;
+  --d-base: 200ms;
+  --d-slow: 240ms;
+  --d-bar: 300ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* -------------------------------------------------------------- shell */
+  --shell-h: 56px;
+  --page-max: 1440px;
+}
+
+/*
+ * One switch for the whole application. Every animated rule in this codebase
+ * is written so that zeroing these two variables removes the motion while
+ * leaving the end state exactly where it was — no rule depends on an
+ * animation having run.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --d-fast: 0ms;
+    --d-base: 0ms;
+    --d-slow: 0ms;
+    --d-bar: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

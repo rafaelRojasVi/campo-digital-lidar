@@ -19,6 +19,7 @@ from sqlalchemy import Connection, text
 from app.access import Action, Role, can
 from app.access_repository import AppUser, get_product_role, list_grants_for_user
 from app.audit import record_audit_event
+from app.csrf import require_csrf
 from app.deps import ensure_can, get_current_app_user, get_db_connection, get_object_store
 from app.inspection.forestry_inspector import ForestryInspectionError
 from app.jobs import enqueue_processing_job
@@ -60,7 +61,11 @@ class AuditEventView(BaseModel):
     subject_id: str | None
 
 
-@router.post("/upload", response_model=UploadResponse)
+@router.post(
+    "/upload",
+    response_model=UploadResponse,
+    dependencies=[Depends(require_csrf)],
+)
 async def upload(
     user: Annotated[AppUser, Depends(get_current_app_user)],
     connection: Annotated[Connection, Depends(get_db_connection)],
@@ -200,7 +205,11 @@ def list_jobs(
     ]
 
 
-@router.post("/jobs/{job_id}/retry", response_model=JobView)
+@router.post(
+    "/jobs/{job_id}/retry",
+    response_model=JobView,
+    dependencies=[Depends(require_csrf)],
+)
 def retry_job(
     job_id: int,
     user: Annotated[AppUser, Depends(get_current_app_user)],

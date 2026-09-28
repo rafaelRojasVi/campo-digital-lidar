@@ -43,6 +43,63 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; 
 
 export const DEV_IDENTITIES = ['dev-admin', 'dev-operator', 'dev-viewer'] as const
 
+const CSRF_HEADER = 'X-CSRF-Token'
+const CSRF_REJECTED = 'CSRF verification failed.'
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
+/**
+ * The API requires a session-bound CSRF token on every state-changing
+ * request. It is issued per session by GET /auth/csrf and held only in
+ * memory here — never compiled into this bundle, and never read from a
+ * cookie. Because it is bound to the session secret, it must be dropped
+ * whenever the session changes (login/logout).
+ */
+let csrfToken: string | null = null
+
+function forgetCsrfToken(): void {
+  csrfToken = null
+}
+
+async function ensureCsrfToken(): Promise<string | null> {
+  if (csrfToken !== null) return csrfToken
+
+  try {
+    const response = await fetch('/api/auth/csrf', { credentials: 'include' })
+    if (!response.ok) return null
+    const body = (await response.json()) as { csrf_token?: string }
+    csrfToken = body.csrf_token ?? null
+  } catch {
+    csrfToken = null
+  }
+
+  return csrfToken
+}
+
+async function send(path: string, init: RequestInit | undefined): Promise<Response> {
+  const method = (init?.method ?? 'GET').toUpperCase()
+  if (SAFE_METHODS.has(method)) {
+    return fetch(path, { credentials: 'include', ...init })
+  }
+
+  const token = await ensureCsrfToken()
+  // A plain record rather than Headers: every caller in this module already
+  // passes one, and Headers would lowercase the name in the recorded init.
+  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) }
+  if (token !== null) headers[CSRF_HEADER] = token
+
+  return fetch(path, { credentials: 'include', ...init, headers })
+}
+
+async function readError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: string }
+    if (body.detail) return body.detail
+  } catch {
+    // no JSON body on this error response; keep the status-text fallback
+  }
+  return response.statusText || `HTTP ${response.status}`
+}
+
 /**
  * All requests go through /api, proxied in dev (see vite.config.ts) to the
  * standalone platform API process started by `make platform-local`. Never
@@ -51,17 +108,22 @@ export const DEV_IDENTITIES = ['dev-admin', 'dev-operator', 'dev-viewer'] as con
  */
 async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T>> {
   try {
-    const response = await fetch(path, { credentials: 'include', ...init })
+    let response = await send(path, init)
+
+    // A token can go stale (the session was replaced elsewhere). Refresh
+    // and retry exactly once, and only for that specific rejection — never
+    // for an ordinary authorization 403, which a retry cannot fix.
+    if (response.status === 403) {
+      const error = await readError(response)
+      if (error !== CSRF_REJECTED) {
+        return { ok: false, status: 403, error }
+      }
+      forgetCsrfToken()
+      response = await send(path, init)
+    }
 
     if (!response.ok) {
-      let error = response.statusText || `HTTP ${response.status}`
-      try {
-        const body = (await response.json()) as { detail?: string }
-        if (body.detail) error = body.detail
-      } catch {
-        // no JSON body on this error response; keep the status-text fallback
-      }
-      return { ok: false, status: response.status, error }
+      return { ok: false, status: response.status, error: await readError(response) }
     }
 
     if (response.status === 204) {
@@ -75,20 +137,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
   }
 }
 
-export function devLogin(identityKey: string): Promise<ApiResult<Me>> {
-  return request<Me>('/api/auth/dev-login', {
+export async function devLogin(identityKey: string): Promise<ApiResult<Me>> {
+  // A new session invalidates any token bound to the previous one. This is
+  // also why dev-login itself carries no token: it establishes the session
+  // a token could be bound to, so it cannot require one.
+  forgetCsrfToken()
+  const result = await request<Me>('/api/auth/dev-login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identity_key: identityKey }),
   })
+  forgetCsrfToken()
+  return result
 }
 
 export function getMe(): Promise<ApiResult<Me>> {
   return request<Me>('/api/auth/me')
 }
 
-export function logout(): Promise<ApiResult<void>> {
-  return request<void>('/api/auth/logout', { method: 'POST' })
+export async function logout(): Promise<ApiResult<void>> {
+  const result = await request<void>('/api/auth/logout', { method: 'POST' })
+  forgetCsrfToken()
+  return result
 }
 
 export function uploadFile(productKey: ProductKey, file: File): Promise<ApiResult<UploadResult>> {

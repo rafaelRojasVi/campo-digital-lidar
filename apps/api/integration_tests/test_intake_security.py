@@ -19,6 +19,7 @@ from app.access_repository import (
     list_grants_for_user,
     resolve_or_create_app_user,
 )
+from app.csrf import CSRF_HEADER_NAME
 from app.deps import SESSION_COOKIE_NAME, get_object_store
 from app.dev_auth import DEFAULT_SEED_GRANTS, DEV_IDENTITY_KIND, SEEDED_DEV_IDENTITIES
 from app.main import app
@@ -98,6 +99,13 @@ def _login(client: TestClient, identity_key: str) -> None:
         connection.commit()
 
     client.cookies.set(SESSION_COOKIE_NAME, raw_secret)
+
+    # Every mutation route is CSRF-protected by app.csrf; a real client
+    # fetches its session-bound token right after authenticating. The
+    # fail-closed behavior itself is covered in test_csrf_router.py.
+    csrf_response = client.get("/auth/csrf")
+    assert csrf_response.status_code == 200, csrf_response.text
+    client.headers[CSRF_HEADER_NAME] = csrf_response.json()["csrf_token"]
 
 
 def test_oversized_upload_is_rejected_with_413(

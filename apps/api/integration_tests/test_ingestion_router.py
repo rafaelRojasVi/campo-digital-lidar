@@ -16,6 +16,7 @@ from app.access_repository import (
     resolve_or_create_app_user,
 )
 from app.audit import record_audit_event
+from app.csrf import CSRF_HEADER_NAME
 from app.deps import SESSION_COOKIE_NAME, get_object_store
 from app.dev_auth import DEFAULT_SEED_GRANTS, DEV_IDENTITY_KIND, SEEDED_DEV_IDENTITIES
 from app.main import app
@@ -81,6 +82,20 @@ def _login(client: TestClient, identity_key: str) -> None:
         connection.commit()
 
     client.cookies.set(SESSION_COOKIE_NAME, raw_secret)
+    _refresh_csrf_token(client)
+
+
+def _refresh_csrf_token(client: TestClient) -> None:
+    """Fetch a session-bound CSRF token, exactly as a real client does.
+
+    Every mutation route is CSRF-protected by app.csrf, so an authenticated
+    client that never fetches a token is answered 403 — see
+    test_csrf_router.py for that fail-closed behavior specifically.
+    """
+
+    response = client.get("/auth/csrf")
+    assert response.status_code == 200, response.text
+    client.headers[CSRF_HEADER_NAME] = response.json()["csrf_token"]
 
 
 def _forestry_zip_bytes() -> bytes:

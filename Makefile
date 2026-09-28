@@ -1,4 +1,4 @@
-.PHONY: setup lint format format-check typecheck test test-api docs-check architecture-check secret-check dependency-audit check db-test-up db-test-reset db-test-down migration-check persistence-check lidar-dev lidar-status lidar-stop campo-demo campo-status campo-stop ensure-platform-db platform-local platform-worker platform-worker-concurrency
+.PHONY: setup lint format format-check typecheck test test-api docs-check architecture-check secret-check dependency-audit check db-test-up db-test-reset db-test-down migration-check persistence-check lidar-dev lidar-status lidar-stop transelec-dev transelec-status transelec-stop campo-demo campo-status campo-stop ensure-platform-db platform-local platform-worker platform-worker-concurrency
 
 N ?= 2
 
@@ -75,6 +75,15 @@ lidar-status:
 
 lidar-stop:
 	uv run python scripts/lidar_dev.py stop
+
+transelec-dev:
+	uv run --extra api python scripts/transelec_dev.py up
+
+transelec-status:
+	uv run python scripts/transelec_dev.py status
+
+transelec-stop:
+	uv run python scripts/transelec_dev.py stop
 
 campo-demo:
 	uv run --extra api python scripts/campo_demo.py up

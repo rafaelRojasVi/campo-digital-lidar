@@ -26,7 +26,7 @@ from app.inspection.forestry_inspector import inspect_forestry_zip
 from app.inspection.lidar_inspector import inspect_lidar_file
 from app.inspection.transelec_inspector import inspect_transelec_workbook
 from app.jobs import ClaimedJob, claim_next_job, complete_job, fail_job, fail_job_terminal
-from app.object_store import LocalObjectStore, ObjectStore
+from app.object_store import LocalObjectStore, ObjectStore, open_configured_object_store
 
 _IDLE_SLEEP_SECONDS = 2.0
 
@@ -151,8 +151,9 @@ def main() -> None:
 
 
 def _build_store_from_env() -> LocalObjectStore:
-    root = Path(os.environ.get("CAMPO_OBJECT_STORE_ROOT", ".local/object-store"))
-    return LocalObjectStore(root)
+    return open_configured_object_store(
+        os.environ.get("APP_ENV"), os.environ.get("CAMPO_OBJECT_STORE_ROOT")
+    )
 
 
 if __name__ == "__main__":

@@ -10,6 +10,10 @@ import json
 
 from sqlalchemy import Connection, text
 
+# One event type for every change to a product role, whoever makes it, so a
+# user's role history is one query. ``metadata.via`` says which path made it.
+PRODUCT_GRANT_CHANGED_EVENT = "product_grant.changed"
+
 
 def record_audit_event(
     connection: Connection,

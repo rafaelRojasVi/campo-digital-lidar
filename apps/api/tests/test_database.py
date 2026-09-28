@@ -38,6 +38,62 @@ def test_build_engine_uses_configured_database_url() -> None:
         engine.dispose()
 
 
+def test_build_engine_requires_tls_in_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        app_env="production",
+        postgres_db="fixture_database",
+        postgres_user="fixture_user",
+        postgres_password="fixture_secret",
+        postgres_host="db.internal",
+        postgres_port=6543,
+    )
+    captured_kwargs: dict[str, object] = {}
+
+    def fake_create_engine(url: object, **kwargs: object) -> Engine:
+        captured_kwargs.update(kwargs)
+        return create_engine("sqlite+pysqlite:///:memory:")
+
+    monkeypatch.setattr(database, "create_engine", fake_create_engine)
+
+    engine = build_engine(settings)
+
+    try:
+        assert captured_kwargs["connect_args"] == {"sslmode": "require"}
+    finally:
+        engine.dispose()
+
+
+def test_build_engine_does_not_force_tls_outside_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        app_env="development",
+        postgres_db="fixture_database",
+        postgres_user="fixture_user",
+        postgres_password="fixture_secret",
+        postgres_host="db.internal",
+        postgres_port=6543,
+    )
+    captured_kwargs: dict[str, object] = {}
+
+    def fake_create_engine(url: object, **kwargs: object) -> Engine:
+        captured_kwargs.update(kwargs)
+        return create_engine("sqlite+pysqlite:///:memory:")
+
+    monkeypatch.setattr(database, "create_engine", fake_create_engine)
+
+    engine = build_engine(settings)
+
+    try:
+        assert captured_kwargs["connect_args"] == {}
+    finally:
+        engine.dispose()
+
+
 def test_process_engine_is_created_lazily_and_cached(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

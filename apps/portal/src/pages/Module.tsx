@@ -53,7 +53,7 @@ export function ModulePage({ moduleId }: { moduleId: string }) {
 const EXPECTED_BRANCH: Record<string, string> = {
   lidar: 'products/lidar (esta misma rama)',
   forestal: 'feat/forestry-dashboard-v1',
-  transelec: 'feat/transelec-ui-reference-parity-v1',
+  transelec: 'products/transelect (esta misma rama)',
 }
 
 function ModuleUnavailable({

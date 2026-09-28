@@ -10,6 +10,11 @@
 *.tiff
 *.zip
 
+# Client spreadsheets (Transelec planillas, source workbooks) - NEVER commit
+*.xlsx
+*.xlsm
+*.xls
+
 # Python
 __pycache__/
 *.py[cod]

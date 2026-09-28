@@ -60,11 +60,48 @@ class Settings(BaseSettings):
         default=None, validation_alias="PLATFORM_TOKEN_ENCRYPTION_KEY"
     )
 
+    # Google Workspace sign-in, the Transelec product's identity provider
+    # (see app.google_auth and ADR-010). Entra above stays in place for the
+    # other products; neither provider's configuration implies the other's.
+    google_client_id: str | None = Field(default=None, validation_alias="GOOGLE_CLIENT_ID")
+    google_client_secret: SecretStr | None = Field(
+        default=None, validation_alias="GOOGLE_CLIENT_SECRET"
+    )
+    google_redirect_base_url: str = Field(
+        default="http://localhost:8000",
+        validation_alias="GOOGLE_REDIRECT_BASE_URL",
+    )
+    # The `hd` claim an id_token must carry, exactly, to be accepted. It is
+    # the Workspace membership control -- not the email's suffix -- so it is
+    # configured rather than inferred, and has no permissive default.
+    google_workspace_domain: str = Field(
+        default="campodigital.cl",
+        validation_alias="GOOGLE_WORKSPACE_DOMAIN",
+    )
+
+    # One-time bootstrap: the single Workspace address allowed to receive an
+    # ADMIN grant on `transelect` at first sign-in, and on no other product
+    # (see app.access_repository.maybe_grant_transelec_bootstrap_admin).
+    transelec_bootstrap_admin_email: str | None = Field(
+        default=None, validation_alias="TRANSELEC_BOOTSTRAP_ADMIN_EMAIL"
+    )
+
     platform_bootstrap_admin_tenant_id: str | None = Field(
         default=None, validation_alias="PLATFORM_BOOTSTRAP_ADMIN_TENANT_ID"
     )
     platform_bootstrap_admin_object_id: str | None = Field(
         default=None, validation_alias="PLATFORM_BOOTSTRAP_ADMIN_OBJECT_ID"
+    )
+
+    # Comma-separated browser origins allowed to drive state-changing
+    # requests, checked by app.csrf's second (Origin/Referer) layer. Needed
+    # wherever the frontend reaches this API through a proxy/rewrite that
+    # forwards the browser's Origin but not its Host (see render.yaml's
+    # /api/* rewrite and apps/portal/vite.config.ts's dev proxy). Empty is
+    # safe: same-origin requests are always trusted without configuration.
+    csrf_trusted_origins: str | None = Field(
+        default=None,
+        validation_alias="CSRF_TRUSTED_ORIGINS",
     )
 
     enable_onedrive_import: bool = Field(default=False, validation_alias="ENABLE_ONEDRIVE_IMPORT")

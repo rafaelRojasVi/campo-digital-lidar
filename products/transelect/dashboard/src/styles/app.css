@@ -1,0 +1,22 @@
+/*
+ * Transelec dashboard stylesheet.
+ *
+ * Four layers, in cascade order:
+ *
+ *   tokens      every colour, size, duration and easing, named once
+ *   base        element defaults, typography, tables, buttons, print
+ *   components  primitives more than one section reuses
+ *   sections    layout that exactly one section needs
+ *
+ * A value that appears as a literal in any of the last three is a bug: it
+ * belongs in tokens.css. That rule is what keeps five sections reading as
+ * one product.
+ *
+ * The palette, the motion budget and the reasoning behind both are recorded
+ * in products/transelect/docs/design/2026-09-13-frontend-ux-rearchitecture-v1.md.
+ */
+
+@import './tokens.css';
+@import './base.css';
+@import './components.css';
+@import './sections.css';

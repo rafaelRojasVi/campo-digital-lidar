@@ -1,0 +1,11 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "/usr/local/bin/campo-entrypoint sh -c \"exec uv run --frozen --no-sync uvicorn app.main:app --app-dir apps/api --host 0.0.0.0 --port ${PORT}\"",
+    "healthcheckPath": "/ready"
+  }
+}

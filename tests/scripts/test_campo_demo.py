@@ -202,61 +202,35 @@ def test_probe_forestry_returns_false_without_a_worktree() -> None:
     assert campo_demo.probe_forestry(None) == (False, None)
 
 
-def test_probe_transelec_returns_false_without_a_worktree() -> None:
-    assert campo_demo.probe_transelec(None) == (False, None)
-
-
-def test_probe_transelec_reads_the_sibling_launchers_state_file(
+def test_probe_transelec_delegates_to_shared_process_state(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    worktree = tmp_path / "transelec-worktree"
-    worktree.mkdir()
+    """Transelec's real dashboard now lives in this same worktree (see
+    scripts/transelec_dev.py), so probing it mirrors probe_lidar exactly —
+    no sibling-worktree lookup, unlike Forestry."""
 
-    state_path = campo_demo.transelec_state_file(worktree)
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(
-        json.dumps(
-            {
-                "backend_pid": 999999,
-                "frontend_pid": 999999,
-                "frontend_url": "http://127.0.0.1:5180/",
-            }
-        ),
-        encoding="utf-8",
-    )
+    from scripts._local_process import ManagedProcess
 
-    monkeypatch.setattr(campo_demo, "pid_alive", lambda _pid: True)
+    process = ManagedProcess(name="frontend", pid=1, port=5200, marker="m")
+    monkeypatch.setattr(campo_demo, "load_process", lambda _dir, _name: process)
+    monkeypatch.setattr(campo_demo, "is_ours", lambda _p: True)
     monkeypatch.setattr(campo_demo, "wait_for_http", lambda _url, _timeout: True)
 
-    running, url = campo_demo.probe_transelec(worktree)
+    running, url = campo_demo.probe_transelec(tmp_path)
 
     assert running is True
-    assert url == "http://127.0.0.1:5180/"
-
-    state_path.unlink()
+    assert url == "http://127.0.0.1:5200/"
 
 
-def test_probe_transelec_false_when_recorded_pids_are_dead(
+def test_probe_transelec_false_when_recorded_process_is_stale(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    worktree = tmp_path / "transelec-worktree-2"
-    worktree.mkdir()
+    monkeypatch.setattr(campo_demo, "load_process", lambda _dir, _name: None)
 
-    state_path = campo_demo.transelec_state_file(worktree)
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(
-        json.dumps({"backend_pid": 999999, "frontend_pid": 999999, "frontend_url": "x"}),
-        encoding="utf-8",
-    )
-
-    monkeypatch.setattr(campo_demo, "pid_alive", lambda _pid: False)
-
-    running, url = campo_demo.probe_transelec(worktree)
+    running, url = campo_demo.probe_transelec(tmp_path)
 
     assert running is False
     assert url is None
-
-    state_path.unlink()
 
 
 # ------------------------------------------------------------- runtime config
@@ -344,6 +318,7 @@ def test_resolve_modules_attaches_measurement_count_only_to_lidar(
     monkeypatch.setattr(campo_demo, "discover_worktrees", lambda: [])
     monkeypatch.setattr(campo_demo, "find_worktree_for_branch", lambda _wt, _b: None)
     monkeypatch.setattr(campo_demo, "probe_lidar", lambda: (True, "http://127.0.0.1:5174/"))
+    monkeypatch.setattr(campo_demo, "probe_transelec", lambda: (False, None))
     monkeypatch.setattr(campo_demo, "lidar_measurement_count", lambda: 14)
 
     modules = campo_demo.resolve_modules(read_only=True)

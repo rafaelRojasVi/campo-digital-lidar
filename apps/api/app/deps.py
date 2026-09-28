@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import Generator
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import Cookie, Depends, HTTPException
@@ -26,7 +25,9 @@ from app.dev_auth import (
     DevSessionStore,
     assert_dev_auth_allowed,
 )
-from app.object_store import LocalObjectStore, ObjectStore
+from app.entra_auth import EntraOidcClient, MsalEntraOidcClient
+from app.google_auth import GoogleOidcClient, GoogleOidcSignInClient
+from app.object_store import LocalObjectStore, ObjectStore, open_configured_object_store
 from app.session_store import PlatformSessionStore
 
 SESSION_COOKIE_NAME = "campo_session"
@@ -34,6 +35,8 @@ SESSION_COOKIE_NAME = "campo_session"
 _session_store = DevSessionStore()
 _platform_session_store = PlatformSessionStore()
 _object_store: LocalObjectStore | None = None
+_entra_oidc_client: EntraOidcClient | None = None
+_google_oidc_client: GoogleOidcClient | None = None
 
 
 def get_session_store() -> DevSessionStore:
@@ -49,13 +52,55 @@ def get_platform_session_store() -> PlatformSessionStore:
 
 
 def get_object_store() -> ObjectStore:
-    """Return the process-level local object store."""
+    """Return the process-level local object store.
+
+    Raises ``app.object_store.ObjectStoreNotConfiguredError`` (mapped to 503
+    by ``app.main``) in production without an absolute
+    ``CAMPO_OBJECT_STORE_ROOT`` on a mounted volume, and stays uncached in
+    that case so a later request succeeds once the configuration arrives.
+    """
 
     global _object_store
     if _object_store is None:
-        root = Path(os.environ.get("CAMPO_OBJECT_STORE_ROOT", ".local/object-store"))
-        _object_store = LocalObjectStore(root)
+        _object_store = open_configured_object_store(
+            os.environ.get("APP_ENV"), os.environ.get("CAMPO_OBJECT_STORE_ROOT")
+        )
     return _object_store
+
+
+def get_entra_oidc_client(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> EntraOidcClient:
+    """Return the process-level Entra OIDC client.
+
+    Raises ``app.entra_auth.EntraNotConfiguredError`` (mapped to 503 by
+    ``app.main``) if ``ENTRA_CLIENT_ID``/``ENTRA_CLIENT_SECRET`` are unset —
+    left uncached in that case, so a later request retries construction
+    rather than staying permanently broken from one early failed attempt.
+    """
+
+    global _entra_oidc_client
+    if _entra_oidc_client is None:
+        _entra_oidc_client = MsalEntraOidcClient(settings)
+    return _entra_oidc_client
+
+
+def get_google_oidc_client(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> GoogleOidcClient:
+    """Return the process-level Google OIDC client.
+
+    Raises ``app.google_auth.GoogleNotConfiguredError`` (mapped to 503 by
+    ``app.main``) if ``GOOGLE_CLIENT_ID``/``GOOGLE_CLIENT_SECRET`` are unset,
+    and stays uncached in that case for the same reason
+    ``get_entra_oidc_client`` does: one early failed attempt must not leave
+    sign-in permanently broken once the configuration arrives.
+    """
+
+    global _google_oidc_client
+    if _google_oidc_client is None:
+        _google_oidc_client = GoogleOidcSignInClient(settings)
+    return _google_oidc_client
 
 
 def get_db_connection(
@@ -103,6 +148,30 @@ def get_current_app_user(
         identity_key=identity_key,
         display_name=display_name,
     )
+
+
+def has_active_session(session_token: str) -> bool:
+    """Whether ``session_token`` would authenticate in ``get_current_app_user``.
+
+    Used by ``app.http_hardening.RequestBodyLimitMiddleware`` to refuse an
+    upload before reading its body, where FastAPI dependencies have not run
+    yet -- hence the process-level engine, settings and stores rather than
+    ``Depends``. Mirrors ``get_current_app_user``'s resolution order: a live
+    platform session, then (development only) a dev-auth token. It creates
+    no app_user row; the route still resolves the user itself.
+    """
+
+    with get_database_engine().connect() as connection:
+        app_user_id = _platform_session_store.resolve_session(connection, session_token)
+        connection.commit()
+    if app_user_id is not None:
+        return True
+
+    try:
+        assert_dev_auth_allowed(get_settings())
+    except DevAuthDisabledInProductionError:
+        return False
+    return _session_store.resolve_session(session_token) is not None
 
 
 def _load_app_user(connection: Connection, app_user_id: int) -> AppUser:

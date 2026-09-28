@@ -81,3 +81,33 @@ def test_migration_chain_is_single_linear_sequence() -> None:
 
     heads = all_targets - set(down_revisions)
     assert len(heads) == 1, f"Expected exactly one head revision, found {heads!r}"
+
+
+def test_migration_0008_extends_0007() -> None:
+    """Pin the chain through 0008 specifically.
+
+    0008 (transelec_import / transelec_resumen_row / transelec_publish_event)
+    must extend 0007 directly -- it does not fork off an earlier revision.
+    """
+
+    root = Path(__file__).resolve().parents[3]
+    revisions = _load_all_migrations(root)
+
+    assert "0008" in revisions, "Expected migration 0008 to be present."
+    down_revision, _ = revisions["0008"]
+    assert down_revision == "0007"
+
+
+def test_migration_0009_extends_0008_as_the_single_head() -> None:
+    """0009 (Transelec AEF fields + mapping report) extends 0008 directly."""
+
+    root = Path(__file__).resolve().parents[3]
+    revisions = _load_all_migrations(root)
+
+    assert "0009" in revisions, "Expected migration 0009 to be present."
+    down_revision, _ = revisions["0009"]
+    assert down_revision == "0008"
+
+    down_revisions = {down for down, _ in revisions.values() if down is not None}
+    heads = set(revisions) - down_revisions
+    assert heads == {"0009"}

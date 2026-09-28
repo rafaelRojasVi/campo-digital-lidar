@@ -7,6 +7,12 @@ Administrator rights in a Campo Digital Entra tenant. **No such tenant
 exists yet as of 2026-09-01** — see "Prerequisite: create the tenant"
 below before step 1. Platform engineering cannot perform either step.
 
+**Update (2026-09-03)** — the application-side sign-in implementation this
+registration feeds is complete and tested against a fake identity provider
+(`docs/adr/ADR-008-entra-sign-in-implementation.md`); every step below
+remains the genuine external blocker. Once the values in step 7 are
+supplied, no further code changes are expected to complete a real sign-in.
+
 ## Revision note (2026-09-01)
 
 Opening the canonical Campo Digital OneDrive folder directly proved it is

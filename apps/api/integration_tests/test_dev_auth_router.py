@@ -28,7 +28,8 @@ from app.access_repository import resolve_or_create_app_user
 from app.config import Settings
 from app.deps import get_current_app_user
 from app.dev_auth import DEV_IDENTITY_KIND, DevSessionStore
-from app.routers.dev_auth import DevLoginRequest, dev_login, logout
+from app.routers.dev_auth import DevLoginRequest, dev_login
+from app.routers.session import logout
 from app.session_store import PlatformSessionStore
 from fastapi import HTTPException, Response
 from sqlalchemy import Connection, text

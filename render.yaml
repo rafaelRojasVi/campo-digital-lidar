@@ -87,6 +87,16 @@ services:
         fromDatabase:
           name: campo-digital-db-staging
           property: password
+      # Browser origins permitted to drive state-changing requests, checked
+      # by app.csrf's second (Origin/Referer) layer on top of its mandatory
+      # per-session token. The static sites below reach this API through a
+      # same-origin /api/* rewrite, which forwards the browser's Origin but
+      # not its Host, so each front-end origin must be named here or its
+      # uploads/publishes would be rejected. Same hostname caveat as the
+      # NOTE on campo-digital-portal-staging below: verify the real
+      # onrender.com URLs after first deploy and update this list to match.
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://campo-digital-portal-staging.onrender.com,https://campo-digital-lidar-staging.onrender.com
       # Staging-only in-process execution backend (app.execution). Kept well
       # below production upload limits (2 GiB) — this adapter demonstrates
       # small/metadata-scale jobs, not real workloads. See

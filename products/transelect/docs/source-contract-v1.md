@@ -2,7 +2,10 @@
 
 ## Status
 
-Evidence-backed source contract under implementation.
+Superseded for layout handling by [Source Contract V2](source-contract-v2.md)
+(2026-09-26): columns are now recognized by header rather than bound to
+A:AD, because the 09-Sept-2026 workbook inserted five columns at A:E. The
+identity, status and auxiliary-worksheet observations below still apply.
 
 ## Authoritative current source
 

@@ -6,15 +6,20 @@ Usage (via the Makefile):
     make campo-status    # scripts/campo_demo.py status
     make campo-stop      # scripts/campo_demo.py stop
 
-This script is a company-level composition shell over three independently
-owned product launchers. It does not implement product logic and does not
-touch product persistence, migrations, or source ingestion itself:
+This script is a company-level composition shell over independently owned
+product launchers. It does not implement product logic and does not touch
+product persistence, migrations, or source ingestion itself:
 
 - LiDAR is started via ``make lidar-dev`` in this worktree.
 - Forestry is started via ``make forestry-dev`` in the sibling worktree
   checked out at ``feat/forestry-dashboard-v1``.
-- Transelec is started via ``make transelec-dev`` in the sibling worktree
-  checked out at ``feat/transelec-ui-reference-parity-v1``.
+- Transelec is started via ``make transelec-dev`` in this same worktree (see
+  ``scripts/transelec_dev.py``): the real, session-authenticated Transelec
+  dashboard now lives alongside LiDAR here, backed by the same shared
+  platform API, so — unlike Forestry — it needs no sibling worktree lookup.
+  The old ``feat/transelec-ui-reference-parity-v1`` worktree was a
+  backend-less UI reference used only to discover pixel-parity requirements
+  (see Task 5's report); it is not wired here.
 
 Sibling worktrees are discovered with ``git worktree list --porcelain`` and
 are treated as read-only: this script never clones, modifies, or resets
@@ -29,12 +34,10 @@ portal's own dev server is always owned by this launcher.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
 import sys
-import tempfile
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -62,7 +65,6 @@ CAMPO_STATE_FILE = CAMPO_STATE_DIR / "state.json"
 PORTAL_PREFERRED_PORT = 5100
 
 FORESTRY_BRANCH = "feat/forestry-dashboard-v1"
-TRANSELEC_BRANCH = "feat/transelec-ui-reference-parity-v1"
 
 MODULE_IDS = ("lidar", "forestal", "transelec")
 
@@ -145,16 +147,6 @@ def discover_worktrees() -> list[Worktree]:
 # ---------------------------------------------------------------- probing
 
 
-def pid_alive(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    return True
-
-
 def probe_lidar(repo_root: Path = REPO_ROOT, probe_timeout: float = 1.5) -> tuple[bool, str | None]:
     """Read-only check: is a LiDAR viewer this launcher's format recognizes
     already running? Never starts or signals anything."""
@@ -202,41 +194,25 @@ def probe_forestry(
     return True, url
 
 
-def transelec_state_file(worktree_root: Path) -> Path:
-    """Mirrors the state-file path computed by the Transelec worktree's own
-    ``scripts/transelec_dev.py`` (same hash of the resolved worktree path)."""
-
-    user_id = getattr(os, "getuid", lambda: 0)()
-    state_key = hashlib.sha1(str(worktree_root.resolve()).encode()).hexdigest()[:10]
-    state_dir = Path(tempfile.gettempdir()) / f"campo-digital-transelec-dev-{user_id}-{state_key}"
-    return state_dir / "state.json"
-
-
 def probe_transelec(
-    worktree_root: Path | None, probe_timeout: float = 1.5
+    repo_root: Path = REPO_ROOT, probe_timeout: float = 1.5
 ) -> tuple[bool, str | None]:
-    if worktree_root is None:
+    """Read-only check: is the real Transelec dashboard's dev server (this
+    launcher's format) already running? Never starts or signals anything.
+
+    Mirrors ``probe_lidar`` exactly: Transelec's real dashboard lives in this
+    same worktree (``products/transelect/dashboard``), started by
+    ``scripts/transelec_dev.py`` via ``make transelec-dev``, not in a
+    separate sibling worktree the way Forestry still is.
+    """
+
+    state_dir = repo_root / ".transelec-dev"
+    frontend = load_process(state_dir, "frontend")
+
+    if frontend is None or not is_ours(frontend):
         return False, None
 
-    state_path = transelec_state_file(worktree_root)
-    if not state_path.is_file():
-        return False, None
-
-    try:
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return False, None
-
-    backend_pid = int(state.get("backend_pid", 0) or 0)
-    frontend_pid = int(state.get("frontend_pid", 0) or 0)
-
-    if not (pid_alive(backend_pid) and pid_alive(frontend_pid)):
-        return False, None
-
-    url = state.get("frontend_url")
-    if not isinstance(url, str) or not url:
-        return False, None
-
+    url = f"http://127.0.0.1:{frontend.port}/"
     if not wait_for_http(url, probe_timeout):
         return False, None
 
@@ -430,14 +406,13 @@ def open_browser(url: str) -> None:
 def resolve_modules(read_only: bool) -> dict[str, ModuleResult]:
     worktrees = discover_worktrees()
     forestry_worktree = find_worktree_for_branch(worktrees, FORESTRY_BRANCH)
-    transelec_worktree = find_worktree_for_branch(worktrees, TRANSELEC_BRANCH)
 
     if read_only:
         modules: dict[str, ModuleResult] = {}
         for module_id, worktree, probe in (
             ("lidar", REPO_ROOT, lambda _w: probe_lidar()),
             ("forestal", forestry_worktree, probe_forestry),
-            ("transelec", transelec_worktree, probe_transelec),
+            ("transelec", REPO_ROOT, lambda _w: probe_transelec()),
         ):
             running, url = probe(worktree)
             modules[module_id] = ModuleResult(
@@ -457,7 +432,7 @@ def resolve_modules(read_only: bool) -> dict[str, ModuleResult]:
             "forestal", forestry_worktree, probe_forestry, forestry_worktree, "forestry-dev"
         ),
         "transelec": ensure_module(
-            "transelec", transelec_worktree, probe_transelec, transelec_worktree, "transelec-dev"
+            "transelec", REPO_ROOT, lambda _w: probe_transelec(), REPO_ROOT, "transelec-dev"
         ),
     }
     modules["lidar"] = replace(modules["lidar"], measurement_count=lidar_measurement_count())
@@ -540,10 +515,9 @@ def command_stop() -> int:
     else:
         log("forestal: not owned by campo-demo, leaving it running")
 
-    transelec_worktree = find_worktree_for_branch(worktrees, TRANSELEC_BRANCH)
-    if ownership["transelec_owned"] and transelec_worktree is not None:
+    if ownership["transelec_owned"]:
         try:
-            run_make_target(transelec_worktree, "transelec-stop")
+            run_make_target(REPO_ROOT, "transelec-stop")
             log("transelec: stopped")
         except LauncherError as exc:
             log(f"transelec: failed to stop cleanly ({exc})")

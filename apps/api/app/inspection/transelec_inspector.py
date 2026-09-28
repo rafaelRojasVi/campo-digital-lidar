@@ -1,7 +1,9 @@
-"""Transelec workbook inspection, reusing the existing xlsx source contract.
+"""Transelec workbook inspection, reusing the xlsx source contract.
 
 Intake inspection reports evidence; it does not gate upload on business
-schema perfection. A contract mismatch is captured, never raised.
+schema perfection. A contract mismatch is captured, never raised. The
+authoritative review happens at validate-and-project, which returns the full
+layout report; this only records counts.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ class TranselecInspectionResult:
     sheet_names: tuple[str, ...]
     resumen_row_count: int | None
     contract_error: str | None
+    layout_warning_count: int | None = None
 
 
 def inspect_transelec_workbook(path: Path) -> TranselecInspectionResult:
@@ -34,6 +37,7 @@ def inspect_transelec_workbook(path: Path) -> TranselecInspectionResult:
 
     resumen_row_count: int | None = None
     contract_error: str | None = None
+    layout_warning_count: int | None = None
 
     try:
         parsed = load_transelec_workbook(path)
@@ -41,9 +45,11 @@ def inspect_transelec_workbook(path: Path) -> TranselecInspectionResult:
         contract_error = str(exc)
     else:
         resumen_row_count = len(parsed.resumen_rows)
+        layout_warning_count = parsed.layout.count("warning")
 
     return TranselecInspectionResult(
         sheet_names=sheet_names,
         resumen_row_count=resumen_row_count,
         contract_error=contract_error,
+        layout_warning_count=layout_warning_count,
     )

@@ -60,3 +60,12 @@ npm \
   audit \
   --omit=dev \
   --audit-level=high
+
+echo
+echo "=== Transelec dashboard production dependencies ==="
+
+npm \
+  --prefix products/transelect/dashboard \
+  audit \
+  --omit=dev \
+  --audit-level=high

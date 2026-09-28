@@ -39,6 +39,7 @@ api = [
   "sqlalchemy>=2.0",
   "uvicorn>=0.30",
   "msal>=1.28,<2",
+  "pyjwt[crypto]>=2.10,<3",
   "cryptography>=49.0",
 ]
 

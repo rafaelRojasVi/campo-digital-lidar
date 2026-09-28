@@ -100,3 +100,46 @@ production infrastructure choice reviews it and either accepts it
 (superseding ADR-001), rejects it (ADR-001 stands, this ADR moves to
 Rejected with its reasoning preserved), or requests the outstanding LiDAR
 benchmark before deciding.
+
+## Update (2026-09-03) — scoped to the Transelec private pilot only
+
+The Slice 8 task evaluated hosting for the first real private deployment —
+a Transelec-only pilot for Javier, not the full multi-product platform —
+and re-checked Render's current paid tier (not previously compared here,
+since ADR-005 only evaluated Render's free staging tier).
+
+- **The one real objection to Azure in this ADR — Container Apps Jobs'
+  8 GiB ephemeral-storage ceiling — does not apply to this pilot.**
+  Transelec's workload (`docs/superpowers/plans/
+  2026-09-01-secure-file-access-slice-design.md`, `app.execution`) is
+  synchronous XLSX row processing, not LiDAR point-cloud geometry; it needs
+  no async batch job compute at all, let alone one near that ceiling. This
+  removes Azure's only documented technical weakness for this specific,
+  narrower deployment.
+- Real Chile Central pricing for a pilot this size (Postgres Burstable
+  B1ms + ~32 GiB storage, low-volume Blob Storage, one small Container
+  Apps replica, Key Vault, Entra ID Free): **≈$45–55/month**, verified
+  against the Azure Retail Prices API (see
+  `docs/research/2026-09-01-platform-runtime-infrastructure-study.md`'s
+  PILOT scenario) — likely toward the low end for Transelec alone, which
+  needs less storage/compute than that platform-wide estimate (which
+  includes occasional LiDAR jobs).
+- **Render paid tier** (checked 2026-09-03, third-party-aggregated pricing
+  since Render's own pricing page did not render as fetchable text —
+  Postgres Starter ≈$7/month, web service Starter ≈$7/month, persistent
+  disk ≈$0.25/GB/month) is the cheapest sticker price of any option
+  considered, but has two real, unresolved weaknesses for this pilot: no
+  South America region (still Oregon/Ohio/Virginia/Frankfurt/Singapore —
+  Virginia remains the least-bad choice, per ADR-005's reasoning), and no
+  true managed object-storage product — `app.object_store.ObjectStore`
+  would map to a paid Disk instead of an S3/Blob/GCS-equivalent, a real
+  architectural downgrade from every other candidate here. Not recommended
+  as the pilot's primary provider; the cost gap does not offset those two
+  weaknesses for data this platform explicitly must keep private and
+  durable.
+
+This update does not change this ADR's Proposed status or its
+platform-wide recommendation — it only makes the case for Azure stronger
+for the Transelec pilot specifically, and adds Render as a considered (and
+rejected) candidate for that narrower decision. Acceptance is still
+Rafael's decision.

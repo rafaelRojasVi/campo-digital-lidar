@@ -1,58 +1,68 @@
+"""Load the ``Resumen`` worksheet of a Transelec workbook.
+
+Since contract V2 the layout is *recognized* rather than fixed: see
+``transelec_ingestion.resumen_layout`` for header detection, alias mapping,
+the explicit two-``Carpeta`` rule and the report of every decision. This
+module keeps the loading entry point and its error type, and raises when the
+resolution contains a blocking (``error``) issue.
+"""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from python_calamine import CalamineWorkbook
 
+from transelec_ingestion.resumen_layout import (
+    AEF_TRACKING_FIELDS,
+    FIELD_SPECS,
+    LayoutIssue,
+    LayoutReport,
+    TextDateEvidence,
+    find_resumen_sheet,
+    resolve_resumen_layout,
+    scan_formula_cells,
+)
+
 
 class TranselecWorkbookError(ValueError):
-    """Raised when a workbook does not satisfy the established source contract."""
+    """Raised when a workbook cannot be imported without review.
+
+    ``report`` carries the full layout report when one could be produced, so
+    a caller can show the operator every row/column reference rather than
+    only the first problem. Its ``str()`` is structural only: issue codes,
+    field names, column letters and row numbers, never a business cell value.
+    """
+
+    def __init__(self, message: str, *, report: LayoutReport | None = None) -> None:
+        super().__init__(message)
+        self.report = report
 
 
-# The workbook contains two columns both labelled "Carpeta".
-# Identity is therefore positional, not header-name based.
-RESUMEN_COLUMNS: tuple[tuple[str, str], ...] = (
-    ("Predio Ref", "predio_ref"),
-    ("Rol Ref", "rol_ref"),
-    ("N° Area de Ref", "area_ref"),
-    ("PMF", "pmf"),
-    ("Carpeta", "carpeta_source"),
-    ("PAS", "pas"),
-    ("Estado", "estado"),
-    ("Estado resumido", "estado_resumido"),
-    ("Tipo de rechazo", "tipo_rechazo"),
-    ("Reingreso_Tec", "reingreso_tec"),
-    ("Reingreso_Legal", "reingreso_legal"),
-    ("Reingreso_RecRep", "reingreso_recrep"),
-    ("Tipo de propietario", "tipo_propietario"),
-    ("ID TRANSELEC", "id_transelec"),
-    ("Rol", "rol"),
-    ("N Predio", "numero_predio"),
-    ("N Area de Corta", "numero_area_corta"),
-    ("Superficie de corta", "superficie_corta"),
-    ("Superficie de total de corta", "superficie_total_corta"),
-    ("Fecha de ingreso", "fecha_ingreso"),
-    ("N Ingreso", "numero_ingreso"),
-    ("90 dias", "fecha_90_dias"),
-    ("Hoy", "hoy"),
-    ("Empresa", "empresa"),
-    ("ID_Predio_UnicoII", "id_predio_unico_ii"),
-    ("ID_PMF", "id_pmf"),
-    ("ID_Predo_Unico", "id_predio_unico"),
-    ("Tramite", "tramite"),
-    ("Carpeta", "carpeta_normalizada"),
-    ("Sector", "sector"),
+# The 30-column business table as it stood in the 14-Aug-2026 workbook (then
+# at A:AD). Kept as the documented legacy layout; tests use it to prove that
+# layout still imports. Header text, not position, binds a column now.
+RESUMEN_COLUMNS: tuple[tuple[str, str], ...] = tuple(
+    (spec.header, spec.name) for spec in FIELD_SPECS if spec.name not in AEF_TRACKING_FIELDS
 )
 
 EXPECTED_RESUMEN_HEADERS = tuple(header for header, _ in RESUMEN_COLUMNS)
+
+# The 09-Sept-2026 layout: the AEF tracking block at A:E, then the 30 fields.
+CURRENT_RESUMEN_COLUMNS: tuple[tuple[str, str], ...] = tuple(
+    (spec.header, spec.name) for spec in FIELD_SPECS
+)
 
 
 @dataclass(frozen=True, slots=True)
 class ResumenSourceRow:
     source_row_number: int
     values: dict[str, Any]
+    # Raw text found in date columns and how it was classified; see
+    # resumen_layout.classify_text_date.
+    text_dates: dict[str, TextDateEvidence] = field(default_factory=dict)
 
     @property
     def pmf(self) -> str:
@@ -74,51 +84,23 @@ class TranselecWorkbook:
     source_path: Path
     sheet_names: tuple[str, ...]
     resumen_rows: tuple[ResumenSourceRow, ...]
+    layout: LayoutReport
 
 
-def _normalize_header(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
-
-
-def _is_blank(value: Any) -> bool:
-    if value is None:
-        return True
-    return isinstance(value, str) and not value.strip()
-
-
-def _validate_resumen_headers(header_row: list[Any]) -> None:
-    expected_count = len(EXPECTED_RESUMEN_HEADERS)
-
-    positional_headers = tuple(
-        _normalize_header(header_row[index] if index < len(header_row) else None)
-        for index in range(expected_count)
-    )
-
-    mismatches = [
-        (index + 1, expected, actual)
-        for index, (expected, actual) in enumerate(
-            zip(
-                EXPECTED_RESUMEN_HEADERS,
-                positional_headers,
-                strict=True,
-            )
-        )
-        if expected != actual
-    ]
-
-    separator = header_row[expected_count] if len(header_row) > expected_count else None
-
-    if mismatches or not _is_blank(separator):
-        raise TranselecWorkbookError(
-            "Resumen schema mismatch: "
-            f"positional={mismatches}; "
-            f"separator_column={expected_count + 1}"
-        )
+def _describe(issue: LayoutIssue) -> str:
+    parts = [issue.code]
+    if issue.field:
+        parts.append(f"field={issue.field}")
+    if issue.columns:
+        parts.append(f"columns={','.join(issue.columns)}")
+    if issue.rows:
+        parts.append(f"rows={','.join(str(row) for row in issue.rows[:10])}")
+    return " ".join(parts)
 
 
 def load_transelec_workbook(path: str | Path) -> TranselecWorkbook:
+    """Read and resolve ``Resumen``; raise on any blocking issue."""
+
     source_path = Path(path)
 
     if not source_path.is_file():
@@ -126,52 +108,39 @@ def load_transelec_workbook(path: str | Path) -> TranselecWorkbook:
 
     with CalamineWorkbook.from_path(str(source_path)) as workbook:
         sheet_names = tuple(workbook.sheet_names)
+        sheet_name, sheet_issue = find_resumen_sheet(sheet_names)
+        if sheet_name is None:
+            assert sheet_issue is not None
+            raise TranselecWorkbookError(f"Resumen layout: {_describe(sheet_issue)}")
+        # skip_empty_area=False keeps the grid absolute: row 0 is worksheet
+        # row 1 and column 0 is column A even when leading rows are blank.
+        grid = workbook.get_sheet_by_name(sheet_name).to_python(skip_empty_area=False)
 
-        if "Resumen" not in sheet_names:
-            raise TranselecWorkbookError('Required worksheet "Resumen" is missing')
-
-        raw_rows = workbook.get_sheet_by_name("Resumen").to_python()
-
-    if not raw_rows:
+    if not grid:
         raise TranselecWorkbookError('Worksheet "Resumen" is empty')
 
-    header_row = raw_rows[0]
-    _validate_resumen_headers(header_row)
+    resolution = resolve_resumen_layout(
+        grid, formula_cells=scan_formula_cells(source_path, sheet_name)
+    )
+    report = resolution.report
 
-    parsed_rows: list[ResumenSourceRow] = []
-
-    for source_row_number, raw_row in enumerate(raw_rows[1:], start=2):
-        separator = raw_row[len(RESUMEN_COLUMNS)] if len(raw_row) > len(RESUMEN_COLUMNS) else None
-
-        if not _is_blank(separator):
-            raise TranselecWorkbookError(
-                "Resumen row contains data in the contract separator: "
-                f"row={source_row_number}; "
-                f"column={len(RESUMEN_COLUMNS) + 1}"
-            )
-
-        values = {
-            field_name: (raw_row[index] if index < len(raw_row) else None)
-            for index, (_, field_name) in enumerate(RESUMEN_COLUMNS)
-        }
-
-        pmf = values["pmf"]
-
-        if pmf is None or not str(pmf).strip():
-            continue
-
-        parsed_rows.append(
-            ResumenSourceRow(
-                source_row_number=source_row_number,
-                values=values,
-            )
+    if report.has_errors:
+        errors = [issue for issue in report.issues if issue.severity == "error"]
+        raise TranselecWorkbookError(
+            "Resumen layout: " + "; ".join(_describe(issue) for issue in errors[:5]),
+            report=report,
         )
-
-    if not parsed_rows:
-        raise TranselecWorkbookError('Worksheet "Resumen" contains no business rows with PMF')
 
     return TranselecWorkbook(
         source_path=source_path,
         sheet_names=sheet_names,
-        resumen_rows=tuple(parsed_rows),
+        resumen_rows=tuple(
+            ResumenSourceRow(
+                source_row_number=row.source_row_number,
+                values=row.values,
+                text_dates=row.text_dates,
+            )
+            for row in resolution.rows
+        ),
+        layout=report,
     )

@@ -4,3 +4,14 @@ title = "gitleaks config for campo-digital-platform"
 # Inherit Gitleaks' maintained default rules rather than duplicating
 # detection rules inside this repository.
 useDefault = true
+
+# Confirmed fake test fixture, not a credential of any environment: a
+# syntactically valid Fernet key that base64-decodes to the ASCII text
+# "ZoogKeyForTestsOnlyNotARealKey00". Committed in 8c27cc9 (PR #56) and
+# scanned by every branch's CI because the scan covers all refs. Matched by
+# exact value AND path, so the same string anywhere else is still reported.
+[[allowlists]]
+description = "Fake Fernet key in the production identity-gate test"
+condition = "AND"
+paths = ['''^apps/api/tests/test_main_production_identity_gate\.py$''']
+regexes = ['''^Wm9vZ0tleUZvclRlc3RzT25seU5vdEFSZWFsS2V5MDA=?$''']

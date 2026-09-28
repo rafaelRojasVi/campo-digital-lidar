@@ -26,6 +26,11 @@ class Action(StrEnum):
     UPLOAD = "upload"
     PROCESS = "process"
     RETRY = "retry"
+    # Making an already-validated, immutable version the one a product
+    # serves — and reverting to a previous one. Distinct from PROCESS
+    # (running work on an upload) because publishing changes what every
+    # viewer sees, which is an operational decision, not a pipeline step.
+    PUBLISH = "publish"
     MANAGE_ACCESS = "manage_access"
 
 
@@ -35,11 +40,13 @@ _ALLOWED: frozenset[tuple[Role, Action]] = frozenset(
         (Role.ADMIN, Action.UPLOAD),
         (Role.ADMIN, Action.PROCESS),
         (Role.ADMIN, Action.RETRY),
+        (Role.ADMIN, Action.PUBLISH),
         (Role.ADMIN, Action.MANAGE_ACCESS),
         (Role.OPERATOR, Action.VIEW),
         (Role.OPERATOR, Action.UPLOAD),
         (Role.OPERATOR, Action.PROCESS),
         (Role.OPERATOR, Action.RETRY),
+        (Role.OPERATOR, Action.PUBLISH),
         (Role.VIEWER, Action.VIEW),
     }
 )
