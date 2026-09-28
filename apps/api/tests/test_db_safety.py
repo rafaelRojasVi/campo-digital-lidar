@@ -53,3 +53,13 @@ def test_production_environment_is_rejected() -> None:
                 database="campo_digital_test",
             )
         )
+
+
+def test_staging_environment_is_rejected() -> None:
+    with pytest.raises(UnsafeTestDatabaseError):
+        require_test_database(
+            make_settings(
+                app_env="staging",
+                database="campo_digital_test",
+            )
+        )

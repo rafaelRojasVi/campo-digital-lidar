@@ -4,6 +4,12 @@
 
 Proposed.
 
+**Note (2026-09-01):** `ADR-004-revisit-production-cloud-provider-choice.md`
+(also Proposed) proposes Microsoft Azure as a competing candidate to the GCP
+lean below, based on newly-confirmed Azure regional parity in Santiago. This
+ADR's status and decision are unchanged pending review; see ADR-004 and
+`../research/2026-09-01-platform-runtime-infrastructure-study.md`.
+
 ## Context
 
 Campo Digital needs production infrastructure for:

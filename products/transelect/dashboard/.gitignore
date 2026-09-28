@@ -1,0 +1,9 @@
+node_modules
+dist
+node_modules/.tmp
+
+# Playwright
+test-results
+playwright-report
+blob-report
+.playwright

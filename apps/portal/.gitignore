@@ -1,0 +1,6 @@
+node_modules
+dist
+node_modules/.tmp
+
+# Launcher-generated local runtime status. Never machine-specific data in Git.
+public/campo-runtime.json

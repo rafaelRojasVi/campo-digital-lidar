@@ -90,6 +90,14 @@ Proposed managed components:
 This provider decision remains **Proposed** until the infrastructure ADR is
 accepted and the cost/operational assumptions are reviewed.
 
+**OPEN QUESTION** (2026-09-01) — `docs/adr/ADR-004-revisit-production-cloud-provider-choice.md`
+(also Proposed) now proposes Microsoft Azure (Chile Central region, Entra ID
+identity, Container Apps Jobs with Azure Batch escalation) as a competing
+candidate, based on newly-confirmed Azure regional parity with GCP in
+Santiago and Campo Digital's existing Microsoft/OneDrive ecosystem. See
+`docs/research/2026-09-01-platform-runtime-infrastructure-study.md` for the
+full comparison. Neither candidate is accepted; do not provision either.
+
 ## Database strategy
 
 Start with one managed PostgreSQL/PostGIS instance.

@@ -8,24 +8,69 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
+from sqlalchemy import Connection
 
+from app.access import Action
+from app.access_repository import AppUser
+from app.deps import ensure_can, get_current_app_user, get_db_connection
 from lidar_core.models import MeasurementRun, VolumeComparisonRecord
 from lidar_io.comparison_store import read_comparison_record
-from lidar_io.run_store import MEASUREMENT_FILENAME, read_measurement_run
+from lidar_io.output_root_discovery import resolve_report_root
+from lidar_io.run_store import (
+    MEASUREMENT_FILENAME,
+    discover_measurement_paths,
+    read_measurement_run,
+)
 
-router = APIRouter()
+LIDAR_PRODUCT_KEY = "lidar"
 
-DEFAULT_OUTPUT_ROOT = Path("products/lidar/reports/out")
+
+def require_lidar_view(
+    user: Annotated[AppUser, Depends(get_current_app_user)],
+    connection: Annotated[Connection, Depends(get_db_connection)],
+) -> None:
+    """Require an authenticated caller with a LiDAR VIEW-capable grant.
+
+    Reuses the same access primitives (app.access.can, app.deps.ensure_can)
+    already used by app.routers.ingestion — no new authorization layer.
+    """
+
+    ensure_can(
+        connection,
+        app_user_id=user.id,
+        product_key=LIDAR_PRODUCT_KEY,
+        action=Action.VIEW,
+    )
+
+
+router = APIRouter(dependencies=[Depends(require_lidar_view)])
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def get_output_root() -> Path:
-    """Return the configured local measurement-output root."""
+    """Return the local measurement-output root to serve.
 
-    configured = os.environ.get(
-        "CAMPO_LIDAR_OUTPUT_ROOT",
-        str(DEFAULT_OUTPUT_ROOT),
+    An explicit ``CAMPO_LIDAR_OUTPUT_ROOT`` always wins; otherwise, only in
+    ``APP_ENV=development``, the report store is discovered automatically
+    across local git worktrees. In any other ``APP_ENV`` (staging,
+    production, ...) that discovery is disabled — a hosted API process must
+    never inspect sibling worktrees or implicitly trust local report state —
+    and this falls back to the same "no report source configured" state the
+    API already handles safely. See ``lidar_io.output_root_discovery`` for
+    the full precedence rules.
+
+    Read straight from the process environment, like the ``APP_ENV`` checks
+    in ``app.main``, so resolving this never requires the full
+    ``app.config.Settings`` (and its database credentials) to be configured.
+    """
+
+    resolution = resolve_report_root(
+        REPO_ROOT,
+        env_value=os.environ.get("CAMPO_LIDAR_OUTPUT_ROOT"),
+        app_env=os.environ.get("APP_ENV", "development"),
     )
-    return Path(configured)
+    return resolution.path
 
 
 def _safe_component(value: str, *, field: str) -> str:
@@ -108,7 +153,7 @@ def list_runs(
 
     runs: list[MeasurementRun] = []
 
-    for measurement_path in sorted(output_root.glob(f"*/{MEASUREMENT_FILENAME}")):
+    for measurement_path in discover_measurement_paths(output_root):
         try:
             run = read_measurement_run(measurement_path)
         except (OSError, ValueError):

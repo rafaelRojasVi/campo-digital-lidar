@@ -51,6 +51,21 @@ stale and must be re-verified before provisioning.
 The stakeholder/project spelling is `Transelec`. The repository product path
 currently remains `products/transelect/`; do not rename that path implicitly.
 
+## Transelec workbooks (planillas) — required skill
+
+Before inspecting, importing, validating, publishing or discussing any
+Transelec workbook (`PlanillaMaestra*.xlsx`, "planilla", the `Resumen` sheet),
+and before changing `products/transelect/src/transelec_ingestion/` layout
+recognition, read and follow:
+
+`.claude/skills/transelec-workbook/SKILL.md`
+
+The canonical reading rules are in
+`products/transelect/docs/source-contract-v2.md`; the skill is the procedure
+and must not duplicate them. Never commit a workbook, never publish or deploy
+one without the user's explicit instruction for that workbook, and never put
+its business values in commits, PRs or docs.
+
 ## External Campo Digital source data
 
 External source material may be available through:

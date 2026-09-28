@@ -165,3 +165,30 @@ Después, crear la fundación local:
 4. almacenamiento de artefactos;
 5. ejecución local de jobs;
 6. integración de LiDAR como primer producto real sobre la fundación.
+
+## Actualización — composición hospedada V1 (2026-09-01)
+
+Desde la propuesta original de agosto, la plataforma ya avanzó más allá de
+la fundación local: existe un despliegue de staging en Render (gratuito) con
+el portal, la API compartida y PostgreSQL/PostGIS.
+
+Lo nuevo en esta actualización:
+
+- **LiDAR ya es accesible públicamente en staging**, sin ningún dato real de
+  cliente — el estado hospedado muestra "sin mediciones" porque no se
+  publica ningún archivo LAS/LAZ real ni ninguna copia del reporte local.
+- **Forestal y Transelec todavía no están disponibles públicamente.** El
+  portal lo indica honestamente (no se simula disponibilidad) porque
+  publicarlos requeriría inventar datos sintéticos de negocio (Forestal) o
+  una arquitectura que hoy solo está diseñada para acceso privado del
+  cliente (Transelec).
+- El portal ahora distingue explícitamente entre el entorno local y el
+  entorno de staging, en vez de mostrar siempre lenguaje de "demo local" en
+  una URL pública.
+- El costo incremental sigue siendo **USD 0/mes**: no se agregó ninguna base
+  de datos, almacenamiento ni servicio de backend nuevo — solo un sitio
+  estático adicional gratuito para LiDAR.
+- El inicio de sesión real (Entra ID) sigue bloqueado externamente; por eso
+  la nueva página "Archivos" en staging muestra un mensaje honesto de que el
+  inicio de sesión todavía no está disponible ahí, en vez de botones de
+  desarrollo que no funcionarían.

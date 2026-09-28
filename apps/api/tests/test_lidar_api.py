@@ -9,7 +9,7 @@ API_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(API_ROOT))
 
 from app.main import app  # noqa: E402
-from app.routers.lidar import get_output_root  # noqa: E402
+from app.routers.lidar import get_output_root, require_lidar_view  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from lidar_core.models import (  # noqa: E402
@@ -28,6 +28,12 @@ from lidar_io.run_store import write_measurement_run  # noqa: E402
 @pytest.fixture
 def client(tmp_path: Path):
     app.dependency_overrides[get_output_root] = lambda: tmp_path
+    # RBAC on this router is covered end-to-end (real sessions + product
+    # grants against a real database) by
+    # integration_tests/test_lidar_router_rbac.py. This file has no database
+    # and exercises path/artifact-safety behavior only, so it bypasses RBAC
+    # here rather than faking a user/session for every test.
+    app.dependency_overrides[require_lidar_view] = lambda: None
 
     with TestClient(app) as test_client:
         yield test_client

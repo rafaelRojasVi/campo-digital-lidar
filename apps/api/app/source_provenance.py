@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy import Connection, text
 
@@ -12,6 +13,8 @@ from app.source_discovery import (
 )
 
 FILESYSTEM_IDENTITY_KIND = "relative_path"
+UPLOAD_IDENTITY_KIND = "content_sha256"
+UPLOAD_SYSTEM_KEY = "campo_digital_upload"
 
 
 class SourceProvenanceError(RuntimeError):
@@ -94,6 +97,93 @@ def persist_filesystem_source_provenance(
             "observed_at": observation.observed_at,
             "source_modified_at": observation.source_modified_at,
             "media_type": observation.media_type,
+        },
+    ).scalar_one()
+
+    return PersistedSourceProvenance(
+        source_system_id=source_system_id,
+        source_asset_id=source_asset_id,
+        source_snapshot_id=source_snapshot_id,
+        source_observation_id=source_observation_id,
+    )
+
+
+def persist_uploaded_source_provenance(
+    connection: Connection,
+    *,
+    content_sha256: str,
+    byte_size: int,
+    object_storage_key: str,
+    original_filename: str,
+    media_type: str | None,
+) -> PersistedSourceProvenance:
+    """Persist one uploaded file's provenance inside the caller's transaction.
+
+    Uploaded content is identified by its own SHA-256 (identity_kind
+    "content_sha256"), under a dedicated "campo_digital_upload" source
+    system distinct from the filesystem mirror — so uploading identical
+    bytes twice resolves to the same source asset and snapshot, reusing the
+    same object_storage_key rather than violating its global uniqueness.
+    """
+
+    source_system_id = _resolve_source_system(
+        connection,
+        system_key=UPLOAD_SYSTEM_KEY,
+    )
+
+    source_asset_id = _resolve_source_asset(
+        connection,
+        source_system_id=source_system_id,
+        identity_kind=UPLOAD_IDENTITY_KIND,
+        identity_key=content_sha256,
+    )
+
+    source_snapshot_id = _resolve_source_snapshot(
+        connection,
+        source_asset_id=source_asset_id,
+        content_sha256=content_sha256,
+        byte_size=byte_size,
+    )
+
+    connection.execute(
+        text(
+            """
+            UPDATE platform.source_snapshot
+            SET object_storage_key = :object_storage_key
+            WHERE id = :id AND object_storage_key IS NULL
+            """
+        ),
+        {"object_storage_key": object_storage_key, "id": source_snapshot_id},
+    )
+
+    source_observation_id = connection.execute(
+        text(
+            """
+            INSERT INTO platform.source_observation (
+                source_snapshot_id,
+                source_path,
+                filename,
+                observed_at,
+                source_modified_at,
+                media_type
+            )
+            VALUES (
+                :source_snapshot_id,
+                :source_path,
+                :filename,
+                :observed_at,
+                NULL,
+                :media_type
+            )
+            RETURNING id
+            """
+        ),
+        {
+            "source_snapshot_id": source_snapshot_id,
+            "source_path": f"upload://{original_filename}",
+            "filename": original_filename,
+            "observed_at": datetime.now(UTC),
+            "media_type": media_type,
         },
     ).scalar_one()
 

@@ -39,12 +39,9 @@ frontends.
 
     apps/
       api/
-        src/app/
-          platform/
-          lidar/
-          forestry/
-          transelect/
-          integrations/
+        app/
+          routers/
+          inspection/
 
     packages/
       contracts/
@@ -75,26 +72,34 @@ Platform-level directories contain only genuinely cross-product concerns.
 
 ## LiDAR migration
 
-The existing LiDAR project will move into:
-
-`products/lidar/`
-
-This includes its Python source, tests, dashboard, research documentation,
+**Status: complete.** The LiDAR project lives under `products/lidar/`,
+including its Python source, tests, dashboard, research documentation,
 sensor/measurement configuration, notebooks, PDAL pipelines, data layout,
-and generated-report layout.
-
-The migration must preserve the established scientific behavior and test
-baseline.
+and generated-report layout. The migration preserved the established
+scientific behavior and test baseline.
 
 ## Backend
 
-`apps/api` is the shared HTTP composition layer.
+`apps/api` is the shared HTTP composition layer. Its Python package is
+`apps/api/app/` — a flat package, not nested under `src/`.
 
-Product-specific API adapters live under:
+Established convention: code is grouped by technical role, not by product
+namespace, because most of what lives here today is genuinely
+cross-product platform infrastructure (access control, authentication,
+audit, the job queue, object storage, source provenance) with only a thin
+layer of product-specific adapters on top:
 
-- `apps/api/src/app/lidar/`
-- `apps/api/src/app/forestry/`
-- `apps/api/src/app/transelect/`
+- `apps/api/app/routers/` — HTTP route modules. Product-specific routers
+  are named per product (e.g. `routers/lidar.py`); platform-wide routers
+  (e.g. `routers/ingestion.py`, `routers/dev_auth.py`) are not.
+- `apps/api/app/inspection/` — lightweight per-product intake inspection
+  adapters (`lidar_inspector.py`, `forestry_inspector.py`,
+  `transelec_inspector.py`), one file per product.
+
+Per-product subpackages (`app/lidar/`, `app/forestry/`, `app/transelect/`)
+remain a reasonable future step if a product's router/adapter surface
+grows enough to justify the extra nesting — introduce that split only when
+it has real files to hold, not ahead of demonstrated need.
 
 Core product logic must not depend on FastAPI.
 

@@ -10,6 +10,11 @@
 *.tiff
 *.zip
 
+# Client spreadsheets (Transelec planillas, source workbooks) - NEVER commit
+*.xlsx
+*.xlsm
+*.xls
+
 # Python
 __pycache__/
 *.py[cod]
@@ -63,5 +68,13 @@ products/lidar/dashboard/public/local-demo/
 # Forestry local demo launcher state (PIDs, ports, logs)
 .forestry-dev/
 
-# Browser-QA session artifacts
+# Local multi-product demo launcher state (PIDs, logs) - machine-specific
+.lidar-dev/
+.campo-demo/
+
+# Local content-addressed object store (platform ingestion foundation) -
+# never commit stored binaries; see apps/api/app/object_store.py
+.local/
+
+# playwright-cli local browser-automation artifacts (snapshots, screenshots)
 .playwright-cli/

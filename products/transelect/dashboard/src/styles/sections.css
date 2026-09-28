@@ -1,0 +1,1059 @@
+/*
+ * Section-specific layout: sign-in, Resumen, Explorador, Pendientes,
+ * Calidad and Datos.
+ *
+ * A rule belongs here only while exactly one section uses it. The moment a
+ * second section wants it, it moves to components.css.
+ */
+
+/* ============================================================== sign-in */
+
+/*
+ * The sign-in screen is the same product, not a detached card floating in
+ * grey. It is a two-column composition on the page's own ground: the left
+ * column states what this is, the right column is the one decision the
+ * visitor has to make.
+ */
+.signin {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: var(--s-9);
+  align-items: center;
+  min-height: calc(100dvh - var(--shell-h));
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--s-8) var(--s-6);
+  animation: rise var(--d-slow) var(--ease-out) both;
+}
+
+.signin-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  max-width: 56ch;
+}
+
+.signin-copy h1 {
+  font-size: 34px;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+}
+
+.signin-lead {
+  color: var(--ink-2);
+  font-size: var(--t-section);
+  line-height: 1.5;
+}
+
+.signin-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: var(--t-small);
+}
+
+.signin-facts div {
+  display: flex;
+  gap: var(--s-3);
+}
+
+.signin-facts i {
+  width: 3px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: var(--line-strong);
+  transform: translateY(2px);
+}
+
+.signin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  padding: var(--s-7);
+  border: 1px solid var(--line);
+  border-radius: var(--r-surface);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+
+.login-action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.login-action .btn {
+  justify-content: center;
+  min-height: 40px;
+  font-size: var(--t-body);
+}
+
+.login-action-note {
+  color: var(--ink-3);
+  font-size: var(--t-small);
+  line-height: 1.55;
+}
+
+.login-foot {
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+  line-height: 1.6;
+}
+
+.login-failure-detail {
+  color: var(--ink-2);
+  font-size: var(--t-small);
+  line-height: 1.55;
+}
+
+/* =============================================================== Resumen */
+
+.lead-block {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: var(--s-8);
+  align-items: center;
+  padding: var(--s-6) 0 var(--s-7);
+}
+
+.lead-figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.lead-figure .basis-tag {
+  align-self: flex-start;
+}
+
+.compositions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+}
+
+/*
+ * Status cards: the three (or four) `Estado resumido` buckets, at PMF grain.
+ *
+ * Aligned on one baseline, one row, equal width — the composition bar above
+ * already carries the proportions, so these carry the counts and the route
+ * into the filtered Explorador. Deliberately smaller than the total figure
+ * beside them: the total is the denominator every card is a part of, and a
+ * card that shouted as loudly would break that reading.
+ *
+ * The tone is a 3px top rule, not a fill. A filled card at this size turns
+ * the row into four coloured blocks competing for the eye; a rule states the
+ * same semantics without changing the card's weight. Colour is never alone:
+ * every card prints its count, its label and its share of the population.
+ */
+.status-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--s-3);
+}
+
+.status-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-5);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--line-strong);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  transition:
+    border-color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--ease);
+}
+
+a.status-card:hover {
+  background: var(--sunken);
+  border-color: var(--line-strong);
+}
+
+a.status-card:active {
+  transform: translateY(1px);
+}
+
+.status-card[data-tone='approved'] {
+  border-top-color: var(--st-approved);
+}
+
+.status-card[data-tone='progress'] {
+  border-top-color: var(--st-progress);
+}
+
+.status-card[data-tone='late'] {
+  border-top-color: var(--st-late);
+}
+
+.status-card[data-tone='struck'] {
+  border-top-color: var(--st-struck);
+}
+
+.status-card[data-tone='none'] {
+  border-top-color: var(--line-strong);
+}
+
+.status-card-value {
+  font-size: 30px;
+  font-weight: 670;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.028em;
+  line-height: 1;
+}
+
+.status-card-label {
+  color: var(--ink);
+  font-size: var(--t-small);
+  font-weight: 650;
+}
+
+.status-card-sub {
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+}
+
+.status-card-go {
+  margin-top: var(--s-2);
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+  font-weight: 700;
+}
+
+a.status-card .status-card-go {
+  color: var(--forest-deep);
+}
+
+/*
+ * A breakdown table is read down one column of counts, so its numbers align
+ * and its row labels do not compete with the section heading above it.
+ */
+.breakdown td:first-child,
+.breakdown th[scope='row'] {
+  white-space: normal;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * Attention row: the three numbers that mean somebody has work to do. They
+ * are the only place on the Resumen that carries a status colour, which is
+ * what makes them read as "act on me" instead of "look me up".
+ */
+.attention {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--s-4);
+}
+
+.attention-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-5);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    border-color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--ease);
+}
+
+.attention-card:hover {
+  border-color: var(--line-strong);
+  background: var(--sunken);
+}
+
+.attention-card:active {
+  transform: translateY(1px);
+}
+
+.attention-card[data-tone='late'] {
+  border-left-color: var(--st-late);
+}
+
+.attention-card[data-tone='progress'] {
+  border-left-color: var(--st-progress);
+}
+
+.attention-card[data-tone='calm'] {
+  border-left-color: var(--st-approved);
+}
+
+.attention-value {
+  font-size: 28px;
+  font-weight: 670;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.028em;
+  line-height: 1;
+}
+
+.attention-card[data-tone='late'] .attention-value {
+  color: var(--st-late);
+}
+
+.attention-label {
+  color: var(--ink);
+  font-size: var(--t-small);
+  font-weight: 650;
+}
+
+.attention-sub {
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+  line-height: 1.5;
+}
+
+.attention-go {
+  margin-top: auto;
+  color: var(--forest-deep);
+  font-size: var(--t-micro);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------- work queue */
+
+.queue {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--r-surface);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.queue-row {
+  display: grid;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  grid-template-columns: minmax(90px, auto) 1fr minmax(120px, auto) auto;
+  gap: var(--s-4);
+  align-items: baseline;
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--t-small);
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+.queue-row:last-child {
+  border-bottom: 0;
+}
+
+.queue-row:hover {
+  background: var(--forest-tint);
+}
+
+.queue-row:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.queue-row[data-selected='true'] {
+  background: var(--forest-tint);
+  box-shadow: inset 3px 0 0 var(--forest);
+}
+
+.queue-row + .queue-row {
+  border-top: 0;
+}
+
+.queue-pmf {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-where {
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.queue-stage {
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+}
+
+/* ============================================================ Explorador */
+
+.explorer-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.search-bar {
+  display: flex;
+  gap: var(--s-3);
+  align-items: stretch;
+}
+
+.search-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.search-field input {
+  min-height: 42px;
+  padding-left: var(--s-8);
+  font-size: var(--t-section);
+}
+
+.search-glyph {
+  position: absolute;
+  top: 50%;
+  left: var(--s-4);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ink-3);
+  border-radius: var(--r-pill);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.search-glyph::after {
+  content: '';
+  position: absolute;
+  top: 11px;
+  left: 11px;
+  width: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--ink-3);
+  transform: rotate(45deg);
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 42px;
+  padding: 0 var(--s-5);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--t-small);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease);
+}
+
+.filter-toggle:hover {
+  border-color: var(--ink-3);
+  background: var(--sunken);
+}
+
+.filter-toggle[aria-expanded='true'] {
+  border-color: var(--forest);
+  background: var(--forest-tint);
+}
+
+.filter-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--forest);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+ /* The disclosure's contents: the five fields, then the presets, inside one
+  * panel so the whole filter surface opens and closes as a unit. */
+.disclosure-inner > .filters,
+.disclosure-inner > .questions {
+  margin-top: var(--s-4);
+  padding: var(--s-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-surface);
+  background: var(--surface);
+}
+
+.disclosure-inner > .questions {
+  border-top: 0;
+  margin-top: var(--s-3);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--s-5);
+}
+
+.active-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.active-filters .eyebrow {
+  margin-right: var(--s-1);
+}
+
+/* -------------------------------------------------------- filter presets */
+
+.presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--s-4) var(--s-5);
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+
+.preset span {
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------- table zone */
+
+.table-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--s-4);
+}
+
+.result-count {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+
+.result-count > span {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  color: var(--ink-3);
+  font-size: var(--t-small);
+}
+
+.result-count b {
+  color: var(--ink);
+  font-size: var(--t-title);
+  font-weight: 660;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.rows-table tbody tr {
+  cursor: pointer;
+}
+
+.rows-table tbody tr:hover {
+  background: var(--forest-tint);
+}
+
+.rows-table tbody tr:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* The row whose detail is open, while the drawer covers the rest: tinted,
+ * barred on its leading edge and bold, so it is found again on close. */
+.rows-table tbody tr[aria-selected='true'] td {
+  background: var(--forest-tint);
+  font-weight: 600;
+}
+
+.rows-table tbody tr[aria-selected='true'] td:first-child {
+  box-shadow: inset 4px 0 0 var(--forest);
+}
+
+.tablewrap[aria-busy='true'] {
+  opacity: 0.55;
+  transition: opacity var(--d-fast) var(--ease);
+}
+
+/* ============================================================ Pendientes */
+
+.pending-lead {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) 1fr;
+  gap: var(--s-8);
+  align-items: center;
+  padding-bottom: var(--s-6);
+}
+
+.queue-table tbody tr:hover {
+  background: var(--sunken);
+}
+
+/* ============================================================== Calidad */
+
+/*
+ * A quality indicator is calm at zero and escalates only when it is not, so
+ * a healthy source never competes with the day's actual work.
+ */
+.quality {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--s-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quality-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-width: 0;
+  padding: var(--s-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+}
+
+.quality-item[data-tone='warn'] {
+  border-color: #e3cd93;
+  border-left: 4px solid var(--st-progress);
+  background: var(--st-progress-tint);
+}
+
+.quality-item p {
+  margin: 0;
+}
+
+.quality-headline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+
+.quality-headline b {
+  font-size: var(--t-title);
+  font-weight: 660;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.quality-item[data-tone='warn'] .quality-headline b {
+  color: var(--st-progress-ink);
+}
+
+.quality-headline span {
+  flex: 1 1 0;
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--t-body);
+  font-weight: 650;
+  text-wrap: balance;
+}
+
+/* When the headline value is words («No disponible»), the label goes below. */
+.quality-item[data-finding='resolucion'] .quality-headline {
+  flex-wrap: wrap;
+}
+
+.quality-item[data-finding='resolucion'] .quality-headline span {
+  flex-basis: 100%;
+}
+
+.quality-what {
+  color: var(--ink-2);
+  font-size: var(--t-small);
+  line-height: 1.5;
+}
+
+.quality-todo {
+  color: var(--ink);
+  font-size: var(--t-small);
+  line-height: 1.5;
+}
+
+.quality-go {
+  align-self: flex-start;
+  color: var(--forest-deep);
+  font-size: var(--t-small);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.quality-go:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.quality-item .how {
+  margin-top: auto;
+}
+
+.refchips {
+  display: flex;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.refchip {
+  display: inline-block;
+  padding: 3px var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--t-micro);
+  font-weight: 600;
+}
+
+.refchip.refmany {
+  border-color: var(--line-strong);
+  background: var(--sunken);
+  color: var(--ink-3);
+}
+
+.report {
+  margin: 0;
+  padding: var(--s-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-surface);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--t-small);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.copy-status {
+  color: var(--st-approved);
+  font-size: var(--t-small);
+  font-weight: 600;
+}
+
+.copy-status.err {
+  color: var(--st-rejected);
+}
+
+/* ================================================================ Datos */
+
+.datos-tabs {
+  display: inline-flex;
+  gap: var(--s-1);
+  padding: var(--s-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--sunken);
+}
+
+/*
+ * The import and versions panes are read as a single column of instructions,
+ * not as a dashboard. Capping the measure keeps the sequence legible instead
+ * of leaving the stepper stranded on the left of an empty 1440px page.
+ */
+.datos-pane {
+  max-width: 880px;
+}
+
+.datos-tabs a {
+  padding: var(--s-3) var(--s-5);
+  border-radius: 2px;
+  color: var(--ink-2);
+  font-size: var(--t-small);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease);
+}
+
+.datos-tabs a:hover {
+  color: var(--ink);
+}
+
+.datos-tabs a[aria-current='page'] {
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+  color: var(--ink);
+}
+
+.dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-7) var(--s-6);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-surface);
+  background: var(--sunken);
+  text-align: center;
+  transition:
+    border-color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease);
+}
+
+.dropzone:hover,
+.dropzone.dragging {
+  border-color: var(--forest);
+  background: var(--forest-tint);
+}
+
+.dropzone p {
+  color: var(--ink-3);
+  font-size: var(--t-small);
+}
+
+/*
+ * The input itself is hidden from sight but not from assistive technology or
+ * from automation: it keeps its `aria-label`, so it is still reachable by
+ * name, and the styled label below is what a pointer user presses.
+ */
+.dropzone input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.dropzone-pick {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 var(--s-5);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--t-small);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition:
+    border-color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease);
+}
+
+.dropzone-pick:hover,
+.dropzone input[type='file']:focus-visible + .dropzone-pick {
+  border-color: var(--forest);
+  background: var(--forest-tint);
+}
+
+.dropzone-file {
+  color: var(--ink);
+  font-size: var(--t-small);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-surface);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.summary-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-4) var(--s-5);
+  background: var(--surface);
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+}
+
+.summary-grid b {
+  color: var(--ink);
+  font-size: var(--t-section);
+  font-weight: 660;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.018em;
+}
+
+/* ========================================================= breakpoints */
+
+@media (max-width: 1023px) {
+  .signin {
+    grid-template-columns: 1fr;
+    gap: var(--s-7);
+    min-height: 0;
+    padding: var(--s-7) var(--s-5) var(--s-8);
+  }
+
+  .lead-block,
+  .pending-lead {
+    grid-template-columns: 1fr;
+    gap: var(--s-6);
+  }
+}
+
+@media (max-width: 767px) {
+  .signin-copy h1 {
+    font-size: 26px;
+  }
+
+  .signin-lead {
+    font-size: var(--t-body);
+  }
+
+  .signin-panel {
+    padding: var(--s-5);
+  }
+
+  .search-bar {
+    flex-direction: column;
+  }
+
+  .filter-toggle {
+    justify-content: center;
+  }
+
+  .queue-row {
+    grid-template-columns: 1fr auto;
+    row-gap: var(--s-2);
+  }
+
+  .queue-where {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+
+  .datos-tabs {
+    align-self: stretch;
+  }
+
+  .datos-tabs a {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+/* ------------------------------------------------------ AEF section */
+
+.split-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-7);
+}
+
+@media (max-width: 720px) {
+  .split-two {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ------------------------------------------- owner table vs main status */
+
+.owner-why {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  max-width: 880px;
+  margin-top: var(--s-7);
+  padding: var(--s-5) var(--s-6);
+  border: 1px solid var(--info-line);
+  border-radius: var(--r-surface);
+  background: var(--info-tint);
+}
+
+.owner-why h3 {
+  margin: 0;
+  font-size: var(--t-section);
+  text-wrap: balance;
+}
+
+.owner-why-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  max-width: var(--measure);
+  margin: 0;
+  padding-left: var(--s-6);
+  color: var(--ink-2);
+  font-size: var(--t-small);
+  line-height: 1.55;
+}
+
+.owner-why-list b {
+  color: var(--ink);
+}
+
+.owner-compare tbody th[scope='row'] {
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--t-small);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+}
+
+.owner-compare tbody tr.total th[scope='row'] {
+  background: inherit;
+}
+
+.owner-compare tbody tr.total th[scope='row'] {
+  font-weight: 700;
+}

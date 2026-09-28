@@ -70,3 +70,17 @@ def read_measurement_run(path: Path) -> MeasurementRun:
     """Load and validate a persisted MeasurementRun JSON document."""
 
     return MeasurementRun.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def discover_measurement_paths(output_root: Path) -> list[Path]:
+    """Return the API-visible measurement records directly below ``output_root``.
+
+    Mirrors the discovery contract used by the HTTP API
+    (``output_root.glob("*/measurement.json")``): a run one level deep is
+    visible, a run nested any deeper is not.
+    """
+
+    if not output_root.is_dir():
+        return []
+
+    return sorted(output_root.glob(f"*/{MEASUREMENT_FILENAME}"))

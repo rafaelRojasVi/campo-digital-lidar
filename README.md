@@ -2,6 +2,17 @@
 
 Multi-product geospatial and forestry software platform for Campo Digital.
 
+## Company portal (local demo)
+
+A local company-branded portal at `apps/portal/` gives one URL that
+navigates into all three products. It is a local demo composition, not a
+production routing architecture — see
+[Company portal V1](docs/platform/company-portal-v1.md).
+
+    make campo-demo      # start (or adopt) all products + the portal
+    make campo-status
+    make campo-stop
+
 ## Products
 
 ### LiDAR / Cubicación

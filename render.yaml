@@ -1,0 +1,167 @@
+# Campo Digital — Render STAGING Blueprint (experimental, not production)
+#
+# This is a minimal, mostly-free demo/staging stack for the shared platform
+# API + portal + PostgreSQL/PostGIS. It is NOT the platform's production
+# provider decision, which remains open — see
+# docs/platform/environments-and-costs.md (GCP planning baseline) and
+# docs/adr/ADR-004-revisit-production-cloud-provider-choice.md (Azure
+# proposal). Render is evaluated here only as a staging/demo experiment.
+#
+# Design decisions, known limitations, and rationale are recorded in
+# docs/adr/ADR-005-render-staging-experiment.md. Read that before changing
+# this file. The hosted LiDAR static site added below (and the portal's
+# STAGING env vars) are recorded in
+# docs/adr/ADR-007-hosted-product-composition-v1.md.
+#
+# Apply from the Render Dashboard: New > Blueprint > select this repo/branch.
+# This file does not provision anything by itself.
+
+previews:
+  generation: off
+
+databases:
+  - name: campo-digital-db-staging
+    databaseName: campo_digital_staging
+    user: campo_digital_staging
+    plan: free
+    region: virginia
+    postgresMajorVersion: "17"
+
+services:
+  # Shared FastAPI platform app (ingestion/access/RBAC + product inspectors).
+  # No separate background worker service is deployed (still deferred, see
+  # ADR-005). Non-LiDAR jobs under STAGING_EXECUTION_MAX_BYTES below are
+  # instead claimed and processed in-process by this same web service via
+  # app.execution.InProcessStagingExecutionBackend (wired in app.main's
+  # lifespan when APP_ENV=staging) — see
+  # docs/superpowers/specs/2026-09-01-secure-file-access-slice-design.md
+  # section 6. LiDAR jobs and anything over the size limit still just queue
+  # and are terminally failed with an explicit rejection reason.
+  - name: campo-digital-api-staging
+    type: web
+    runtime: python
+    plan: free
+    region: virginia
+    repo: https://github.com/rafaelRojasVi/campo-digital-platform.git
+    branch: feat/hosted-composition-v1
+    # preDeployCommand is a paid-plan-only feature, so migrations run as the
+    # last build step instead — once per deploy, not on every process
+    # restart/wake. alembic upgrade head (including 0001's `CREATE EXTENSION
+    # IF NOT EXISTS postgis`) is idempotent at head, so this is safe to
+    # re-run. See ADR-005 for the free-tier constraint that forced this.
+    # --extra transelec is required at import time, not just for Transelec
+    # jobs: app.main -> app.routers.ingestion -> app.worker ->
+    # app.inspection.transelec_inspector imports python_calamine
+    # unconditionally, so the API process fails to start without it even
+    # though no worker runs here.
+    buildCommand: >-
+      pip install -U "uv==0.12.5" &&
+      uv sync --extra api --extra transelec --no-dev --frozen &&
+      .venv/bin/alembic upgrade head
+    startCommand: >-
+      .venv/bin/uvicorn app.main:app --app-dir apps/api
+      --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: APP_ENV
+        value: staging
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: campo-digital-db-staging
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: campo-digital-db-staging
+          property: port
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: campo-digital-db-staging
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: campo-digital-db-staging
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: campo-digital-db-staging
+          property: password
+      # Browser origins permitted to drive state-changing requests, checked
+      # by app.csrf's second (Origin/Referer) layer on top of its mandatory
+      # per-session token. The static sites below reach this API through a
+      # same-origin /api/* rewrite, which forwards the browser's Origin but
+      # not its Host, so each front-end origin must be named here or its
+      # uploads/publishes would be rejected. Same hostname caveat as the
+      # NOTE on campo-digital-portal-staging below: verify the real
+      # onrender.com URLs after first deploy and update this list to match.
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://campo-digital-portal-staging.onrender.com,https://campo-digital-lidar-staging.onrender.com
+      # Staging-only in-process execution backend (app.execution). Kept well
+      # below production upload limits (2 GiB) — this adapter demonstrates
+      # small/metadata-scale jobs, not real workloads. See
+      # docs/superpowers/specs/2026-09-01-secure-file-access-slice-design.md
+      # section 6.
+      - key: STAGING_EXECUTION_MAX_BYTES
+        value: "26214400" # 25 MiB
+
+  # Static portal build. Calls the API through a same-origin /api/* rewrite
+  # (mirrors apps/portal/vite.config.ts's dev proxy) instead of CORS, so the
+  # dev-auth session cookie stays first-party. See ADR-005.
+  #
+  # NOTE: campo-digital-api-staging.onrender.com below assumes Render grants
+  # the API service that exact default hostname (no name collision). Verify
+  # the API service's actual onrender.com URL after first deploy and update
+  # this destination if it differs.
+  - name: campo-digital-portal-staging
+    type: web
+    runtime: static
+    repo: https://github.com/rafaelRojasVi/campo-digital-platform.git
+    branch: feat/hosted-composition-v1
+    buildCommand: cd apps/portal && npm ci && npm run build
+    staticPublishPath: apps/portal/dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://campo-digital-api-staging.onrender.com/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Build-time only (static site — these are read by `vite build`, not by
+      # anything at request time). See
+      # apps/portal/src/runtime/environment.ts and
+      # apps/portal/src/runtime/hostedModules.ts.
+      - key: VITE_CAMPO_ENV
+        value: staging
+      - key: VITE_LIDAR_HOSTED_URL
+        value: https://campo-digital-lidar-staging.onrender.com
+
+  # Static build of the LiDAR product dashboard (products/lidar/dashboard).
+  # Talks to the SAME already-deployed campo-digital-api-staging service via
+  # the identical same-origin /api/* rewrite pattern used by the portal above
+  # — apps/api/app/routers/lidar.py has no DB dependency and already
+  # resolves to an empty [] with no CAMPO_LIDAR_OUTPUT_ROOT set (see
+  # docs/adr/ADR-007-hosted-product-composition-v1.md), so this adds a
+  # second free static site and zero new backend surface, zero new data.
+  #
+  # Same NOTE as campo-digital-portal-staging above: verify this service's
+  # actual onrender.com URL after first deploy and update both this file's
+  # /api rewrite destination pattern (none needed here — this service has no
+  # other Render service depending on ITS hostname except the portal's
+  # VITE_LIDAR_HOSTED_URL above and Module.tsx's iframe allowlist in
+  # apps/portal/src/lib/safeUrl.ts) if the hostname differs.
+  - name: campo-digital-lidar-staging
+    type: web
+    runtime: static
+    repo: https://github.com/rafaelRojasVi/campo-digital-platform.git
+    branch: feat/hosted-composition-v1
+    buildCommand: cd products/lidar/dashboard && npm ci && npm run build
+    staticPublishPath: products/lidar/dashboard/dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://campo-digital-api-staging.onrender.com/*
+      - type: rewrite
+        source: /*
+        destination: /index.html

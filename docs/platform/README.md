@@ -15,11 +15,13 @@ Product-specific implementation truth remains inside each product boundary. Plat
 ## Start here
 
 - [System overview](system-overview.md)
+- [Company portal V1](company-portal-v1.md)
 - [Production platform V1](production-platform-v1.md)
 - [Environments and infrastructure costs](environments-and-costs.md)
 - [Source ingestion](source-ingestion.md)
 - [Client data organization](client-data-organization.md)
 - [Security model](security-model.md)
+- [Entra ID app registration — handoff for tenant admin](entra-app-registration-handoff.md)
 - [Platform roadmap](roadmap.md)
 
 ## Architecture contracts
@@ -37,10 +39,16 @@ Product-specific implementation truth remains inside each product boundary. Plat
 
 - [ADR-001 — Managed production platform](../adr/ADR-001-managed-production-platform.md)
 - [ADR-002 — Source provenance identity](../adr/ADR-002-source-provenance-identity.md)
+- [ADR-003 — Migration revision allocation convention](../adr/ADR-003-migration-revision-allocation-convention.md)
+- [ADR-004 — Revisit production cloud provider choice](../adr/ADR-004-revisit-production-cloud-provider-choice.md) (Proposed; does not supersede ADR-001)
+- [ADR-005 — Render STAGING experiment](../adr/ADR-005-render-staging-experiment.md) (Accepted for staging only; not a production provider decision)
+- [ADR-006 — Restrict dev-auth to development](../adr/ADR-006-restrict-dev-auth-to-development.md)
 
 ## Research
 
 Research documents preserve dated evidence and comparisons but are not canonical architecture.
+
+- [Platform runtime infrastructure study (2026-09-01)](../research/2026-09-01-platform-runtime-infrastructure-study.md)
 
 - [Infrastructure provider study — 2026-08-27](../research/2026-08-27-infrastructure-provider-study.md)
 

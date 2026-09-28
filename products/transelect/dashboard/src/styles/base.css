@@ -1,0 +1,777 @@
+/*
+ * Element defaults, typography and the primitives every section reuses.
+ *
+ * Grouping here is by rule and by space before it is by card: a `.panel` is
+ * used when elevation communicates a real boundary, not as the default
+ * wrapper for every block. That is the single change that stops the page
+ * reading as a pile of interchangeable cards.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--t-body);
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.011em;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--t-title);
+}
+
+h2 {
+  font-size: var(--t-section);
+}
+
+h3 {
+  font-size: var(--t-body);
+}
+
+p {
+  margin: 0;
+}
+
+code,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* Every figure and every numeric column aligns digit-for-digit, so a column
+ * of counts can be compared by eye without reading each one. */
+.numeric,
+.figure-value,
+.stat-value,
+td.numeric,
+th.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--r-control);
+}
+
+/* The focused element must never end up underneath the sticky shell. */
+[id],
+:target {
+  scroll-margin-top: calc(var(--shell-h) + var(--s-6));
+}
+
+::selection {
+  background: var(--forest-tint);
+}
+
+/* ------------------------------------------------------------ skip link */
+
+.skip-link {
+  position: absolute;
+  left: var(--s-3);
+  top: var(--s-3);
+  z-index: 90;
+  padding: var(--s-3) var(--s-5);
+  border-radius: var(--r-control);
+  background: var(--forest-deep);
+  color: var(--ink-inverse);
+  font-size: var(--t-small);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform var(--d-fast) var(--ease);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* --------------------------------------------------------------- layout */
+
+.page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--s-6) var(--s-6) var(--s-9);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+}
+
+.stack-tight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+}
+
+.row-between {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-5);
+  flex-wrap: wrap;
+}
+
+.prose {
+  max-width: var(--measure);
+  color: var(--ink-2);
+  font-size: var(--t-small);
+  line-height: 1.6;
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+.hint {
+  max-width: var(--measure);
+  color: var(--ink-3);
+  font-size: var(--t-small);
+  line-height: 1.55;
+}
+
+/* -------------------------------------------------------------- surfaces */
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--r-surface);
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+}
+
+.panel-pad {
+  padding: var(--s-6);
+}
+
+.sunken {
+  border-radius: var(--r-surface);
+  background: var(--sunken);
+}
+
+/* A section that is grouped by a rule rather than by a card. This is the
+ * default; `.panel` is the exception. */
+.ruled {
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line);
+}
+
+/* -------------------------------------------------------- section header */
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--s-4);
+}
+
+.section-head h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.section-head-meta {
+  color: var(--ink-3);
+  font-size: var(--t-small);
+}
+
+.eyebrow {
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------- basis tag */
+
+/*
+ * The identifier of a named counting rule, as the API reports it. These
+ * rules genuinely disagree with each other, so the identifier stays one click
+ * away from every figure it produced — inside that figure's «Cómo se calcula»
+ * detail — rather than in the reading line, where it meant nothing to the
+ * people the page is for.
+ */
+.basis-tag {
+  display: inline-block;
+  padding: 1px var(--s-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--sunken);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+/* A source column name, as headed in the workbook. */
+.source-col {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+/* ------------------------------------------------------- how calculated */
+
+.how {
+  max-width: var(--measure);
+  margin-top: var(--s-4);
+  font-size: var(--t-small);
+}
+
+.how > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 32px;
+  color: var(--forest-deep);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  touch-action: manipulation;
+}
+
+.how > summary::-webkit-details-marker {
+  display: none;
+}
+
+.how > summary::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid currentcolor;
+  transition: transform var(--d-fast) var(--ease);
+}
+
+.how[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.how > summary:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.how > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--r-control);
+}
+
+.how-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  margin-top: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-left: 3px solid var(--line-strong);
+  background: var(--sunken);
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+.how-body p,
+.how-body ol {
+  margin: 0;
+}
+
+.how-body ol {
+  padding-left: var(--s-6);
+}
+
+.how-rule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.how-rule-name {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.how-meta {
+  color: var(--ink-3);
+}
+
+@media print {
+  .how:not([open]) {
+    display: none;
+  }
+}
+
+/* -------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 34px;
+  padding: 0 var(--s-5);
+  border: 1px solid var(--forest);
+  border-radius: var(--r-control);
+  background: var(--forest);
+  color: #fff;
+  font-family: inherit;
+  font-size: var(--t-small);
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--d-fast) var(--ease),
+    border-color var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--ease);
+}
+
+.btn:hover {
+  background: var(--forest-deep);
+  border-color: var(--forest-deep);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn.alt {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.btn.alt:hover {
+  border-color: var(--ink-3);
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+.btn.quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.btn.quiet:hover {
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+.btn.danger {
+  border-color: var(--st-rejected);
+  background: var(--st-rejected);
+  color: #fff;
+}
+
+.btn.danger:hover {
+  border-color: #7d1f22;
+  background: #7d1f22;
+}
+
+.btn.small {
+  min-height: 28px;
+  padding: 0 var(--s-4);
+  font-size: var(--t-micro);
+}
+
+.btn-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--forest-deep);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  color: var(--forest);
+}
+
+.btns {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------- fields */
+
+label,
+.field-label {
+  display: block;
+  color: var(--ink-2);
+  font-size: var(--t-micro);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+input[type='search'],
+input[type='text'],
+select {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 var(--s-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--t-body);
+  transition:
+    border-color var(--d-fast) var(--ease),
+    box-shadow var(--d-fast) var(--ease);
+}
+
+input::placeholder {
+  color: var(--ink-3);
+}
+
+input[type='search']:hover,
+select:hover {
+  border-color: var(--ink-3);
+}
+
+/*
+ * The global `:focus-visible` outline is deliberately NOT removed here. The
+ * tinted ring and the accent border are an addition to it, not a replacement:
+ * a field that traded a 2px high-contrast outline for a 3px low-contrast
+ * tint would be a regression for anyone navigating by keyboard.
+ */
+input[type='search']:focus,
+select:focus {
+  border-color: var(--forest);
+  box-shadow: 0 0 0 3px var(--forest-tint);
+}
+
+select {
+  appearance: none;
+  padding-right: var(--s-7);
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 50%,
+    calc(100% - 10px) 50%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+
+input[type='file'] {
+  font-family: inherit;
+  font-size: var(--t-small);
+}
+
+/* --------------------------------------------------------------- tables */
+
+/*
+ * A dense table scrolls inside its own container so the page never does.
+ * The shadow on the right edge is how the reader knows there is more: it
+ * appears only while the content actually overflows, and it retreats as they
+ * reach the end (the classic four-layer scroll-shadow, pure CSS, no script).
+ */
+.tablewrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-surface);
+  background:
+    linear-gradient(to right, var(--surface) 30%, transparent) left center,
+    linear-gradient(to left, var(--surface) 30%, transparent) right center,
+    radial-gradient(farthest-side at 0 50%, rgb(22 33 29 / 0.14), transparent) left center,
+    radial-gradient(farthest-side at 100% 50%, rgb(22 33 29 / 0.14), transparent) right center;
+  background-repeat: no-repeat;
+  background-size:
+    36px 100%,
+    36px 100%,
+    12px 100%,
+    12px 100%;
+  background-attachment: local, local, scroll, scroll;
+  background-color: var(--surface);
+  overscroll-behavior-x: contain;
+}
+
+.tablewrap.short {
+  max-height: 420px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-small);
+}
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--sunken);
+  color: var(--ink-2);
+  font-size: var(--t-micro);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/*
+ * Cells stay on one line and the wrapper scrolls. A dense operational table
+ * is read by scanning down a column; letting a rol like `152-5` break across
+ * two lines destroys that, and costs more vertical space than the horizontal
+ * scroll it saves. Print overrides this and lets every cell wrap, because
+ * paper has no scroll container.
+ */
+td {
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+tbody tr {
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+td.numeric,
+th.numeric {
+  text-align: right;
+}
+
+td .ok {
+  color: var(--st-approved);
+}
+
+td.ok {
+  color: var(--st-approved);
+  font-weight: 600;
+}
+
+td.warn {
+  color: var(--st-progress-ink);
+  font-weight: 600;
+}
+
+td.bad {
+  color: var(--st-rejected);
+  font-weight: 600;
+}
+
+tr.total td {
+  border-top: 2px solid var(--line-strong);
+  background: var(--sunken);
+  font-weight: 700;
+}
+
+td.empty,
+.empty {
+  padding: var(--s-7) var(--s-5);
+  color: var(--ink-3);
+  font-size: var(--t-small);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------- status pill */
+
+.pill {
+  display: inline-block;
+  padding: 1px var(--s-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font-size: var(--t-micro);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.pill-aprobado {
+  border-color: #bcd9c9;
+  background: var(--st-approved-tint);
+  color: #14603f;
+}
+
+.pill-en-tramite {
+  border-color: #e3cd93;
+  background: var(--st-progress-tint);
+  color: #8a6100;
+}
+
+.pill-pendiente {
+  border-color: #e5c1b4;
+  background: var(--st-late-tint);
+  color: #8f3720;
+}
+
+.pill-tachado {
+  border-color: var(--line-strong);
+  background: var(--st-struck-tint);
+  color: #5b6862;
+}
+
+.pill-otro {
+  border-color: var(--line-strong);
+  background: var(--sunken);
+  color: var(--ink-2);
+}
+
+/* --------------------------------------------------------------- chips */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 3px var(--s-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--sunken);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease);
+}
+
+.chip-remove:hover {
+  background: var(--st-late-tint);
+  color: var(--st-late);
+}
+
+/* ------------------------------------------------------------- printing */
+
+@media print {
+  .topbar,
+  .filters,
+  .questions,
+  .notice,
+  .no-print,
+  .btns,
+  .pagination,
+  .drawer-backdrop,
+  .dialog-backdrop,
+  .skip-link {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .grid {
+    display: block;
+  }
+
+  .page {
+    max-width: none;
+    padding: 0;
+  }
+
+  .panel {
+    box-shadow: none;
+  }
+
+  .tablewrap,
+  .tablewrap.short {
+    max-height: none;
+    overflow: visible;
+    border: 1px solid var(--line);
+  }
+
+  th {
+    position: static;
+    background: var(--sunken);
+    color: var(--ink);
+  }
+
+  td,
+  th {
+    white-space: normal;
+  }
+
+  .panel,
+  .composition,
+  .stat-strip,
+  .attention,
+  .status-cards {
+    break-inside: avoid;
+  }
+
+  /* A status card is a link on screen and a figure on paper. */
+  a.status-card .status-card-go {
+    display: none;
+  }
+}

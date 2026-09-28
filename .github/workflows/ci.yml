@@ -79,3 +79,47 @@ jobs:
       - name: Viewer build
         working-directory: products/lidar/dashboard
         run: npm run build
+
+  transelec_dashboard:
+    name: Transelec dashboard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: ".node-version"
+          cache: npm
+          cache-dependency-path: products/transelect/dashboard/package-lock.json
+
+      - name: Install dashboard dependencies
+        working-directory: products/transelect/dashboard
+        run: npm ci
+
+      - name: Dashboard lint
+        working-directory: products/transelect/dashboard
+        run: npm run lint
+
+      - name: Dashboard unit tests
+        working-directory: products/transelect/dashboard
+        run: npm test
+
+      - name: Dashboard build and typecheck
+        working-directory: products/transelect/dashboard
+        run: npm run build
+
+      - name: Install Chromium
+        working-directory: products/transelect/dashboard
+        run: npx playwright install --with-deps chromium
+
+      - name: Dashboard browser tests
+        working-directory: products/transelect/dashboard
+        env:
+          DEBUG: pw:webserver
+        run: npm run test:e2e

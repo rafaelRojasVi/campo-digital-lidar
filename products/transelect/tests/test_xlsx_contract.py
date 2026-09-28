@@ -105,12 +105,12 @@ def test_rejects_workbook_without_resumen_sheet(
 
     with pytest.raises(
         TranselecWorkbookError,
-        match='Required worksheet "Resumen" is missing',
+        match="hoja_resumen_ausente",
     ):
         load_transelec_workbook(path)
 
 
-def test_rejects_positional_schema_change(
+def test_rejects_renamed_required_column(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "transelec.xlsx"
@@ -126,7 +126,7 @@ def test_rejects_positional_schema_change(
 
     with pytest.raises(
         TranselecWorkbookError,
-        match="Resumen schema mismatch",
+        match=r"columna_esencial_ausente field=estado($|;)",
     ):
         load_transelec_workbook(path)
 
@@ -143,7 +143,7 @@ def test_rejects_resumen_without_business_rows(
 
     with pytest.raises(
         TranselecWorkbookError,
-        match="contains no business rows with PMF",
+        match="sin_filas_con_pmf",
     ):
         load_transelec_workbook(path)
 
@@ -158,7 +158,7 @@ def test_rejects_missing_workbook(
         load_transelec_workbook(tmp_path / "missing.xlsx")
 
 
-def test_rejects_data_in_contract_separator_column(
+def test_warns_about_unlabeled_data_in_the_former_separator_column(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "transelec.xlsx"
@@ -172,11 +172,12 @@ def test_rejects_data_in_contract_separator_column(
         rows=[row],
     )
 
-    with pytest.raises(
-        TranselecWorkbookError,
-        match="contract separator",
-    ):
-        load_transelec_workbook(path)
+    workbook = load_transelec_workbook(path)
+
+    warnings = [issue for issue in workbook.layout.issues if issue.severity == "warning"]
+    assert [(issue.code, issue.columns, issue.rows) for issue in warnings] == [
+        ("columna_sin_encabezado", ("AE",), (2,))
+    ]
 
 
 def test_ignores_auxiliary_worksheet_content_after_separator(

@@ -16,13 +16,20 @@ class DatabaseUnavailableError(RuntimeError):
 
 
 def build_engine(settings: Settings | None = None) -> Engine:
-    """Create a SQLAlchemy engine from application settings."""
+    """Create a SQLAlchemy engine from application settings.
+
+    Production reaches a managed Postgres provider over a network Campo
+    Digital does not control, unlike local/staging Postgres on a private
+    Docker network, so production connections require TLS explicitly.
+    """
 
     resolved_settings = settings or get_settings()
+    connect_args = {"sslmode": "require"} if resolved_settings.app_env == "production" else {}
 
     return create_engine(
         resolved_settings.database_url,
         pool_pre_ping=True,
+        connect_args=connect_args,
     )
 
 
