@@ -1,7 +1,8 @@
-# Campo Digital API — Transelec production container.
+# Campo Digital API — unified platform production container.
 #
-# One container serves both the JSON API (/transelec, /api/transelec) and
-# the built React dashboard from the same origin (see
+# One container serves the JSON API (/api/...), the Campo Digital front door
+# (apps/portal, sign-in and project picker) at / and the Transelec dashboard
+# under /transelec/, all from the same origin (see
 # apps/api/app/dashboard_static.py) — no separate frontend origin, no CORS
 # surface. See docs/platform/production-platform-v1.md for the target
 # production architecture (Cloud Run) and
@@ -34,6 +35,21 @@ COPY products/transelect/dashboard/package.json products/transelect/dashboard/pa
 RUN npm ci
 
 COPY products/transelect/dashboard/ ./
+# Built for the unified platform: signed-out visitors go to the front door
+# at /, and the bar links back to it (src/runtime/frontDoor.ts).
+ENV VITE_PLATFORM_FRONT_DOOR=true
+RUN npm run build
+
+# ---- Stage 1b: build the Campo Digital front door (apps/portal) ------------
+FROM node:24.19.0-slim AS portal-build
+
+WORKDIR /portal
+
+COPY apps/portal/package.json apps/portal/package-lock.json ./
+RUN npm ci
+
+COPY apps/portal/ ./
+ENV VITE_CAMPO_ENV=production
 RUN npm run build
 
 # ---- Stage 2: Python runtime -------------------------------------------------
@@ -60,6 +76,7 @@ COPY apps/api ./apps/api
 COPY migrations ./migrations
 COPY alembic.ini ./alembic.ini
 COPY --from=dashboard-build /dashboard/dist ./products/transelect/dashboard/dist
+COPY --from=portal-build /portal/dist ./apps/portal/dist
 COPY scripts/container/entrypoint.sh /usr/local/bin/campo-entrypoint
 
 RUN chmod 0755 /usr/local/bin/campo-entrypoint && \
