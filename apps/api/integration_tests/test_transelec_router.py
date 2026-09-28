@@ -91,6 +91,9 @@ def _workbook_bytes(
 ) -> bytes:
     path = tmp_path / name
     workbook = xlsxwriter.Workbook(path)
+    # xlsxwriter stamps the file with the current second; pin it so a workbook
+    # rebuilt for a re-upload has the same bytes, and so the same content hash.
+    workbook.set_properties({"created": dt.datetime(2026, 1, 1)})
     worksheet = workbook.add_worksheet("Resumen")
     date_format = workbook.add_format({"num_format": "yyyy-mm-dd"})
 
