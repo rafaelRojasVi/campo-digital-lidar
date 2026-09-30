@@ -39,7 +39,7 @@ fondo" evita esas descargas.
 ## Qué viene después
 
 Cargar nuevas versiones del shapefile desde la plataforma, con revisión y
-"Publicar", en una entrega posterior.
+"Publicar": ver [Cargar, revisar y publicar versiones](carga-y-publicacion.md).
 
 ## Documentación relacionada
 

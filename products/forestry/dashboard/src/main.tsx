@@ -4,7 +4,8 @@ import 'leaflet/dist/leaflet.css'
 import './styles.css'
 import './workspace.css'
 import './draft.css'
-import App from './App.tsx'
+import './workflow.css'
+import Root from './Root.tsx'
 
 const rootElement = document.getElementById('root')
 
@@ -14,6 +15,6 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <Root />
   </StrictMode>,
 )

@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 from app.access import Role
+from app.forestry_publication import publish_initial_if_unpublished
 from app.main import app
 from app.routers.forestry import get_forestry_read_connection, require_forestry_viewer
 from fastapi.testclient import TestClient
@@ -31,7 +32,9 @@ def api_client(integration_connection: Connection) -> Iterator[TestClient]:
 
     app.dependency_overrides[get_forestry_read_connection] = lambda: integration_connection
     # Access is covered by test_forestry_route_access.py with real sessions.
-    app.dependency_overrides[require_forestry_viewer] = lambda: Role.VIEWER
+    # ADMIN, because these snapshots are never published and a viewer only
+    # sees published ones (covered there too).
+    app.dependency_overrides[require_forestry_viewer] = lambda: Role.ADMIN
 
     try:
         with TestClient(app) as client:
@@ -125,10 +128,10 @@ def test_no_persisted_snapshot_behavior(api_client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == []
 
-    latest = api_client.get("/api/forestry/snapshots/latest-ingested")
+    published = api_client.get("/api/forestry/snapshots/published")
 
-    assert latest.status_code == 404
-    assert latest.json() == {"detail": "no forestry snapshot is persisted"}
+    assert published.status_code == 404
+    assert published.json() == {"detail": "no forestry snapshot is published"}
 
     for path in [
         "/api/forestry/snapshots/1",
@@ -145,7 +148,7 @@ def test_no_persisted_snapshot_behavior(api_client: TestClient) -> None:
         assert response.json() == {"detail": "forestry snapshot 1 is not persisted"}
 
 
-def test_snapshot_list_and_latest_ingested(
+def test_snapshot_list_and_published_snapshot(
     api_client: TestClient,
     integration_connection: Connection,
     tmp_path: Path,
@@ -176,10 +179,14 @@ def test_snapshot_list_and_latest_ingested(
         assert len(entry["family_fingerprint"]) == 64
         assert "created_at" in entry
 
-    latest = api_client.get("/api/forestry/snapshots/latest-ingested")
+    # Ingesting publishes nothing: the newest snapshot is not "the" map.
+    assert api_client.get("/api/forestry/snapshots/published").status_code == 404
 
-    assert latest.status_code == 200
-    assert latest.json()["shapefile_snapshot_id"] == max(first_id, second_id)
+    assert publish_initial_if_unpublished(integration_connection, shapefile_snapshot_id=first_id)
+    published = api_client.get("/api/forestry/snapshots/published")
+
+    assert published.status_code == 200
+    assert published.json()["shapefile_snapshot_id"] == first_id
 
 
 def test_snapshot_summary_reports_quality_evidence(

@@ -61,3 +61,24 @@ puede responder y que necesitamos para construir sobre seguro.
 14. Hay 7 polígonos con geometría auto-intersectada y un par de micro-
     polígonos duplicados (0,16 m² en Purretrun). ¿Los corregimos nosotros y
     te avisamos, o prefieres corregirlos tú en la base original?
+
+## 6. Cortes (agregado el 2026-09-30)
+
+Ya se pueden cargar y publicar nuevas versiones del shapefile desde la
+plataforma. Registrar **cortes** es el paso siguiente, pero no queremos
+inventar reglas. La plataforma no deduce un corte a partir de un cambio de
+forma o de atributos entre versiones.
+
+15. **Total o parcial.** ¿Un corte es siempre un rodal completo, o puede ser
+    una parte? Si es parcial, ¿cómo se dibuja o se indica esa parte?
+16. **Fechas.** ¿Qué fechas importan (planificada, inicio, término,
+    informada)? ¿Cuál es la oficial?
+17. **Respaldo.** ¿Qué demuestra que el corte ocurrió (informe de terreno,
+    fotos, nuevo shapefile, factura)? ¿La plataforma debe guardar ese
+    respaldo?
+18. **Aprobación.** ¿Quién registra un corte y quién lo aprueba, si alguien
+    lo aprueba?
+19. **Vínculo con el rodal entre versiones.** Cuando llegue un shapefile
+    nuevo, el OBJECTID y el número de rodal pueden cambiar. ¿Cómo debería
+    quedar asociado un corte ya registrado al rodal correcto? ¿Le parece bien
+    que la persona que publica confirme esas asociaciones?

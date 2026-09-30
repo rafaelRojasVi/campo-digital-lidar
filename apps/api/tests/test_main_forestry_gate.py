@@ -21,8 +21,12 @@ import sys
 sys.path.insert(0, {api_root!r})
 from app.main import app
 from app.routers.forestry import require_forestry_viewer, router
+from app.routers.forestry_workflow import router as workflow_router
 paths = [p for p in app.openapi()["paths"] if p.startswith("/api/forestry")]
-guarded = require_forestry_viewer in {{d.dependency for d in router.dependencies}}
+guarded = all(
+    require_forestry_viewer in {{d.dependency for d in r.dependencies}}
+    for r in (router, workflow_router)
+)
 print(len(paths), guarded)
 """
 
@@ -37,4 +41,4 @@ def test_every_environment_mounts_the_guarded_forestry_api(app_env: str) -> None
         cwd=API_ROOT,
         check=True,
     )
-    assert result.stdout.split() == ["9", "True"]
+    assert result.stdout.split() == ["14", "True"]

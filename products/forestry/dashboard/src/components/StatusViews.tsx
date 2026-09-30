@@ -1,4 +1,5 @@
 import { DEV_IDENTITIES } from '../api.ts'
+import { ROUTES } from '../router.ts'
 import { PLATFORM_FRONT_DOOR_PATH, platformFrontDoorEnabled } from '../runtime/frontDoor.ts'
 
 interface RetryProps {
@@ -17,15 +18,21 @@ export function LoadingView({ step }: { step: string }) {
   )
 }
 
-export function NoSnapshotView({ onRetry }: RetryProps) {
+export function NoSnapshotView({ onRetry, canUpload }: RetryProps & { canUpload: boolean }) {
   return (
     <div className="status">
       <div className="status__card">
-        <h1 className="status__title">Sin datos de origen</h1>
+        <h1 className="status__title">Sin versión publicada</h1>
         <p className="status__text">
-          Todavía no hay ninguna instantánea de Rodales cargada en la plataforma.
+          Todavía no hay una versión de Rodales publicada en la plataforma.
         </p>
-        {platformFrontDoorEnabled() ? null : (
+        {canUpload ? (
+          <p className="status__text status__text--secondary">
+            Puede cargar una capa en <a href={ROUTES.importar}>Cargar versión</a>, revisarla y
+            publicarla.
+          </p>
+        ) : null}
+        {platformFrontDoorEnabled() || canUpload ? null : (
           <p className="status__text status__text--secondary">
             Para cargar la instantánea real desde la fuente externa, ejecute{' '}
             <code>make forestry-dev</code> en el repositorio.

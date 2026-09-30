@@ -107,3 +107,127 @@ export interface SourceFeatureDetail extends SourceFeatureProperties {
   source_attributes: Record<string, unknown>
   geometry: MultiPolygonGeometry
 }
+
+// ---------------------------------------------------------------------------
+// Upload → review → publish → restore (apps/api/app/routers/forestry_workflow.py)
+// ---------------------------------------------------------------------------
+
+export type VersionStatus = 'published' | 'pending' | 'previously_published'
+
+export interface UploadRecord {
+  snapshot_upload_id: number
+  original_filename: string
+  byte_size: number
+  content_sha256: string
+  uploaded_at: string
+  uploaded_by_display_name: string
+}
+
+export interface ImportedSource {
+  filename: string
+  content_sha256: string
+  byte_size: number
+  observed_at: string
+}
+
+export interface Version {
+  shapefile_snapshot_id: number
+  status: VersionStatus
+  layer_name: string
+  family_fingerprint: string
+  crs_name: string | null
+  storage_srid: number
+  feature_count: number
+  total_sup_ha: number
+  total_geometry_area_source_units: number
+  geometry_invalid_count: number
+  created_at: string
+  uploads: UploadRecord[]
+  imported_source: ImportedSource | null
+}
+
+export interface PublicationEvent {
+  publication_event_id: number
+  shapefile_snapshot_id: number
+  event_type: 'initial' | 'publish' | 'restore'
+  previous_snapshot_id: number | null
+  occurred_at: string
+  actor_display_name: string | null
+}
+
+export interface VersionsResponse {
+  published_snapshot_id: number | null
+  versions: Version[]
+  events: PublicationEvent[]
+}
+
+export interface FeatureRef {
+  feature_ordinal: number
+  source_objectid: number | null
+  cod_predial: string | null
+  nom_predio: string | null
+  n_rodal: string | null
+  sup_ha: number | null
+  geometry_area_source_units: number
+}
+
+export type ChangeKind = 'same_geometry' | 'geometry_changed' | 'uncertain' | 'added' | 'removed'
+
+export interface ChangeItem {
+  kind: ChangeKind
+  published: FeatureRef[]
+  pending: FeatureRef[]
+  changed_fields: string[]
+  overlaps: { published_ordinal: number; pending_ordinal: number; overlap_ratio_of_smaller: number }[]
+  same_objectid: boolean | null
+}
+
+export interface Comparison {
+  published_snapshot_id: number
+  link_overlap_ratio: number
+  counts: Record<ChangeKind, number>
+  unchanged_count: number
+  review_required_count: number
+  items: ChangeItem[]
+}
+
+export interface InvalidGeometry {
+  feature_ordinal: number
+  source_objectid: number | null
+  cod_predial: string | null
+  nom_predio: string | null
+  n_rodal: string | null
+  reason: string
+}
+
+export interface Review {
+  version: Version
+  published_version: Version | null
+  quality_flag_counts: Record<string, number>
+  invalid_geometries: InvalidGeometry[]
+  comparison: Comparison | null
+  comparison_unavailable: boolean
+  review_required: boolean
+  can_publish: boolean
+  can_restore: boolean
+}
+
+export interface UploadResult {
+  status: 'uploaded' | 'already_uploaded'
+  shapefile_snapshot_id: number
+  version_status: VersionStatus
+  layer_name: string
+  feature_count: number
+  content_sha256: string
+  byte_size: number
+}
+
+export interface ActivationResult {
+  status: 'published' | 'restored'
+  shapefile_snapshot_id: number
+  previous_snapshot_id: number | null
+  publication_event_id: number
+  occurred_at: string
+}
+
+export type ForestryRole = 'admin' | 'operator' | 'viewer'
