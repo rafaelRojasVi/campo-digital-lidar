@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 TRANSELEC_PAGES = frozenset({"transelec", "transelec/pendientes"})
-RODALES_PAGES = frozenset({"rodales"})
+RODALES_PAGES = frozenset({"rodales", "rodales/versiones", "rodales/revision"})
 RESERVED = frozenset({"api", "health", "transelec", "rodales"})
 
 
@@ -100,6 +100,14 @@ def test_rodales_serves_its_shell_and_assets_under_its_own_prefix(tmp_path: Path
     assert client.get("/rodales/mapa").status_code == 404
 
 
+def test_rodales_pages_survive_a_direct_reload(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for path in ("/rodales/versiones", "/rodales/versiones/", "/rodales/revision?version=3"):
+        response = client.get(path)
+        assert response.status_code == 200, path
+        assert "rodales shell" in response.text, path
+
+
 def test_rodales_without_a_build_is_a_404_not_the_portal(tmp_path: Path) -> None:
     client = _client(tmp_path, rodales=False)
     assert client.get("/rodales/").status_code == 404
@@ -149,3 +157,22 @@ def test_spa_page_paths_match_every_dashboard_route() -> None:
 
     assert dashboard_paths
     assert dashboard_paths == TRANSELEC_SPA_PAGE_PATHS
+
+
+def test_rodales_page_paths_match_every_dashboard_route() -> None:
+    """A Rodales route missing here 404s on reload or on a shared link."""
+
+    from app.main import RODALES_SPA_PAGE_PATHS
+
+    router_source = (
+        Path(__file__).resolve().parents[3]
+        / "products"
+        / "forestry"
+        / "dashboard"
+        / "src"
+        / "router.ts"
+    ).read_text(encoding="utf-8")
+    routes_block = router_source.split("export const ROUTES = {", 1)[1].split("} as const", 1)[0]
+    dashboard_paths = {path.lstrip("/") for path in re.findall(r"'(/[^']*)'", routes_block)}
+
+    assert dashboard_paths == RODALES_SPA_PAGE_PATHS

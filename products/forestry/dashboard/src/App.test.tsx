@@ -42,7 +42,7 @@ vi.mock('./api.ts', async (importOriginal) => {
   const original = await importOriginal<typeof import('./api.ts')>()
   return {
     ...original,
-    fetchLatestIngestedSnapshot: vi.fn(),
+    fetchPublishedSnapshot: vi.fn(),
     fetchSnapshotSummary: vi.fn(),
     fetchFeatureCollection: vi.fn(),
     fetchComparison: vi.fn(),
@@ -54,7 +54,7 @@ vi.mock('./api.ts', async (importOriginal) => {
 const api = vi.mocked(await import('./api.ts'))
 
 function mockHappyApi() {
-  api.fetchLatestIngestedSnapshot.mockResolvedValue(testSnapshot())
+  api.fetchPublishedSnapshot.mockResolvedValue(testSnapshot())
   api.fetchSnapshotSummary.mockResolvedValue(testSummary())
   api.fetchFeatureCollection.mockResolvedValue(testCollection())
   api.fetchComparison.mockResolvedValue(testComparison())
@@ -69,7 +69,7 @@ beforeEach(() => {
 
 describe('loading and failure states', () => {
   it('shows the loading state before data arrives', async () => {
-    api.fetchLatestIngestedSnapshot.mockReturnValue(new Promise(() => {}))
+    api.fetchPublishedSnapshot.mockReturnValue(new Promise(() => {}))
 
     render(<App />)
 
@@ -77,17 +77,17 @@ describe('loading and failure states', () => {
   })
 
   it('shows the no-source state when no snapshot is persisted', async () => {
-    api.fetchLatestIngestedSnapshot.mockRejectedValue(new NoSnapshotError())
+    api.fetchPublishedSnapshot.mockRejectedValue(new NoSnapshotError())
 
     render(<App />)
 
-    expect(await screen.findByText('Sin datos de origen')).toBeInTheDocument()
+    expect(await screen.findByText('Sin versión publicada')).toBeInTheDocument()
     expect(screen.getByText(/make forestry-dev/)).toBeInTheDocument()
   })
 
   it('shows the API-unavailable state and retries successfully', async () => {
     const user = userEvent.setup()
-    api.fetchLatestIngestedSnapshot.mockRejectedValueOnce(new ApiError(0, 'network unreachable'))
+    api.fetchPublishedSnapshot.mockRejectedValueOnce(new ApiError(0, 'network unreachable'))
 
     render(<App />)
 
@@ -108,7 +108,7 @@ describe('access', () => {
 
   it('offers development sign-in on 401 in a local build, then loads', async () => {
     const user = userEvent.setup()
-    api.fetchLatestIngestedSnapshot.mockRejectedValueOnce(new ApiError(401, 'no session'))
+    api.fetchPublishedSnapshot.mockRejectedValueOnce(new ApiError(401, 'no session'))
     api.devLogin.mockResolvedValue(undefined)
 
     render(<App />)
@@ -126,7 +126,7 @@ describe('access', () => {
     vi.stubEnv('VITE_PLATFORM_FRONT_DOOR', 'true')
     const assign = vi.fn()
     vi.stubGlobal('location', { ...window.location, assign })
-    api.fetchLatestIngestedSnapshot.mockRejectedValue(new ApiError(401, 'no session'))
+    api.fetchPublishedSnapshot.mockRejectedValue(new ApiError(401, 'no session'))
 
     render(<App />)
 
@@ -135,7 +135,7 @@ describe('access', () => {
   })
 
   it('says so when the account has no Rodales grant (403)', async () => {
-    api.fetchLatestIngestedSnapshot.mockRejectedValue(new ApiError(403, 'forbidden'))
+    api.fetchPublishedSnapshot.mockRejectedValue(new ApiError(403, 'forbidden'))
 
     render(<App />)
 
@@ -168,8 +168,8 @@ describe('ready application', () => {
 
     expect(await screen.findByText('Patrimonio Degenfeld')).toBeInTheDocument()
 
-    // Provenance is labeled as ingestion order, never as official currency.
-    expect(screen.getByText('Última ingesta')).toBeInTheDocument()
+    // The map shows the published version, labeled as such.
+    expect(screen.getByText('Versión publicada')).toBeInTheDocument()
     expect(screen.getByText('Gdb_Test_mv')).toBeInTheDocument()
     expect(screen.getByText('EPSG:32718')).toBeInTheDocument()
 
@@ -327,5 +327,32 @@ describe('ready application', () => {
     expect(
       within(legend).getByText(/no representan avance ni gestión realizada/),
     ).toBeInTheDocument()
+  })
+})
+
+describe('previewing a version that is not the published one', () => {
+  it('says so and links back to the published version', async () => {
+    mockHappyApi()
+    api.fetchSnapshotSummary.mockResolvedValue({ ...testSummary(), shapefile_snapshot_id: 7 })
+
+    render(<App versionId={7} />)
+
+    const banner = (await screen.findByText(/Está viendo la versión N.º 7/)).closest('div')!
+    expect(banner).toHaveTextContent('que no es la versión publicada')
+    expect(banner).toHaveTextContent('siguen viendo la versión N.º 1')
+    expect(within(banner).getByRole('link', { name: 'Ver la versión publicada' })).toHaveAttribute(
+      'href',
+      '/rodales/',
+    )
+    expect(screen.getByText('Vista previa')).toBeInTheDocument()
+  })
+
+  it('shows no banner when the requested version is the published one', async () => {
+    mockHappyApi()
+
+    render(<App versionId={testSnapshot().shapefile_snapshot_id} />)
+
+    expect(await screen.findByText('Versión publicada')).toBeInTheDocument()
+    expect(screen.queryByText(/que no es la versión publicada/)).not.toBeInTheDocument()
   })
 })

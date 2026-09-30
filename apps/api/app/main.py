@@ -294,9 +294,13 @@ TRANSELEC_SPA_PAGE_PATHS = frozenset(
 
 _transelec_dist = dist_dir_from_environment(TRANSELEC_DIST_ENV, DEFAULT_TRANSELEC_DIST)
 
-# The Rodales (forestry) dashboard is one page; its data comes from
-# /api/forestry, which needs a forestry grant. The shell itself holds no data.
-RODALES_SPA_PAGE_PATHS = frozenset({"rodales"})
+# The Rodales (forestry) dashboard pages; their data comes from /api/forestry,
+# which needs a forestry grant. The shell itself holds no data. Must match
+# ROUTES in products/forestry/dashboard/src/router.ts (enforced by
+# test_dashboard_static.py), so a reload of any page gets the shell.
+RODALES_SPA_PAGE_PATHS = frozenset(
+    {"rodales", "rodales/versiones", "rodales/importar", "rodales/revision"}
+)
 
 _rodales_dist = dist_dir_from_environment(RODALES_DIST_ENV, DEFAULT_RODALES_DIST)
 

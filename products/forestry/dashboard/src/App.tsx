@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  ApiError,
   NoSnapshotError,
+  canUpload,
   devLogin,
   fetchComparison,
   fetchFeatureCollection,
-  fetchLatestIngestedSnapshot,
+  fetchPublishedSnapshot,
   fetchSnapshotSummary,
   isForbidden,
   isSignedOut,
@@ -30,8 +32,10 @@ import type { FilterState } from './lib/filters.ts'
 import { selectionStats } from './lib/aggregate.ts'
 import { buildColorEncoding } from './lib/palette.ts'
 import type { ColorDimension } from './lib/palette.ts'
+import { ROUTES, mapPath, onLinkClick } from './router.ts'
 import type {
   FeatureCollection,
+  ForestryRole,
   ForestrySnapshot,
   SnapshotSummary,
   SourceFieldComparison,
@@ -49,6 +53,8 @@ type LoadPhase =
       summary: SnapshotSummary
       collection: FeatureCollection
       comparison: SourceFieldComparison
+      /** The published version's id, when the map previews another one. */
+      previewOf: number | null
     }
 
 export interface ZoomRequest {
@@ -56,7 +62,33 @@ export interface ZoomRequest {
   nonce: number
 }
 
-export default function App() {
+interface AppProps {
+  /** `?version=<id>`: preview that version instead of the published one. */
+  versionId?: number | null
+  role?: ForestryRole | null
+}
+
+function snapshotFromSummary(summary: SnapshotSummary): ForestrySnapshot {
+  return {
+    shapefile_snapshot_id: summary.shapefile_snapshot_id,
+    layer_name: summary.layer_name,
+    family_fingerprint: summary.family_fingerprint,
+    storage_srid: summary.storage_srid,
+    feature_count: summary.feature_count,
+    created_at: summary.created_at,
+  }
+}
+
+async function publishedIdOrNull(): Promise<number | null> {
+  try {
+    return (await fetchPublishedSnapshot()).shapefile_snapshot_id
+  } catch (error) {
+    if (error instanceof NoSnapshotError) return null
+    throw error
+  }
+}
+
+export default function App({ versionId = null, role = null }: AppProps) {
   const [phase, setPhase] = useState<LoadPhase>({
     status: 'loading',
     step: 'Conectando con la API…',
@@ -78,7 +110,20 @@ export default function App() {
       setPhase({ status: 'loading', step: 'Conectando con la API…' })
 
       try {
-        const snapshot = await fetchLatestIngestedSnapshot()
+        let snapshot: ForestrySnapshot
+        let publishedId: number | null
+
+        if (versionId === null) {
+          snapshot = await fetchPublishedSnapshot()
+          publishedId = snapshot.shapefile_snapshot_id
+        } else {
+          const [summary, published] = await Promise.all([
+            fetchSnapshotSummary(versionId),
+            publishedIdOrNull(),
+          ])
+          snapshot = snapshotFromSummary(summary)
+          publishedId = published
+        }
 
         if (cancelled) return
         setPhase({ status: 'loading', step: 'Cargando resumen y geometría…' })
@@ -90,7 +135,14 @@ export default function App() {
         ])
 
         if (cancelled) return
-        setPhase({ status: 'ready', snapshot, summary, collection, comparison })
+        setPhase({
+          status: 'ready',
+          snapshot,
+          summary,
+          collection,
+          comparison,
+          previewOf: publishedId === snapshot.shapefile_snapshot_id ? null : publishedId,
+        })
       } catch (error) {
         if (cancelled) return
 
@@ -105,6 +157,8 @@ export default function App() {
           setPhase({ status: 'signed-out' })
         } else if (isForbidden(error)) {
           setPhase({ status: 'forbidden' })
+        } else if (versionId !== null && error instanceof ApiError && error.status === 404) {
+          setPhase({ status: 'error', message: 'No se encontró la versión solicitada.' })
         } else {
           setPhase({
             status: 'error',
@@ -119,7 +173,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [reloadNonce])
+  }, [reloadNonce, versionId])
 
   const collection = phase.status === 'ready' ? phase.collection : null
 
@@ -192,18 +246,40 @@ export default function App() {
   }
 
   if (phase.status === 'no-snapshot') {
-    return <NoSnapshotView onRetry={handleRetry} />
+    return <NoSnapshotView onRetry={handleRetry} canUpload={canUpload(role)} />
   }
 
   if (phase.status === 'error') {
     return <ErrorView message={phase.message} onRetry={handleRetry} />
   }
 
-  const { snapshot, summary, comparison } = phase
+  const { snapshot, summary, comparison, previewOf } = phase
+  const previewing = versionId !== null && previewOf !== null
 
   return (
     <div className={`app${mapFocus ? ' app--map-focus' : ''}`}>
-      <Header snapshot={snapshot} summary={summary} />
+      <Header
+        active={ROUTES.mapa}
+        role={role}
+        snapshot={snapshot}
+        summary={summary}
+        preview={previewing}
+      />
+      {previewing ? (
+        <div className="preview-banner" role="status">
+          <span>
+            Está viendo la versión N.º {snapshot.shapefile_snapshot_id}, que <b>no</b> es la
+            versión publicada. Los demás usuarios siguen viendo la versión N.º {previewOf}.
+          </span>
+          <a
+            className="preview-banner__link"
+            href={mapPath()}
+            onClick={(event) => onLinkClick(event, mapPath())}
+          >
+            Ver la versión publicada
+          </a>
+        </div>
+      ) : null}
       <KpiStrip summary={summary} comparison={comparison} collection={phase.collection} />
 
       <div className="app__body">
