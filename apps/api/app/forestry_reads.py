@@ -188,30 +188,6 @@ def get_snapshot_record(
     return None if row is None else _snapshot_record(row)
 
 
-def latest_ingested_snapshot(
-    connection: Connection,
-) -> ForestrySnapshotRecord | None:
-    """Return the most recently ingested snapshot (ingestion order).
-
-    "Latest ingested" is a deterministic fact about ingestion order only; it
-    carries no authoritative current-state or supersession semantics, which
-    remain unestablished.
-    """
-
-    row = connection.execute(
-        text(
-            f"""
-            SELECT {_SNAPSHOT_RECORD_COLUMNS}
-            FROM forestry.shapefile_snapshot
-            ORDER BY id DESC
-            LIMIT 1
-            """
-        )
-    ).one_or_none()
-
-    return None if row is None else _snapshot_record(row)
-
-
 def snapshot_summary(
     connection: Connection,
     shapefile_snapshot_id: int,

@@ -251,3 +251,31 @@ def write_family_zip(
                 archive.write(member, arcname=f"{arcname_prefix}{member.name}")
 
     return zip_path
+
+
+def family_members(
+    directory: Path,
+    rows: list[dict[str, object]],
+    **family_options: object,
+) -> dict[str, bytes]:
+    """Write a family under ``directory`` and return its members as {filename: bytes}."""
+
+    directory.mkdir(parents=True, exist_ok=True)
+    write_family(directory, rows, **family_options)  # type: ignore[arg-type]
+    return {member.name: member.read_bytes() for member in sorted(directory.iterdir())}
+
+
+def zip_bytes(
+    members: dict[str, bytes],
+    *,
+    compression: int = zipfile.ZIP_DEFLATED,
+) -> bytes:
+    """Package {arcname: bytes} as an in-memory ZIP, names exactly as given."""
+
+    import io
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=compression) as archive:
+        for name, content in members.items():
+            archive.writestr(name, content)
+    return buffer.getvalue()

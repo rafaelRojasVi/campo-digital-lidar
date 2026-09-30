@@ -39,6 +39,8 @@ from app.routers.access_admin import router as access_admin_router
 from app.routers.csrf import router as csrf_router
 from app.routers.entra_auth import router as entra_auth_router
 from app.routers.forestry import router as forestry_router
+from app.routers.forestry_workflow import FORESTRY_MAX_UPLOAD_BYTES, FORESTRY_UPLOAD_PATH
+from app.routers.forestry_workflow import router as forestry_workflow_router
 from app.routers.google_auth import router as google_auth_router
 from app.routers.ingestion import MAX_UPLOAD_BYTES as INGESTION_MAX_UPLOAD_BYTES
 from app.routers.ingestion import router as ingestion_router
@@ -121,6 +123,7 @@ UPLOAD_BODY_LIMITS: dict[str, int] = {
     "/transelec/uploads": TRANSELEC_MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_BYTES,
     "/api/transelec/uploads": TRANSELEC_MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_BYTES,
     "/ingesta/upload": INGESTION_MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_BYTES,
+    FORESTRY_UPLOAD_PATH: FORESTRY_MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_BYTES,
 }
 # Every other route takes, at most, a small JSON body.
 DEFAULT_MAX_BODY_BYTES = 1024 * 1024
@@ -250,6 +253,7 @@ if APP_ENV == "development":
 # ``forestry`` product grant (router-level ``require_forestry_viewer``). It
 # already serves under /api/forestry, so it needs no second /api mount.
 app.include_router(forestry_router)
+app.include_router(forestry_workflow_router)
 
 # Second mount under /api for the routers a browser bundle actually calls at
 # that prefix (see products/transelect/dashboard/src/api.ts). Every frontend

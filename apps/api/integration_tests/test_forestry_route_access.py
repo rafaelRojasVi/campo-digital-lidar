@@ -19,6 +19,7 @@ import pytest
 from app.access import Role
 from app.access_repository import grant_product_role, resolve_or_create_app_user
 from app.deps import SESSION_COOKIE_NAME, get_db_connection
+from app.forestry_publication import publish_initial_if_unpublished
 from app.main import app
 from app.routers.forestry import get_forestry_read_connection
 from app.session_store import PlatformSessionStore
@@ -47,12 +48,25 @@ def client(integration_connection: Connection) -> Iterator[TestClient]:
 def snapshot_id(integration_connection: Connection, tmp_path: Path) -> int:
     rows = [source_row(objectid=1, cod_predial="P1", nom_predio="Predio Uno", n_rodal="1")]
     zip_relative_path = build_zip(tmp_path, rows, geometries=[[square_ring(0.0, 0.0, 10.0)]])
-    return ingest(integration_connection, tmp_path, zip_relative_path).shapefile_snapshot_id
+    snapshot_id = ingest(integration_connection, tmp_path, zip_relative_path).shapefile_snapshot_id
+    # Published, so a viewer may read it (a pending snapshot is 404 to viewers).
+    publish_initial_if_unpublished(integration_connection, shapefile_snapshot_id=snapshot_id)
+    return snapshot_id
 
 
-def _forestry_urls(snapshot_id: int) -> list[str]:
-    paths = [path for path in app.openapi()["paths"] if path.startswith("/api/forestry")]
-    assert len(paths) == 9
+# Reads that need more than VIEW (the pending-upload review is for uploaders).
+_UPLOADER_READS = {"/api/forestry/snapshots/{shapefile_snapshot_id}/review"}
+
+
+def _forestry_urls(snapshot_id: int, *, include_uploader_reads: bool = True) -> list[str]:
+    paths = [
+        path
+        for path, operations in app.openapi()["paths"].items()
+        if path.startswith("/api/forestry")
+        and "get" in operations
+        and (include_uploader_reads or path not in _UPLOADER_READS)
+    ]
+    assert len(paths) == (11 if include_uploader_reads else 10)
     urls = []
     for path in paths:
         url = path.replace("{shapefile_snapshot_id}", str(snapshot_id)).replace(
@@ -123,8 +137,39 @@ def test_every_forestry_role_reads_every_route(
 ) -> None:
     _sign_in(client, integration_connection, f"forestry-{role.value}", (("forestry", role),))
 
-    for url in _forestry_urls(snapshot_id):
+    for url in _forestry_urls(snapshot_id, include_uploader_reads=False):
         assert client.get(url).status_code == 200, url
+
+    review = client.get(f"/api/forestry/snapshots/{snapshot_id}/review").status_code
+    assert review == (403 if role is Role.VIEWER else 200)
 
     geometry = client.get(f"/api/forestry/snapshots/{snapshot_id}/feature-collection").json()
     assert geometry["feature_count"] == 1
+
+
+def test_a_viewer_cannot_see_a_pending_snapshot(
+    client: TestClient, integration_connection: Connection, snapshot_id: int, tmp_path: Path
+) -> None:
+    rows = [source_row(objectid=2, cod_predial="P9", nom_predio="Predio Pendiente", n_rodal="1")]
+    zip_relative_path = build_zip(
+        tmp_path, rows, zip_name="pending.zip", geometries=[[square_ring(50.0, 0.0, 10.0)]]
+    )
+    pending = ingest(integration_connection, tmp_path, zip_relative_path).shapefile_snapshot_id
+
+    _sign_in(client, integration_connection, "viewer", (("forestry", Role.VIEWER),))
+
+    for url in _forestry_urls(pending, include_uploader_reads=False):
+        if url.endswith(("/snapshots", "/snapshots/published", "/versions")):
+            continue
+        response = client.get(url)
+        assert response.status_code == 404, url
+        assert "Predio Pendiente" not in response.text, url
+
+    listed = client.get("/api/forestry/snapshots").json()
+    assert [entry["shapefile_snapshot_id"] for entry in listed] == [snapshot_id]
+    assert client.get("/api/forestry/snapshots/published").json()["shapefile_snapshot_id"] == (
+        snapshot_id
+    )
+
+    _sign_in(client, integration_connection, "operator", (("forestry", Role.OPERATOR),))
+    assert client.get(f"/api/forestry/snapshots/{pending}/feature-collection").status_code == 200

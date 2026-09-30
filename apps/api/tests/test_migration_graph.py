@@ -98,7 +98,7 @@ def test_migration_0008_extends_0007() -> None:
     assert down_revision == "0007"
 
 
-def test_migration_0009_extends_0008_as_the_single_head() -> None:
+def test_migration_0009_extends_0008() -> None:
     """0009 (Transelec AEF fields + mapping report) extends 0008 directly."""
 
     root = Path(__file__).resolve().parents[3]
@@ -108,6 +108,17 @@ def test_migration_0009_extends_0008_as_the_single_head() -> None:
     down_revision, _ = revisions["0009"]
     assert down_revision == "0008"
 
+
+def test_migration_0010_extends_0009_as_the_single_head() -> None:
+    """0010 (Forestry upload records + publication marker) extends 0009 directly."""
+
+    root = Path(__file__).resolve().parents[3]
+    revisions = _load_all_migrations(root)
+
+    assert "0010" in revisions, "Expected migration 0010 to be present."
+    down_revision, _ = revisions["0010"]
+    assert down_revision == "0009"
+
     down_revisions = {down for down, _ in revisions.values() if down is not None}
     heads = set(revisions) - down_revisions
-    assert heads == {"0009"}
+    assert heads == {"0010"}

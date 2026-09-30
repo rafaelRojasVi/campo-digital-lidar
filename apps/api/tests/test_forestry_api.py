@@ -28,7 +28,12 @@ from sqlalchemy.exc import SQLAlchemyError
 
 EXPECTED_FORESTRY_PATHS = {
     "/api/forestry/snapshots",
-    "/api/forestry/snapshots/latest-ingested",
+    "/api/forestry/snapshots/published",
+    "/api/forestry/versions",
+    "/api/forestry/uploads",
+    "/api/forestry/snapshots/{shapefile_snapshot_id}/review",
+    "/api/forestry/snapshots/{shapefile_snapshot_id}/publish",
+    "/api/forestry/snapshots/{shapefile_snapshot_id}/restore",
     "/api/forestry/snapshots/{shapefile_snapshot_id}",
     "/api/forestry/snapshots/{shapefile_snapshot_id}/predio-distribution",
     "/api/forestry/snapshots/{shapefile_snapshot_id}/use-distribution",
@@ -79,13 +84,35 @@ def test_quality_flag_parameter_matches_evidence_vocabulary() -> None:
     assert set(get_args(QualityFlag)) == set(KNOWN_QUALITY_FLAGS)
 
 
-def test_forestry_exposes_no_mutation_routes() -> None:
+FORESTRY_MUTATION_PATHS = {
+    "/api/forestry/uploads",
+    "/api/forestry/snapshots/{shapefile_snapshot_id}/publish",
+    "/api/forestry/snapshots/{shapefile_snapshot_id}/restore",
+}
+
+
+def test_forestry_mutations_are_exactly_upload_publish_restore() -> None:
     routes = forestry_routes()
 
     assert routes
 
     for path, methods in routes.items():
-        assert methods == {"GET"}, f"unexpected methods {methods} on {path}"
+        expected = {"POST"} if path in FORESTRY_MUTATION_PATHS else {"GET"}
+        assert methods == expected, f"unexpected methods {methods} on {path}"
+
+
+def test_every_forestry_mutation_requires_csrf_and_a_write_permission() -> None:
+    from app.csrf import require_csrf
+    from fastapi.routing import APIRoute
+
+    for route in app.routes:
+        if not isinstance(route, APIRoute) or route.path not in FORESTRY_MUTATION_PATHS:
+            continue
+        dependencies = [dependency.call for dependency in route.dependant.dependencies]
+        assert require_csrf in dependencies, route.path
+        # The router-level viewer check plus the route's own UPLOAD/PUBLISH check.
+        assert require_forestry_viewer in dependencies, route.path
+        assert len(dependencies) >= 3, route.path
 
 
 def test_database_unavailable_returns_503_without_leaking_backend_error() -> None:

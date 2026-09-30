@@ -299,14 +299,21 @@ def test_main_app_bounds_every_upload_route_and_defaults_small() -> None:
         "/transelec/uploads",
         "/api/transelec/uploads",
         "/ingesta/upload",
+        "/api/forestry/uploads",
     }
-    # A Transelec workbook is bounded far below the LiDAR ingestion limit.
+    # A Transelec workbook and a Rodales ZIP are bounded far below the LiDAR limit.
     assert UPLOAD_BODY_LIMITS["/api/transelec/uploads"] < 100 * 1024 * 1024
+    assert UPLOAD_BODY_LIMITS["/api/forestry/uploads"] < 100 * 1024 * 1024
 
 
 def test_main_app_refuses_anonymous_transelec_upload_without_reading_it() -> None:
     body, content_type = _multipart(50_000)
-    for path in ("/api/transelec/uploads", "/transelec/uploads", "/ingesta/upload"):
+    for path in (
+        "/api/transelec/uploads",
+        "/transelec/uploads",
+        "/ingesta/upload",
+        "/api/forestry/uploads",
+    ):
         exchange = _Exchange(body)
 
         exchange.run(main_app, path=path, headers=[(b"content-type", content_type)])

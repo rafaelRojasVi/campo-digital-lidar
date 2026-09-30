@@ -18,6 +18,11 @@ It is deliberately narrow:
   back, and nothing is written.
 - A committed import is recorded as a ``forestry.snapshot.imported`` audit
   event with no actor (it is an operator action, not a signed-in user's).
+- Since migration 0010 the dashboard shows only the *published* snapshot.
+  When nothing is published yet, the imported snapshot is published in the
+  same transaction as an ``initial`` publication event (no actor), so the
+  import alone makes the map visible, as it did before 0010. When something
+  is already published, the import publishes nothing.
 
 The archive is only read. Nothing from it is printed beyond the counts
 already recorded in products/forestry/docs/ingestion-substrate-v1.md.
@@ -117,6 +122,7 @@ class ImportOutcome:
     shapefile_snapshot_id: int
     already_persisted: bool
     committed: bool
+    published: bool
     checks: tuple[tuple[str, object, object], ...]
 
 
@@ -180,6 +186,7 @@ def run_import(
 
     from app.audit import record_audit_event
     from app.forestry_persistence import ingest_forestry_snapshot
+    from app.forestry_publication import publish_initial_if_unpublished
     from app.forestry_reads import list_shapefile_snapshots
 
     archive = Path(source_root) / zip_relative_path
@@ -223,6 +230,10 @@ def run_import(
                 "verification failed for: " + ", ".join(failed) + "; rolled back"
             )
 
+        published = publish_initial_if_unpublished(
+            connection, shapefile_snapshot_id=result.shapefile_snapshot_id
+        )
+
         if commit and not result.already_persisted:
             record_audit_event(
                 connection,
@@ -236,6 +247,7 @@ def run_import(
                     "family_fingerprint": expected.family_fingerprint,
                     "zip_sha256": expected.zip_sha256,
                     "feature_count": expected.feature_count,
+                    "published_as_initial": published,
                 },
             )
     except BaseException:
@@ -251,6 +263,7 @@ def run_import(
         shapefile_snapshot_id=result.shapefile_snapshot_id,
         already_persisted=result.already_persisted,
         committed=commit,
+        published=published,
         checks=checks,
     )
 
@@ -328,12 +341,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     for name, want, got in outcome.checks:
         print(f"  ok  {name}: {got}" if want == got else f"  !!  {name}: {got} != {want}")
     state = "already present" if outcome.already_persisted else "new"
+    publication = (
+        "published as the initial Rodales version"
+        if outcome.published
+        else "not published (another snapshot is already published)"
+    )
     if outcome.committed:
-        print(f"COMMITTED: snapshot id {outcome.shapefile_snapshot_id} ({state}), verified.")
+        print(
+            f"COMMITTED: snapshot id {outcome.shapefile_snapshot_id} ({state}), verified, "
+            f"{publication}."
+        )
     else:
         print(
-            f"DRY RUN OK: snapshot would be id {outcome.shapefile_snapshot_id} ({state}); "
-            "rolled back, nothing written. Re-run with --commit to write it."
+            f"DRY RUN OK: snapshot would be id {outcome.shapefile_snapshot_id} ({state}) and "
+            f"{publication}; rolled back, nothing written. Re-run with --commit to write it."
         )
     return 0
 

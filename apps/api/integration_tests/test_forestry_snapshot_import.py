@@ -27,7 +27,12 @@ def _truncate(engine: Engine) -> None:
     # DELETE in dependency order, never TRUNCATE ... CASCADE: a cascade from
     # the provenance tables would also empty seeded platform state.
     with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE forestry.publication_state SET published_snapshot_id = NULL")
+        )
         for table in (
+            "forestry.publication_event",
+            "forestry.snapshot_upload",
             "forestry.source_feature",
             "forestry.shapefile_snapshot",
             "platform.source_observation",
@@ -132,8 +137,10 @@ def test_a_dry_run_verifies_and_writes_nothing(tmp_path: Path, integration_engin
         )
 
     assert outcome.committed is False
+    assert outcome.published is True  # would publish; rolled back
     assert all(want == got for _, want, got in outcome.checks)
     assert _counts(integration_engine) == (0, 0)
+    assert _publication(integration_engine) == (None, 0)
 
 
 def test_a_commit_persists_once_and_audits_once(tmp_path: Path, integration_engine: Engine) -> None:
@@ -151,6 +158,21 @@ def test_a_commit_persists_once_and_audits_once(tmp_path: Path, integration_engi
             )
 
     assert _counts(integration_engine) == (1, 1)
+    # The first commit published it as the initial version; the second did not.
+    published, initial_events = _publication(integration_engine)
+    assert published is not None
+    assert initial_events == 1
+
+
+def _publication(engine: Engine) -> tuple[int | None, int]:
+    with engine.connect() as connection:
+        published = connection.execute(
+            text("SELECT published_snapshot_id FROM forestry.publication_state WHERE id = 1")
+        ).scalar_one()
+        events = connection.execute(
+            text("SELECT count(*) FROM forestry.publication_event WHERE event_type = 'initial'")
+        ).scalar_one()
+    return published, int(events)
 
 
 def test_another_file_is_refused_before_any_write(

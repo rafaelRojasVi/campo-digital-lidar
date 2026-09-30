@@ -20,32 +20,39 @@ from app.deps import get_db_connection
 from app.main import app
 from app.routers.forestry import get_forestry_read_connection, require_forestry_viewer
 from app.routers.forestry import router as forestry_router
+from app.routers.forestry_workflow import router as forestry_workflow_router
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 
 def _forestry_routes() -> list[APIRoute]:
-    return [route for route in forestry_router.routes if isinstance(route, APIRoute)]
+    return [
+        route
+        for router in (forestry_router, forestry_workflow_router)
+        for route in router.routes
+        if isinstance(route, APIRoute)
+    ]
 
 
 def _mounted_forestry_paths() -> set[str]:
     return {path for path in app.openapi()["paths"] if path.startswith("/api/forestry")}
 
 
-def concrete_forestry_urls() -> list[str]:
-    """One requestable URL per forestry route, with valid parameters."""
+def concrete_forestry_urls() -> list[tuple[str, str]]:
+    """One requestable (method, URL) per forestry route, with valid parameters."""
 
     urls = []
     for route in _forestry_routes():
         url = route.path.replace("{shapefile_snapshot_id}", "1").replace("{feature_ordinal}", "1")
         if url.endswith("/use-distribution"):
             url += "?field=uso_2024"
-        urls.append(url)
+        for method in sorted(route.methods or ()):
+            urls.append((method, url))
     return urls
 
 
 def test_the_forestry_router_is_mounted_with_every_route() -> None:
-    assert len(_forestry_routes()) == 9
+    assert len(_forestry_routes()) == 14
     assert _mounted_forestry_paths() == {route.path for route in _forestry_routes()}
 
 
@@ -71,13 +78,13 @@ def anonymous_client() -> Iterator[tuple[TestClient, Mock, Mock]]:
             app.dependency_overrides.pop(dependency, None)
 
 
-@pytest.mark.parametrize("url", concrete_forestry_urls())
+@pytest.mark.parametrize(("method", "url"), concrete_forestry_urls())
 def test_anonymous_callers_get_401_and_no_data_is_read(
-    anonymous_client: tuple[TestClient, Mock, Mock], url: str
+    anonymous_client: tuple[TestClient, Mock, Mock], method: str, url: str
 ) -> None:
     client, session_connection, read_connection = anonymous_client
 
-    response = client.get(url)
+    response = client.request(method, url)
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Not authenticated."}

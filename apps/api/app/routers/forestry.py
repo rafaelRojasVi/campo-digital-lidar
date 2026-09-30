@@ -5,7 +5,14 @@ evidence (`app.forestry_reads`). Nothing here establishes canonical predio or
 rodal identity, cross-snapshot feature identity, workflow status, approval,
 progress, or authoritative current state; year-stamped comparisons are
 literal source-field differences and quality flags are data-quality
-evidence, never business status. There are no mutation endpoints.
+evidence, never business status. This module has no mutation endpoints;
+upload, review, publish and restore live in ``app.routers.forestry_workflow``.
+
+Which snapshot is "the" Rodales map is decided only by publication
+(``app.forestry_publication``): ``/snapshots/published``. A snapshot that
+has never been published (an upload pending review) is readable by the roles
+that can upload or publish it, and answers ``404`` to a viewer exactly as a
+snapshot that does not exist.
 
 Every route requires a platform session and a ``forestry`` product grant
 (``Action.VIEW``), enforced once at router level by
@@ -26,10 +33,11 @@ from pydantic import BaseModel
 from sqlalchemy import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.access import Action, Role
+from app.access import Action, Role, can
 from app.access_repository import AppUser
 from app.database import get_database_engine
 from app.deps import ensure_can, get_current_app_user, get_db_connection
+from app.forestry_publication import ever_published_snapshot_ids, read_published_snapshot_id
 from app.forestry_reads import (
     ChangeFilter,
     ForestrySnapshotRecord,
@@ -38,7 +46,6 @@ from app.forestry_reads import (
     UseFieldChange,
     get_snapshot_record,
     get_source_feature,
-    latest_ingested_snapshot,
     list_feature_geometries,
     list_shapefile_snapshots,
     list_source_features,
@@ -61,6 +68,8 @@ def require_forestry_viewer(
         connection, app_user_id=user.id, product_key=FORESTRY_PRODUCT_KEY, action=Action.VIEW
     )
 
+
+ViewerRole = Annotated[Role, Depends(require_forestry_viewer)]
 
 router = APIRouter(
     prefix="/api/forestry",
@@ -302,13 +311,22 @@ def _snapshot_model(record: ForestrySnapshotRecord) -> ForestrySnapshotModel:
     )
 
 
+def _visible_to(role: Role, connection: Connection, shapefile_snapshot_id: int) -> bool:
+    """Pending (never-published) snapshots are for the roles that review them."""
+
+    return can(role, Action.UPLOAD) or shapefile_snapshot_id in ever_published_snapshot_ids(
+        connection
+    )
+
+
 def _snapshot_or_404(
     connection: Connection,
     shapefile_snapshot_id: int,
+    role: Role,
 ) -> ForestrySnapshotRecord:
     record = get_snapshot_record(connection, shapefile_snapshot_id)
 
-    if record is None:
+    if record is None or not _visible_to(role, connection, shapefile_snapshot_id):
         raise HTTPException(
             status_code=404,
             detail=f"forestry snapshot {shapefile_snapshot_id} is not persisted",
@@ -361,29 +379,34 @@ def _comparison_side(
     "/snapshots",
     response_model=list[ForestrySnapshotModel],
 )
-def list_snapshots(connection: ReadConnection) -> list[ForestrySnapshotModel]:
-    """List persisted Forestry snapshots in ingestion order."""
+def list_snapshots(connection: ReadConnection, role: ViewerRole) -> list[ForestrySnapshotModel]:
+    """List the caller's visible Forestry snapshots in ingestion order."""
 
-    return [_snapshot_model(record) for record in list_shapefile_snapshots(connection)]
+    return [
+        _snapshot_model(record)
+        for record in list_shapefile_snapshots(connection)
+        if _visible_to(role, connection, record.shapefile_snapshot_id)
+    ]
 
 
 @router.get(
-    "/snapshots/latest-ingested",
+    "/snapshots/published",
     response_model=ForestrySnapshotModel,
 )
-def get_latest_ingested_snapshot(connection: ReadConnection) -> ForestrySnapshotModel:
-    """Return the most recently ingested snapshot (ingestion order only).
+def get_published_snapshot(connection: ReadConnection) -> ForestrySnapshotModel:
+    """Return the snapshot the Rodales dashboard serves (the last «Publicar»/«Restaurar»).
 
-    This is a fact about ingestion order, not an authoritative current
-    forest state: supersession semantics are not established.
+    Publication is an explicit, audited decision; it still does not make the
+    source an authoritative forest state.
     """
 
-    record = latest_ingested_snapshot(connection)
+    published_id = read_published_snapshot_id(connection)
+    record = None if published_id is None else get_snapshot_record(connection, published_id)
 
     if record is None:
         raise HTTPException(
             status_code=404,
-            detail="no forestry snapshot is persisted",
+            detail="no forestry snapshot is published",
         )
 
     return _snapshot_model(record)
@@ -396,10 +419,11 @@ def get_latest_ingested_snapshot(connection: ReadConnection) -> ForestrySnapshot
 def get_snapshot_summary(
     shapefile_snapshot_id: SnapshotIdPath,
     connection: ReadConnection,
+    role: ViewerRole,
 ) -> ForestrySnapshotSummaryModel:
     """Aggregate persisted evidence for one snapshot, quality flags included."""
 
-    _snapshot_or_404(connection, shapefile_snapshot_id)
+    _snapshot_or_404(connection, shapefile_snapshot_id, role)
 
     summary = snapshot_summary(connection, shapefile_snapshot_id)
 
@@ -427,6 +451,7 @@ def get_snapshot_summary(
 def get_predio_distribution(
     shapefile_snapshot_id: SnapshotIdPath,
     connection: ReadConnection,
+    role: ViewerRole,
 ) -> list[PredioDistributionModel]:
     """Source predio code/name pairs with counts and area sums.
 
@@ -434,7 +459,7 @@ def get_predio_distribution(
     pairs appear as their own rows.
     """
 
-    _snapshot_or_404(connection, shapefile_snapshot_id)
+    _snapshot_or_404(connection, shapefile_snapshot_id, role)
 
     return [
         PredioDistributionModel(
@@ -455,11 +480,12 @@ def get_predio_distribution(
 def get_use_distribution(
     shapefile_snapshot_id: SnapshotIdPath,
     connection: ReadConnection,
+    role: ViewerRole,
     field: Annotated[Literal["uso_2024", "uso_2026"], Query()],
 ) -> UseDistributionModel:
     """Distribution of one year-stamped source use-class column."""
 
-    _snapshot_or_404(connection, shapefile_snapshot_id)
+    _snapshot_or_404(connection, shapefile_snapshot_id, role)
 
     entries = use_distribution(connection, shapefile_snapshot_id, field=field)
 
@@ -485,6 +511,7 @@ def get_use_distribution(
 def get_source_field_comparison(
     shapefile_snapshot_id: SnapshotIdPath,
     connection: ReadConnection,
+    role: ViewerRole,
 ) -> SourceFieldComparisonModel:
     """Literal `Uso2024 vs Uso2026` / `Cod_Uso vs CodUso_2026` differences.
 
@@ -492,7 +519,7 @@ def get_source_field_comparison(
     workflow transitions, approvals, or progress.
     """
 
-    _snapshot_or_404(connection, shapefile_snapshot_id)
+    _snapshot_or_404(connection, shapefile_snapshot_id, role)
 
     comparison = use_field_comparison(connection, shapefile_snapshot_id)
 
@@ -511,13 +538,14 @@ def get_source_field_comparison(
 def list_features(
     shapefile_snapshot_id: SnapshotIdPath,
     connection: ReadConnection,
+    role: ViewerRole,
     filters: FeatureFilters,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> SourceFeaturePageModel:
     """Paginated snapshot-local feature listing in feature-ordinal order."""
 
-    _snapshot_or_404(connection, shapefile_snapshot_id)
+    _snapshot_or_404(connection, shapefile_snapshot_id, role)
 
     page = list_source_features(
         connection,
@@ -544,10 +572,11 @@ def get_feature_detail(
     shapefile_snapshot_id: SnapshotIdPath,
     feature_ordinal: FeatureOrdinalPath,
     connection: ReadConnection,
+    role: ViewerRole,
 ) -> SourceFeatureDetailModel:
     """One source feature: full attribute row, validity evidence, geometry."""
 
-    snapshot = _snapshot_or_404(connection, shapefile_snapshot_id)
+    snapshot = _snapshot_or_404(connection, shapefile_snapshot_id, role)
 
     detail = get_source_feature(connection, shapefile_snapshot_id, feature_ordinal)
 
@@ -578,6 +607,7 @@ def get_feature_detail(
 def get_feature_collection(
     shapefile_snapshot_id: SnapshotIdPath,
     connection: ReadConnection,
+    role: ViewerRole,
     filters: FeatureFilters,
 ) -> FeatureCollectionModel:
     """GeoJSON-shaped collection of the filtered snapshot-local features.
@@ -587,7 +617,7 @@ def get_feature_collection(
     never repaired.
     """
 
-    snapshot = _snapshot_or_404(connection, shapefile_snapshot_id)
+    snapshot = _snapshot_or_404(connection, shapefile_snapshot_id, role)
 
     records = list_feature_geometries(
         connection,

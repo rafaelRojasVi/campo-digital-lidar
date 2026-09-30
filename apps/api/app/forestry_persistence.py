@@ -68,6 +68,66 @@ class ForestrySnapshotIngestion:
     already_persisted: bool
 
 
+@dataclass(frozen=True, slots=True)
+class ParsedForestryFamily:
+    """A contract-valid shapefile family, decoded and ready to persist."""
+
+    table: ForestryShapefileTable
+    layer_name: str
+    feature_parameters: list[dict[str, object]]
+
+
+def parse_forestry_family(shp_path: Path, *, layer_name: str | None = None) -> ParsedForestryFamily:
+    """Validate, decode and compute quality evidence for one family; no writes.
+
+    ``layer_name`` defaults to the ``.shp`` stem; an upload passes the name
+    from the archive because its members are written under a server-chosen
+    stem.
+    """
+
+    table = load_forestry_shapefile(shp_path)
+    geometries = decode_polygon_records(shp_path)
+    _require_aligned_records(table, geometries)
+    quality_flags = compute_quality_flags(table.rows, geometries)
+
+    return ParsedForestryFamily(
+        table=table,
+        layer_name=layer_name if layer_name is not None else table.source_shp_path.stem,
+        feature_parameters=_build_feature_parameters(table, geometries, quality_flags),
+    )
+
+
+def persist_parsed_family(
+    connection: Connection,
+    parsed: ParsedForestryFamily,
+    *,
+    source_snapshot_id: int,
+) -> tuple[int, bool]:
+    """Insert the snapshot and its features; return (id, already_persisted).
+
+    Identical family content (same fingerprint) resolves to the existing
+    snapshot and writes nothing.
+    """
+
+    inserted_snapshot_id = _insert_shapefile_snapshot(
+        connection,
+        table=parsed.table,
+        layer_name=parsed.layer_name,
+        source_snapshot_id=source_snapshot_id,
+    )
+
+    if inserted_snapshot_id is None:
+        return _resolve_existing_snapshot(connection, parsed), True
+
+    feature_parameters = [
+        {**parameters, "snapshot_id": inserted_snapshot_id}
+        for parameters in parsed.feature_parameters
+    ]
+    _insert_source_features(connection, feature_parameters)
+
+    return inserted_snapshot_id, False
+
+
 def ingest_forestry_snapshot(
     connection: Connection,
     *,
@@ -85,12 +145,7 @@ def ingest_forestry_snapshot(
             Path(source_root) / zip_relative_path,
             Path(scratch),
         )
-        table = load_forestry_shapefile(shp_path)
-        geometries = decode_polygon_records(shp_path)
-
-    _require_aligned_records(table, geometries)
-    quality_flags = compute_quality_flags(table.rows, geometries)
-    feature_parameters = _build_feature_parameters(table, geometries, quality_flags)
+        parsed = parse_forestry_family(shp_path)
 
     provenance = persist_filesystem_source_provenance(
         connection,
@@ -99,34 +154,18 @@ def ingest_forestry_snapshot(
         fingerprint=fingerprint,
     )
 
-    inserted_snapshot_id = _insert_shapefile_snapshot(
+    snapshot_id, already_persisted = persist_parsed_family(
         connection,
-        table=table,
+        parsed,
         source_snapshot_id=provenance.source_snapshot_id,
     )
 
-    if inserted_snapshot_id is None:
-        existing_id = _resolve_existing_snapshot(connection, table)
-
-        return ForestrySnapshotIngestion(
-            provenance=provenance,
-            shapefile_snapshot_id=existing_id,
-            family_fingerprint=table.family_fingerprint,
-            feature_count=len(table.rows),
-            already_persisted=True,
-        )
-
-    for parameters in feature_parameters:
-        parameters["snapshot_id"] = inserted_snapshot_id
-
-    _insert_source_features(connection, feature_parameters)
-
     return ForestrySnapshotIngestion(
         provenance=provenance,
-        shapefile_snapshot_id=inserted_snapshot_id,
-        family_fingerprint=table.family_fingerprint,
-        feature_count=len(table.rows),
-        already_persisted=False,
+        shapefile_snapshot_id=snapshot_id,
+        family_fingerprint=parsed.table.family_fingerprint,
+        feature_count=len(parsed.table.rows),
+        already_persisted=already_persisted,
     )
 
 
@@ -182,6 +221,7 @@ def _insert_shapefile_snapshot(
     connection: Connection,
     *,
     table: ForestryShapefileTable,
+    layer_name: str,
     source_snapshot_id: int,
 ) -> int | None:
     result = connection.execute(
@@ -224,7 +264,7 @@ def _insert_shapefile_snapshot(
         {
             "source_snapshot_id": source_snapshot_id,
             "family_fingerprint": table.family_fingerprint,
-            "layer_name": table.source_shp_path.stem,
+            "layer_name": layer_name,
             "member_sha256": json.dumps(table.member_sha256),
             "prj_wkt": table.prj_wkt,
             "storage_srid": SOURCE_STORAGE_SRID,
@@ -243,7 +283,7 @@ def _insert_shapefile_snapshot(
 
 def _resolve_existing_snapshot(
     connection: Connection,
-    table: ForestryShapefileTable,
+    parsed: ParsedForestryFamily,
 ) -> int:
     existing = connection.execute(
         text(
@@ -253,12 +293,10 @@ def _resolve_existing_snapshot(
             WHERE family_fingerprint = :family_fingerprint
             """
         ),
-        {"family_fingerprint": table.family_fingerprint},
+        {"family_fingerprint": parsed.table.family_fingerprint},
     ).one()
 
-    if existing.layer_name != table.source_shp_path.stem or existing.feature_count != len(
-        table.rows
-    ):
+    if existing.layer_name != parsed.layer_name or existing.feature_count != len(parsed.table.rows):
         raise ForestryIngestionConflictError(
             "Existing Forestry snapshot with the same family fingerprint "
             "disagrees with the parsed source content"
