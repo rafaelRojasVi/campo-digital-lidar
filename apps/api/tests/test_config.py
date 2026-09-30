@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from app.config import Settings
+from app.config import Settings, parse_bootstrap_admins
 from pydantic import ValidationError
 from pytest import MonkeyPatch
 
@@ -117,3 +117,37 @@ def test_new_settings_default_safely() -> None:
     assert settings.staging_execution_max_bytes == 25 * 1024 * 1024
     assert settings.entra_tenant_id is None
     assert settings.platform_bootstrap_admin_tenant_id is None
+
+
+# ---------------------------------------------------------------------------
+# PLATFORM_BOOTSTRAP_ADMINS
+# ---------------------------------------------------------------------------
+
+
+def test_bootstrap_admins_parse_into_casefolded_product_email_pairs() -> None:
+    assert parse_bootstrap_admins(None) == ()
+    assert parse_bootstrap_admins("  ") == ()
+    assert parse_bootstrap_admins(" forestry:Ana@CampoDigital.cl , lidar:b@campodigital.cl,") == (
+        ("forestry", "ana@campodigital.cl"),
+        ("lidar", "b@campodigital.cl"),
+    )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "ana@campodigital.cl",  # no product
+        "forestry:",  # no email
+        "forestry:ana",  # not an address
+        "rodales:ana@campodigital.cl",  # the product key is "forestry"
+        "Forestry:ana@campodigital.cl",  # product keys are exact
+    ],
+)
+def test_a_malformed_bootstrap_admins_value_fails_settings(value: str) -> None:
+    with pytest.raises(ValidationError, match="PLATFORM_BOOTSTRAP_ADMINS"):
+        Settings(
+            _env_file=None,
+            app_env="production",
+            postgres_password="x",
+            platform_bootstrap_admins=value,
+        )

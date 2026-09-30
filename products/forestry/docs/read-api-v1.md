@@ -7,7 +7,10 @@ Implemented 2026-08-29 on top of
 
 This is a **read-only factual projection** of the persisted Forestry source
 substrate. Every endpoint reports stored source evidence or deterministic
-arithmetic over it. There are no mutation endpoints and no authentication.
+arithmetic over it. There are no mutation endpoints. Since
+[Hosted release V1](hosted-release-v1.md) (2026-09-29) every endpoint
+requires a platform session and a `forestry` product grant (`401`/`403`
+otherwise).
 [Dashboard V1](dashboard-v1.md) consumes this API as its only data boundary.
 
 ## What this API does NOT establish

@@ -296,10 +296,16 @@ export function MapView({
     if (basemapMode === 'none') return
 
     const satellite = basemapMode === 'satellite'
+    // The platform sends `Referrer-Policy: same-origin`, so tile requests
+    // would carry no Referer; OpenStreetMap's tile usage policy requires one.
+    // `strict-origin` sends only the platform origin (never the page path)
+    // and only over HTTPS. The API's CSP allows exactly these two tile
+    // origins on /rodales (app.http_hardening.RODALES_TILE_ORIGINS).
     baseLayerRef.current = L.tileLayer(satellite ? SATELLITE_TILE_URL : OSM_TILE_URL, {
       maxZoom: 19,
       attribution: satellite ? SATELLITE_ATTRIBUTION : OSM_ATTRIBUTION,
       crossOrigin: true,
+      referrerPolicy: 'strict-origin',
     }).addTo(map)
   }, [basemapMode])
 

@@ -29,3 +29,14 @@ htmlcov
 .campo-demo
 .lidar-dev
 .transelec-dev
+products/forestry/tests
+.forestry-dev
+# Client source data must never enter the build context (see CLAUDE.md).
+**/*.zip
+**/*.shp
+**/*.shx
+**/*.dbf
+**/*.cpg
+**/*.las
+**/*.laz
+**/*.xlsx

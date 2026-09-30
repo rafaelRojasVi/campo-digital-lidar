@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App.tsx'
@@ -47,6 +47,7 @@ vi.mock('./api.ts', async (importOriginal) => {
     fetchFeatureCollection: vi.fn(),
     fetchComparison: vi.fn(),
     fetchFeatureDetail: vi.fn(),
+    devLogin: vi.fn(),
   }
 })
 
@@ -96,6 +97,64 @@ describe('loading and failure states', () => {
     await user.click(screen.getByRole('button', { name: 'Reintentar' }))
 
     expect(await screen.findByText('Patrimonio Degenfeld')).toBeInTheDocument()
+  })
+})
+
+describe('access', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it('offers development sign-in on 401 in a local build, then loads', async () => {
+    const user = userEvent.setup()
+    api.fetchLatestIngestedSnapshot.mockRejectedValueOnce(new ApiError(401, 'no session'))
+    api.devLogin.mockResolvedValue(undefined)
+
+    render(<App />)
+
+    expect(await screen.findByText('Inicie sesión')).toBeInTheDocument()
+
+    mockHappyApi()
+    await user.click(screen.getByRole('button', { name: /Dev Admin/ }))
+
+    expect(api.devLogin).toHaveBeenCalledWith('dev-admin')
+    expect(await screen.findByText('Patrimonio Degenfeld')).toBeInTheDocument()
+  })
+
+  it('sends a signed-out viewer to the front door on the platform', async () => {
+    vi.stubEnv('VITE_PLATFORM_FRONT_DOOR', 'true')
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign })
+    api.fetchLatestIngestedSnapshot.mockRejectedValue(new ApiError(401, 'no session'))
+
+    render(<App />)
+
+    await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('/'))
+    expect(screen.queryByText('Inicie sesión')).not.toBeInTheDocument()
+  })
+
+  it('says so when the account has no Rodales grant (403)', async () => {
+    api.fetchLatestIngestedSnapshot.mockRejectedValue(new ApiError(403, 'forbidden'))
+
+    render(<App />)
+
+    expect(await screen.findByText('Sin acceso a Rodales')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Volver a Proyectos' })).toHaveAttribute('href', '/')
+    expect(api.fetchFeatureCollection).not.toHaveBeenCalled()
+  })
+
+  it('links back to the projects only on the platform', async () => {
+    mockHappyApi()
+    const { unmount } = render(<App />)
+    await screen.findByText('Patrimonio Degenfeld')
+    expect(screen.queryByRole('link', { name: 'Proyectos' })).not.toBeInTheDocument()
+    unmount()
+
+    vi.stubEnv('VITE_PLATFORM_FRONT_DOOR', 'true')
+    render(<App />)
+    await screen.findByText('Patrimonio Degenfeld')
+    expect(screen.getByRole('link', { name: 'Proyectos' })).toHaveAttribute('href', '/')
   })
 })
 

@@ -16,7 +16,7 @@ export class NoSnapshotError extends Error {
   }
 }
 
-/** The API responded with an unexpected status (5xx, 404 on known data, …). */
+/** The API responded with an unexpected status (401, 403, 5xx, 404 on known data, …). */
 export class ApiError extends Error {
   readonly status: number
 
@@ -73,4 +73,37 @@ export function fetchFeatureDetail(
   featureOrdinal: number,
 ): Promise<SourceFeatureDetail> {
   return getJson<SourceFeatureDetail>(`/snapshots/${snapshotId}/features/${featureOrdinal}`)
+}
+
+/** No session (401): the viewer must sign in. */
+export function isSignedOut(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401
+}
+
+/** Signed in, but without a Rodales (forestry) grant (403). */
+export function isForbidden(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403
+}
+
+/** Development identities seeded by the platform API's dev sign-in. */
+export const DEV_IDENTITIES = [
+  { identityKey: 'dev-admin', label: 'Dev Admin (Rodales admin)' },
+  { identityKey: 'dev-operator', label: 'Dev Operator (Rodales operador)' },
+  { identityKey: 'dev-viewer', label: 'Dev Viewer (solo Transelec)' },
+] as const
+
+/**
+ * Development-only sign-in (`POST /api/auth/dev-login`, mounted only when the
+ * API runs with APP_ENV=development). Production signs in at the front door.
+ */
+export async function devLogin(identityKey: string): Promise<void> {
+  const response = await fetch('/api/auth/dev-login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ identity_key: identityKey }),
+  })
+
+  if (!response.ok) {
+    throw new ApiError(response.status, `dev sign-in failed (${response.status})`)
+  }
 }

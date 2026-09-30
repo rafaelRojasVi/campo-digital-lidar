@@ -133,7 +133,11 @@ Transelec variable keeps working.
    the `401` redirect in Transelec. Transelec keeps working.
 2. **Accesos for every project**, plus generalized bootstrap.
 3. **Rodales online**: protected API, `/rodales` serving, CSP tiles, Importar
-   shapefile with review and Publicar.
+   shapefile with review and Publicar. Split on 2026-09-29: the protected
+   API, `/rodales` serving, CSP tiles, the `forestry` first-admin bootstrap
+   and a controlled CLI snapshot import are
+   [Rodales hosted release V1](../../../products/forestry/docs/hosted-release-v1.md);
+   Importar shapefile with review and Publicar is a later PR.
 4. Later, separate spec: saving cuts (versions, history, export), as agreed on
    2026-09-28.
 

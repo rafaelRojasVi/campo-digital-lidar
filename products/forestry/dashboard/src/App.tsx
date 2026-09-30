@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   NoSnapshotError,
+  devLogin,
   fetchComparison,
   fetchFeatureCollection,
   fetchLatestIngestedSnapshot,
   fetchSnapshotSummary,
+  isForbidden,
+  isSignedOut,
 } from './api.ts'
 import { Header } from './components/Header.tsx'
 import { KpiStrip } from './components/KpiStrip.tsx'
@@ -14,7 +17,14 @@ import { MapView } from './components/MapView.tsx'
 import { DataPanel } from './components/DataPanel.tsx'
 import { Inspector } from './components/Inspector.tsx'
 import { ActiveFilterBar } from './components/ActiveFilterBar.tsx'
-import { ErrorView, LoadingView, NoSnapshotView } from './components/StatusViews.tsx'
+import {
+  ErrorView,
+  ForbiddenView,
+  LoadingView,
+  NoSnapshotView,
+  SignedOutView,
+} from './components/StatusViews.tsx'
+import { PLATFORM_FRONT_DOOR_PATH, platformFrontDoorEnabled } from './runtime/frontDoor.ts'
 import { EMPTY_FILTERS, applyFilters, countActiveFilters } from './lib/filters.ts'
 import type { FilterState } from './lib/filters.ts'
 import { selectionStats } from './lib/aggregate.ts'
@@ -30,6 +40,8 @@ import type {
 type LoadPhase =
   | { status: 'loading'; step: string }
   | { status: 'no-snapshot' }
+  | { status: 'signed-out' }
+  | { status: 'forbidden' }
   | { status: 'error'; message: string }
   | {
       status: 'ready'
@@ -84,6 +96,15 @@ export default function App() {
 
         if (error instanceof NoSnapshotError) {
           setPhase({ status: 'no-snapshot' })
+        } else if (isSignedOut(error)) {
+          // On the platform, sign-in lives at the front door.
+          if (platformFrontDoorEnabled()) {
+            window.location.assign(PLATFORM_FRONT_DOOR_PATH)
+            return
+          }
+          setPhase({ status: 'signed-out' })
+        } else if (isForbidden(error)) {
+          setPhase({ status: 'forbidden' })
         } else {
           setPhase({
             status: 'error',
@@ -138,6 +159,12 @@ export default function App() {
 
   const handleRetry = useCallback(() => setReloadNonce((nonce) => nonce + 1), [])
 
+  const handleDevLogin = useCallback((identityKey: string) => {
+    void devLogin(identityKey)
+      .catch(() => undefined)
+      .finally(() => setReloadNonce((nonce) => nonce + 1))
+  }, [])
+
   const handleToggleSidebar = useCallback(() => {
     if (mapFocus) {
       setMapFocus(false)
@@ -154,6 +181,14 @@ export default function App() {
 
   if (phase.status === 'loading') {
     return <LoadingView step={phase.step} />
+  }
+
+  if (phase.status === 'signed-out') {
+    return <SignedOutView onDevLogin={handleDevLogin} />
+  }
+
+  if (phase.status === 'forbidden') {
+    return <ForbiddenView />
   }
 
   if (phase.status === 'no-snapshot') {

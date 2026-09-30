@@ -6,6 +6,12 @@ rodal identity, cross-snapshot feature identity, workflow status, approval,
 progress, or authoritative current state; year-stamped comparisons are
 literal source-field differences and quality flags are data-quality
 evidence, never business status. There are no mutation endpoints.
+
+Every route requires a platform session and a ``forestry`` product grant
+(``Action.VIEW``), enforced once at router level by
+``require_forestry_viewer`` so no route can be added without it
+(``test_forestry_route_access.py`` enumerates every route). The data is a
+client's private estate; signing in alone proves nothing about access to it.
 """
 
 from __future__ import annotations
@@ -20,7 +26,10 @@ from pydantic import BaseModel
 from sqlalchemy import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.access import Action, Role
+from app.access_repository import AppUser
 from app.database import get_database_engine
+from app.deps import ensure_can, get_current_app_user, get_db_connection
 from app.forestry_reads import (
     ChangeFilter,
     ForestrySnapshotRecord,
@@ -39,9 +48,24 @@ from app.forestry_reads import (
     use_field_comparison,
 )
 
+FORESTRY_PRODUCT_KEY = "forestry"
+
+
+def require_forestry_viewer(
+    user: Annotated[AppUser, Depends(get_current_app_user)],
+    connection: Annotated[Connection, Depends(get_db_connection)],
+) -> Role:
+    """401 without a session, 403 without a ``forestry`` grant allowing VIEW."""
+
+    return ensure_can(
+        connection, app_user_id=user.id, product_key=FORESTRY_PRODUCT_KEY, action=Action.VIEW
+    )
+
+
 router = APIRouter(
     prefix="/api/forestry",
     tags=["forestry"],
+    dependencies=[Depends(require_forestry_viewer)],
 )
 
 COMPARISON_SEMANTICS = (

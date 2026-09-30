@@ -14,8 +14,10 @@ from sqlalchemy import Engine
 from app.config import get_settings
 from app.dashboard_static import (
     DEFAULT_PORTAL_DIST,
+    DEFAULT_RODALES_DIST,
     DEFAULT_TRANSELEC_DIST,
     PORTAL_DIST_ENV,
+    RODALES_DIST_ENV,
     TRANSELEC_DIST_ENV,
     PrefixedDashboard,
     dist_dir_from_environment,
@@ -36,6 +38,7 @@ from app.object_store import LocalObjectStore, ObjectStoreError, ObjectStoreNotC
 from app.routers.access_admin import router as access_admin_router
 from app.routers.csrf import router as csrf_router
 from app.routers.entra_auth import router as entra_auth_router
+from app.routers.forestry import router as forestry_router
 from app.routers.google_auth import router as google_auth_router
 from app.routers.ingestion import MAX_UPLOAD_BYTES as INGESTION_MAX_UPLOAD_BYTES
 from app.routers.ingestion import router as ingestion_router
@@ -243,13 +246,10 @@ if APP_ENV == "development":
     app.include_router(dev_auth_router)
     app.include_router(dev_auth_router, prefix="/api")
 
-# The forestry read API has no authentication or product grant yet, and this
-# app is the one deployed to staging and production; until it gets both, it
-# exists only where nothing is deployed (local development and CI's "test").
-if APP_ENV in ("development", "test"):
-    from app.routers.forestry import router as forestry_router
-
-    app.include_router(forestry_router)
+# Mounted in every APP_ENV: every forestry route requires a session and a
+# ``forestry`` product grant (router-level ``require_forestry_viewer``). It
+# already serves under /api/forestry, so it needs no second /api mount.
+app.include_router(forestry_router)
 
 # Second mount under /api for the routers a browser bundle actually calls at
 # that prefix (see products/transelect/dashboard/src/api.ts). Every frontend
@@ -269,9 +269,9 @@ app.include_router(session_router, prefix="/api")
 app.include_router(transelec_router, prefix="/api")
 
 # Serves the built frontends from this same process when production builds
-# are present (see app.dashboard_static): the Campo Digital front door at "/"
-# and Transelec under "/transelec/". A no-op in local dev and in every
-# test/CI environment, where no dist directories exist. Must stay last: it
+# are present (see app.dashboard_static): the Campo Digital front door at "/",
+# Transelec under "/transelec/" and Rodales under "/rodales/". A no-op in
+# local dev and in every test/CI environment, where no dist directories exist. Must stay last: it
 # registers a catch-all route that would otherwise shadow the routers above.
 TRANSELEC_SPA_PAGE_PATHS = frozenset(
     {
@@ -290,18 +290,29 @@ TRANSELEC_SPA_PAGE_PATHS = frozenset(
 
 _transelec_dist = dist_dir_from_environment(TRANSELEC_DIST_ENV, DEFAULT_TRANSELEC_DIST)
 
+# The Rodales (forestry) dashboard is one page; its data comes from
+# /api/forestry, which needs a forestry grant. The shell itself holds no data.
+RODALES_SPA_PAGE_PATHS = frozenset({"rodales"})
+
+_rodales_dist = dist_dir_from_environment(RODALES_DIST_ENV, DEFAULT_RODALES_DIST)
+
+_prefixed_dashboards = [
+    PrefixedDashboard(segment, dist, page_paths)
+    for segment, dist, page_paths in (
+        # TRANSELEC_SPA_PAGE_PATHS must match ROUTES in
+        # products/transelect/dashboard/src/router.tsx (enforced by
+        # test_dashboard_static.py): the frontend's own page paths, which
+        # share the "transelec" first segment with the real API prefix.
+        ("transelec", _transelec_dist, TRANSELEC_SPA_PAGE_PATHS),
+        ("rodales", _rodales_dist, RODALES_SPA_PAGE_PATHS),
+    )
+    if dist is not None
+]
+
 mount_dashboards(
     app,
     root_dist=dist_dir_from_environment(PORTAL_DIST_ENV, DEFAULT_PORTAL_DIST),
-    # TRANSELEC_SPA_PAGE_PATHS must match ROUTES in
-    # products/transelect/dashboard/src/router.tsx (enforced by
-    # test_dashboard_static.py): the frontend's own page paths, which share
-    # the "transelec" first segment with the real API prefix.
-    prefixed=(
-        [PrefixedDashboard("transelec", _transelec_dist, TRANSELEC_SPA_PAGE_PATHS)]
-        if _transelec_dist is not None
-        else []
-    ),
+    prefixed=_prefixed_dashboards,
     reserved_root_segments=frozenset(
         {
             "health",
@@ -310,6 +321,7 @@ mount_dashboards(
             "ingesta",
             "auth",
             "transelec",
+            "rodales",
             "api",
             # Reserved even where unmounted (production), so they 404
             # instead of falling through to the portal.

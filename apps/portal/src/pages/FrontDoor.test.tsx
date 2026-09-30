@@ -46,17 +46,27 @@ describe('FrontDoor', () => {
     expect(screen.queryByText('Rodales')).not.toBeInTheDocument()
   })
 
-  it('shows a project that is not online yet as upcoming, without a link', async () => {
+  it('links Rodales only for an account holding a forestry grant', async () => {
     vi.mocked(api.getMe).mockResolvedValue(
       me([
         { product_key: 'transelect', role: 'admin' },
-        { product_key: 'forestry', role: 'admin' },
+        { product_key: 'forestry', role: 'viewer' },
       ]),
     )
     render(<FrontDoor />)
-    expect(await screen.findByText('Rodales')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /Rodales/ })).toHaveAttribute(
+      'href',
+      '/rodales/',
+    )
+    expect(screen.getByRole('link', { name: /Transelec/ })).toHaveAttribute('href', '/transelec/')
+  })
+
+  it('shows a project that is not online yet as upcoming, without a link', async () => {
+    vi.mocked(api.getMe).mockResolvedValue(me([{ product_key: 'lidar', role: 'admin' }]))
+    render(<FrontDoor />)
+    expect(await screen.findByText('Cubicación LiDAR')).toBeInTheDocument()
     expect(screen.getByText('Próximamente')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /Rodales/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /LiDAR/ })).not.toBeInTheDocument()
   })
 
   it('explains an account with no projects', async () => {

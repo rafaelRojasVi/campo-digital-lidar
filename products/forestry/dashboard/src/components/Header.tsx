@@ -1,5 +1,6 @@
 import campoDigitalLogo from '../assets/campo-digital-logo.png'
 import { formatDate, shortFingerprint } from '../lib/format.ts'
+import { PLATFORM_FRONT_DOOR_PATH, platformFrontDoorEnabled } from '../runtime/frontDoor.ts'
 import type { ForestrySnapshot, SnapshotSummary } from '../types.ts'
 
 interface HeaderProps {
@@ -32,29 +33,38 @@ export function Header({ snapshot, summary }: HeaderProps) {
         </div>
       </div>
 
-      <dl
-        className="header__provenance"
-        title="Instantánea más reciente ingerida en la plataforma. No implica que sea la versión oficial vigente del patrimonio."
-      >
-        <div>
-          <dt>Última ingesta</dt>
-          <dd>{formatDate(snapshot.created_at)}</dd>
-        </div>
-        <div>
-          <dt>Capa de origen</dt>
-          <dd>{snapshot.layer_name}</dd>
-        </div>
-        <div>
-          <dt>CRS almacenado</dt>
-          <dd>EPSG:{summary.storage_srid}</dd>
-        </div>
-        <div>
-          <dt>Huella de familia</dt>
-          <dd>
-            <code>{shortFingerprint(snapshot.family_fingerprint)}</code>
-          </dd>
-        </div>
-      </dl>
+      <div className="header__end">
+        <dl
+          className="header__provenance"
+          title="Instantánea más reciente ingerida en la plataforma. No implica que sea la versión oficial vigente del patrimonio."
+        >
+          <div>
+            <dt>Última ingesta</dt>
+            <dd>{formatDate(snapshot.created_at)}</dd>
+          </div>
+          <div>
+            <dt>Capa de origen</dt>
+            <dd>{snapshot.layer_name}</dd>
+          </div>
+          <div>
+            <dt>CRS almacenado</dt>
+            <dd>EPSG:{summary.storage_srid}</dd>
+          </div>
+          <div>
+            <dt>Huella de familia</dt>
+            <dd>
+              <code>{shortFingerprint(snapshot.family_fingerprint)}</code>
+            </dd>
+          </div>
+        </dl>
+        {/* On the platform, the front door owns sign-in, sign-out and the
+            project picker; this is the way back to it. */}
+        {platformFrontDoorEnabled() ? (
+          <a className="header__projects" href={PLATFORM_FRONT_DOOR_PATH}>
+            Proyectos
+          </a>
+        ) : null}
+      </div>
     </header>
   )
 }

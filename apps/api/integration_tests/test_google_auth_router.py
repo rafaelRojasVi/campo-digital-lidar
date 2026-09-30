@@ -533,3 +533,44 @@ def test_bootstrap_admin_grants_admin_to_a_named_account_through_the_api(
             .all()
         )
     assert vias == ["bootstrap_email", "admin_api"]
+
+
+# ---------------------------------------------------------------------------
+# PLATFORM_BOOTSTRAP_ADMINS at sign-in
+# ---------------------------------------------------------------------------
+
+
+def test_the_configured_rodales_admin_gets_forestry_after_the_transelec_bootstrap(
+    client: TestClient,
+) -> None:
+    # The same address is both the Transelec bootstrap admin and the first
+    # Rodales admin: both grants land, Transelec's first.
+    provider = _use(
+        FakeGoogleOidcClient(sign_in=_sign_in()),
+        transelec_bootstrap_admin_email=_BOOTSTRAP_EMAIL,
+        platform_bootstrap_admins=f"forestry:{_BOOTSTRAP_EMAIL}",
+    )
+
+    _complete_sign_in(client, provider)
+
+    assert client.get("/auth/me").json()["product_grants"] == [
+        {"product_key": "forestry", "role": "admin"},
+        {"product_key": "transelect", "role": "admin"},
+    ]
+
+
+def test_a_transelec_admin_not_named_for_forestry_gets_no_rodales_access(
+    client: TestClient,
+) -> None:
+    provider = _use(
+        FakeGoogleOidcClient(sign_in=_sign_in()),
+        transelec_bootstrap_admin_email=_BOOTSTRAP_EMAIL,
+        platform_bootstrap_admins="forestry:someone-else@campodigital.cl",
+    )
+
+    _complete_sign_in(client, provider)
+
+    assert client.get("/auth/me").json()["product_grants"] == [
+        {"product_key": "transelect", "role": "admin"}
+    ]
+    assert client.get("/api/forestry/snapshots").status_code == 403

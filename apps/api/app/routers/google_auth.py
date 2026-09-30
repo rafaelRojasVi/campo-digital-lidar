@@ -15,8 +15,10 @@ of which is deliberate:
    because it later calls Graph on the user's behalf; this flow is sign-in
    only, so Google's access token is dropped the moment the id_token is
    verified, and nothing Google-issued is ever handed to the browser.
-3. The bootstrap grant is Transelec-only
-   (``maybe_grant_transelec_bootstrap_admin``), never the all-products one.
+3. The bootstrap grants are per product: Transelec-only
+   (``maybe_grant_transelec_bootstrap_admin``) and the configured first
+   admin of each named product (``maybe_grant_configured_product_admins``),
+   never the all-products one.
 
 Signing in here proves who the caller is and nothing else. Every Transelec
 route still requires a ``platform.product_grant`` through
@@ -35,6 +37,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import Connection
 
 from app.access_repository import (
+    maybe_grant_configured_product_admins,
     maybe_grant_transelec_bootstrap_admin,
     resolve_or_create_app_user,
 )
@@ -144,6 +147,14 @@ def google_callback(
         email=sign_in.email,
     )
     maybe_grant_transelec_bootstrap_admin(
+        connection,
+        settings=settings,
+        email=sign_in.email,
+        app_user_id=user.id,
+    )
+    # After the Transelec bootstrap, which fires only for a user with no grant
+    # at all: a per-product first-admin grant must not pre-empt it.
+    maybe_grant_configured_product_admins(
         connection,
         settings=settings,
         email=sign_in.email,

@@ -176,6 +176,7 @@ class RequestBodyLimitMiddleware:
 # Response security headers
 # ---------------------------------------------------------------------------
 
+
 # The built Transelec dashboard loads one module script and one stylesheet
 # from /assets, images from /assets, and calls only same-origin /api/*. It
 # has no inline <script> or <style>, no third-party origin, and no
@@ -183,20 +184,44 @@ class RequestBodyLimitMiddleware:
 # CSSOM, which `style-src 'self'` does not restrict. Sign-in leaves the page
 # by a top-level navigation to /api/auth/google/login, which CSP does not
 # govern either.
-DASHBOARD_CONTENT_SECURITY_POLICY = "; ".join(
-    (
-        "default-src 'self'",
-        "script-src 'self'",
-        "style-src 'self'",
-        "img-src 'self'",
-        "font-src 'self'",
-        "connect-src 'self'",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-        "frame-ancestors 'none'",
+def _content_security_policy(img_src: str) -> str:
+    return "; ".join(
+        (
+            "default-src 'self'",
+            "script-src 'self'",
+            "style-src 'self'",
+            f"img-src {img_src}",
+            "font-src 'self'",
+            "connect-src 'self'",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "frame-ancestors 'none'",
+        )
     )
+
+
+DASHBOARD_CONTENT_SECURITY_POLICY = _content_security_policy("'self'")
+
+# The Rodales map (products/forestry/dashboard, served under /rodales/) draws
+# basemap tiles as <img> elements from exactly these two origins; "Sin fondo"
+# requests none. Only the tile coordinates (the map area being viewed) and
+# the viewer's IP reach them: rodal geometry and attributes are drawn from
+# /api/forestry on a canvas and never leave this origin. Every other page
+# keeps img-src 'self'.
+RODALES_TILE_ORIGINS = (
+    "https://tile.openstreetmap.org",
+    "https://services.arcgisonline.com",
 )
+# `data:` too, for one image only: Leaflet cancels an off-screen tile's
+# download by pointing it at a hard-coded 1x1 `data:` GIF (a closure constant
+# in leaflet-src.js, not configurable). Blocking it floods the console with a
+# CSP violation per panned tile. An image cannot run script, and scripts,
+# styles and connections stay 'self'.
+RODALES_CONTENT_SECURITY_POLICY = _content_security_policy(
+    " ".join(("'self'", "data:", *RODALES_TILE_ORIGINS))
+)
+_RODALES_PATH = "/rodales"
 
 # FastAPI's interactive docs load Swagger UI / ReDoc from a CDN with an
 # inline bootstrap script, so they keep only the framing restriction.
@@ -205,13 +230,21 @@ _DOCS_PATHS = frozenset({"/docs", "/docs/oauth2-redirect", "/redoc"})
 
 # Content-hashed build output (index-<hash>.js); safe to cache, and never
 # carries client data.
-_CACHEABLE_PATH_PREFIXES = ("/assets/", "/transelec/assets/")
+_CACHEABLE_PATH_PREFIXES = ("/assets/", "/transelec/assets/", "/rodales/assets/")
 
 # A year, per common HSTS deployment guidance. No `preload`: that is a
 # registry submission with its own consequences, not a header default.
 _HSTS_VALUE = "max-age=31536000; includeSubDomains"
 
 _HSTS_APP_ENVS = frozenset({"staging", "production"})
+
+
+def _policy_for(path: str) -> str:
+    if path in _DOCS_PATHS:
+        return _DOCS_CONTENT_SECURITY_POLICY
+    if path == _RODALES_PATH or path.startswith(_RODALES_PATH + "/"):
+        return RODALES_CONTENT_SECURITY_POLICY
+    return DASHBOARD_CONTENT_SECURITY_POLICY
 
 
 class SecurityHeadersMiddleware:
@@ -250,11 +283,7 @@ class SecurityHeadersMiddleware:
                     "X-Frame-Options": "DENY",
                     "Referrer-Policy": "same-origin",
                     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-                    "Content-Security-Policy": (
-                        _DOCS_CONTENT_SECURITY_POLICY
-                        if path in _DOCS_PATHS
-                        else DASHBOARD_CONTENT_SECURITY_POLICY
-                    ),
+                    "Content-Security-Policy": _policy_for(path),
                 }
                 if not path.startswith(_CACHEABLE_PATH_PREFIXES):
                     defaults["Cache-Control"] = "no-store"

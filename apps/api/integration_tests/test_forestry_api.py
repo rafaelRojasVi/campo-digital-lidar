@@ -12,8 +12,9 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from app.access import Role
 from app.main import app
-from app.routers.forestry import get_forestry_read_connection
+from app.routers.forestry import get_forestry_read_connection, require_forestry_viewer
 from fastapi.testclient import TestClient
 from sqlalchemy import Connection
 from test_forestry_ingestion import BOWTIE, build_zip, ingest
@@ -29,12 +30,15 @@ def api_client(integration_connection: Connection) -> Iterator[TestClient]:
     """API client reading through the rolled-back integration transaction."""
 
     app.dependency_overrides[get_forestry_read_connection] = lambda: integration_connection
+    # Access is covered by test_forestry_route_access.py with real sessions.
+    app.dependency_overrides[require_forestry_viewer] = lambda: Role.VIEWER
 
     try:
         with TestClient(app) as client:
             yield client
     finally:
         app.dependency_overrides.pop(get_forestry_read_connection, None)
+        app.dependency_overrides.pop(require_forestry_viewer, None)
 
 
 def ingest_main_family(connection: Connection, tmp_path: Path) -> int:
