@@ -22,7 +22,7 @@ export const PRODUCT_CARDS: readonly ProductCard[] = [
     key: 'forestry',
     title: 'Rodales',
     description: 'Patrimonio Degenfeld: rodales, usos de suelo y superficies.',
-    href: null,
+    href: '/rodales/',
     accent: 'forestal',
   },
   {

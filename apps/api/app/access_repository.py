@@ -8,7 +8,7 @@ from sqlalchemy import Connection, text
 
 from app.access import Role
 from app.audit import PRODUCT_GRANT_CHANGED_EVENT, record_audit_event
-from app.config import Settings
+from app.config import Settings, parse_bootstrap_admins
 
 
 @dataclass(frozen=True, slots=True)
@@ -315,3 +315,69 @@ def maybe_grant_transelec_bootstrap_admin(
         metadata={"previous_role": None, "role": Role.ADMIN.value, "via": "bootstrap_email"},
     )
     return True
+
+
+def product_has_admin(connection: Connection, *, product_key: str) -> bool:
+    """Whether any user holds ADMIN on ``product_key``."""
+
+    return connection.execute(
+        text(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM platform.product_grant
+                WHERE product_key = :product_key AND role = :role
+            )
+            """
+        ),
+        {"product_key": product_key, "role": Role.ADMIN.value},
+    ).scalar_one()
+
+
+def maybe_grant_configured_product_admins(
+    connection: Connection,
+    *,
+    settings: Settings,
+    email: str,
+    app_user_id: int,
+) -> tuple[str, ...]:
+    """Grant ADMIN on each product ``PLATFORM_BOOTSTRAP_ADMINS`` names for ``email``.
+
+    Establishes a product's *first* administrator without opening it to
+    anyone else: a product is granted only while it has no ADMIN at all,
+    and only to a user who holds no grant for it (an existing grant, of any
+    role, is never changed here). Grants on other products are untouched,
+    so a Transelec admin gains nothing on Rodales unless named for
+    ``forestry`` explicitly. Once the product has an admin the entry is
+    inert; that admin manages access from then on, and the entry should be
+    removed from the configuration.
+
+    Returns the product keys granted. Each grant is audited as
+    ``product_grant.changed`` with no actor, like the Transelec bootstrap.
+    """
+
+    normalized_email = email.strip().casefold()
+    granted: list[str] = []
+
+    for product_key, configured_email in parse_bootstrap_admins(settings.platform_bootstrap_admins):
+        if configured_email != normalized_email:
+            continue
+        if get_product_role(connection, app_user_id=app_user_id, product_key=product_key):
+            continue
+        if product_has_admin(connection, product_key=product_key):
+            continue
+
+        grant_product_role(
+            connection, app_user_id=app_user_id, product_key=product_key, role=Role.ADMIN
+        )
+        record_audit_event(
+            connection,
+            actor_app_user_id=None,
+            event_type=PRODUCT_GRANT_CHANGED_EVENT,
+            product_key=product_key,
+            subject_kind="app_user",
+            subject_id=str(app_user_id),
+            metadata={"previous_role": None, "role": Role.ADMIN.value, "via": "bootstrap_config"},
+        )
+        granted.append(product_key)
+
+    return tuple(granted)

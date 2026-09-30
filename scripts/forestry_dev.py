@@ -404,7 +404,7 @@ def start_frontend(api_port: int) -> ManagedProcess:
     log(f"starting frontend on 127.0.0.1:{port}…")
     process = spawn("frontend", command, DASHBOARD_ROOT, port, marker, env)
 
-    if not wait_for_http(f"http://127.0.0.1:{port}/", 60):
+    if not wait_for_http(f"http://127.0.0.1:{port}/rodales/", 60):
         raise LauncherError(
             f"The frontend did not start on port {port}. See {STATE_DIR / 'frontend.log'}"
         )
@@ -441,10 +441,12 @@ def command_up() -> int:
     api = start_api()
     frontend = start_frontend(api.port)
 
-    frontend_url = f"http://127.0.0.1:{frontend.port}/"
+    # Served under /rodales/ like the platform; the API needs a session with
+    # a forestry grant, so the page offers the development sign-in first.
+    frontend_url = f"http://127.0.0.1:{frontend.port}/rodales/"
     log("ready:")
-    log(f"  frontend  {frontend_url}")
-    log(f"  API       http://127.0.0.1:{api.port}/api/forestry/snapshots")
+    log(f"  frontend  {frontend_url}  (sign in as Dev Admin or Dev Operator)")
+    log(f"  API       http://127.0.0.1:{api.port}/api/forestry/snapshots (needs a session)")
     log(f"  logs      {STATE_DIR}/api.log · {STATE_DIR}/frontend.log")
     log("stop with: make forestry-stop (the dev database stays up)")
     open_browser(frontend_url)

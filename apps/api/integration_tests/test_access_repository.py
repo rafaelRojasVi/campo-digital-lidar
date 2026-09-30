@@ -10,11 +10,12 @@ from app.access_repository import (
     list_grantees_for_product,
     list_grants_for_user,
     maybe_grant_bootstrap_admin,
+    maybe_grant_configured_product_admins,
     maybe_grant_transelec_bootstrap_admin,
     resolve_or_create_app_user,
 )
 from app.config import Settings
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 
 
 def test_resolve_or_create_is_idempotent(integration_connection: Connection) -> None:
@@ -388,3 +389,138 @@ def test_transelec_bootstrap_is_one_time_and_never_re_escalates(
         get_product_role(integration_connection, app_user_id=app_user_id, product_key="transelect")
         is Role.VIEWER
     )
+
+
+# ---------------------------------------------------------------------------
+# PLATFORM_BOOTSTRAP_ADMINS: the first admin of one named product
+# ---------------------------------------------------------------------------
+
+_FORESTRY_ADMIN = "ana@campodigital.cl"
+
+
+def _product_bootstrap_settings(value: str = f"forestry:{_FORESTRY_ADMIN}") -> Settings:
+    return Settings(
+        _env_file=None,
+        app_env="development",
+        postgres_password="x",
+        platform_bootstrap_admins=value,
+    )
+
+
+def _grants(connection: Connection, app_user_id: int) -> list[tuple[str, Role]]:
+    return [
+        (grant.product_key, grant.role)
+        for grant in list_grants_for_user(connection, app_user_id=app_user_id)
+    ]
+
+
+def test_product_bootstrap_grants_forestry_admin_and_keeps_existing_grants(
+    integration_connection: Connection,
+) -> None:
+    # The first Rodales admin is already a Transelec admin: that grant stays.
+    app_user_id = _google_user(integration_connection, _FORESTRY_ADMIN)
+    grant_product_role(
+        integration_connection, app_user_id=app_user_id, product_key="transelect", role=Role.ADMIN
+    )
+
+    granted = maybe_grant_configured_product_admins(
+        integration_connection,
+        settings=_product_bootstrap_settings(),
+        email="Ana@CampoDigital.cl",
+        app_user_id=app_user_id,
+    )
+
+    assert granted == ("forestry",)
+    assert _grants(integration_connection, app_user_id) == [
+        ("forestry", Role.ADMIN),
+        ("transelect", Role.ADMIN),
+    ]
+    event = integration_connection.execute(
+        text(
+            "SELECT actor_app_user_id, event_type, product_key, subject_id, metadata "
+            "FROM platform.audit_event WHERE product_key = 'forestry'"
+        )
+    ).one()
+    assert tuple(event) == (
+        None,
+        "product_grant.changed",
+        "forestry",
+        str(app_user_id),
+        {"previous_role": None, "role": "admin", "via": "bootstrap_config"},
+    )
+
+
+def test_product_bootstrap_never_reaches_other_transelec_admins(
+    integration_connection: Connection,
+) -> None:
+    other_admin = _google_user(integration_connection, "javier@campodigital.cl")
+    grant_product_role(
+        integration_connection, app_user_id=other_admin, product_key="transelect", role=Role.ADMIN
+    )
+
+    granted = maybe_grant_configured_product_admins(
+        integration_connection,
+        settings=_product_bootstrap_settings(),
+        email="javier@campodigital.cl",
+        app_user_id=other_admin,
+    )
+
+    assert granted == ()
+    assert _grants(integration_connection, other_admin) == [("transelect", Role.ADMIN)]
+
+
+def test_product_bootstrap_is_inert_once_the_product_has_an_admin(
+    integration_connection: Connection,
+) -> None:
+    existing_admin = _google_user(integration_connection, "javier@campodigital.cl")
+    grant_product_role(
+        integration_connection, app_user_id=existing_admin, product_key="forestry", role=Role.ADMIN
+    )
+    app_user_id = _google_user(integration_connection, _FORESTRY_ADMIN)
+
+    granted = maybe_grant_configured_product_admins(
+        integration_connection,
+        settings=_product_bootstrap_settings(),
+        email=_FORESTRY_ADMIN,
+        app_user_id=app_user_id,
+    )
+
+    assert granted == ()
+    assert _grants(integration_connection, app_user_id) == []
+
+
+def test_product_bootstrap_never_changes_an_existing_grant_on_that_product(
+    integration_connection: Connection,
+) -> None:
+    # An admin demoted this account to viewer and then left: signing in again
+    # must not silently hand ADMIN back.
+    app_user_id = _google_user(integration_connection, _FORESTRY_ADMIN)
+    grant_product_role(
+        integration_connection, app_user_id=app_user_id, product_key="forestry", role=Role.VIEWER
+    )
+
+    granted = maybe_grant_configured_product_admins(
+        integration_connection,
+        settings=_product_bootstrap_settings(),
+        email=_FORESTRY_ADMIN,
+        app_user_id=app_user_id,
+    )
+
+    assert granted == ()
+    assert _grants(integration_connection, app_user_id) == [("forestry", Role.VIEWER)]
+
+
+def test_product_bootstrap_does_nothing_when_unconfigured(
+    integration_connection: Connection,
+) -> None:
+    app_user_id = _google_user(integration_connection, _FORESTRY_ADMIN)
+
+    granted = maybe_grant_configured_product_admins(
+        integration_connection,
+        settings=_product_bootstrap_settings(""),
+        email=_FORESTRY_ADMIN,
+        app_user_id=app_user_id,
+    )
+
+    assert granted == ()
+    assert _grants(integration_connection, app_user_id) == []

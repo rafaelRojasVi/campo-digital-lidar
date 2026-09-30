@@ -1,8 +1,9 @@
 # Campo Digital API — unified platform production container.
 #
 # One container serves the JSON API (/api/...), the Campo Digital front door
-# (apps/portal, sign-in and project picker) at / and the Transelec dashboard
-# under /transelec/, all from the same origin (see
+# (apps/portal, sign-in and project picker) at /, the Transelec dashboard
+# under /transelec/ and the Rodales dashboard under /rodales/, all from the
+# same origin (see
 # apps/api/app/dashboard_static.py) — no separate frontend origin, no CORS
 # surface. See docs/platform/production-platform-v1.md for the target
 # production architecture (Cloud Run) and
@@ -52,6 +53,20 @@ COPY apps/portal/ ./
 ENV VITE_CAMPO_ENV=production
 RUN npm run build
 
+# ---- Stage 1c: build the Rodales (forestry) dashboard -----------------------
+# Only the static shell: every byte of rodal data comes from /api/forestry,
+# which requires a forestry grant. No source ZIP or snapshot enters the image.
+FROM node:24.19.0-slim AS rodales-build
+
+WORKDIR /rodales
+
+COPY products/forestry/dashboard/package.json products/forestry/dashboard/package-lock.json ./
+RUN npm ci
+
+COPY products/forestry/dashboard/ ./
+ENV VITE_PLATFORM_FRONT_DOOR=true
+RUN npm run build
+
 # ---- Stage 2: Python runtime -------------------------------------------------
 FROM python:3.12-slim AS runtime
 
@@ -66,6 +81,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY products/lidar/src ./products/lidar/src
 COPY products/transelect/src ./products/transelect/src
+COPY products/forestry/src ./products/forestry/src
 
 # --no-dev excludes lint/test/notebook tooling. "api" and "transelec" are the
 # only extras this service needs at runtime (matches render.yaml's own
@@ -77,6 +93,7 @@ COPY migrations ./migrations
 COPY alembic.ini ./alembic.ini
 COPY --from=dashboard-build /dashboard/dist ./products/transelect/dashboard/dist
 COPY --from=portal-build /portal/dist ./apps/portal/dist
+COPY --from=rodales-build /rodales/dist ./products/forestry/dashboard/dist
 COPY scripts/container/entrypoint.sh /usr/local/bin/campo-entrypoint
 
 RUN chmod 0755 /usr/local/bin/campo-entrypoint && \

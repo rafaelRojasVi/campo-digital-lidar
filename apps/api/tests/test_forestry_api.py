@@ -13,10 +13,15 @@ from typing import get_args
 from unittest.mock import Mock
 
 import pytest
+from app.access import Role
 from app.database import get_database_engine
 from app.forestry_reads import KNOWN_QUALITY_FLAGS
 from app.main import app
-from app.routers.forestry import QualityFlag, get_forestry_read_connection
+from app.routers.forestry import (
+    QualityFlag,
+    get_forestry_read_connection,
+    require_forestry_viewer,
+)
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
@@ -44,11 +49,15 @@ def client_without_database() -> Iterator[TestClient]:
 
     stub_connection = Mock()
     app.dependency_overrides[get_forestry_read_connection] = lambda: stub_connection
+    # Access itself is covered by test_forestry_route_access.py (unit) and
+    # integration_tests/test_forestry_route_access.py (real sessions).
+    app.dependency_overrides[require_forestry_viewer] = lambda: Role.VIEWER
 
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(get_forestry_read_connection, None)
+        app.dependency_overrides.pop(require_forestry_viewer, None)
         assert stub_connection.execute.call_count == 0
 
 
@@ -83,11 +92,13 @@ def test_database_unavailable_returns_503_without_leaking_backend_error() -> Non
     engine = Mock(spec=Engine)
     engine.connect.side_effect = SQLAlchemyError("password=should-never-appear")
     app.dependency_overrides[get_database_engine] = lambda: engine
+    app.dependency_overrides[require_forestry_viewer] = lambda: Role.VIEWER
 
     try:
         response = TestClient(app).get("/api/forestry/snapshots")
     finally:
         app.dependency_overrides.pop(get_database_engine, None)
+        app.dependency_overrides.pop(require_forestry_viewer, None)
 
     assert response.status_code == 503
     assert response.json() == {"detail": "database unavailable"}

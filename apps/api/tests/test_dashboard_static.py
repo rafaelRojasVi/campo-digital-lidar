@@ -11,7 +11,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 TRANSELEC_PAGES = frozenset({"transelec", "transelec/pendientes"})
-RESERVED = frozenset({"api", "health", "transelec"})
+RODALES_PAGES = frozenset({"rodales"})
+RESERVED = frozenset({"api", "health", "transelec", "rodales"})
 
 
 def _build(tmp_path: Path, name: str, marker: str) -> Path:
@@ -23,22 +24,28 @@ def _build(tmp_path: Path, name: str, marker: str) -> Path:
     return dist
 
 
-def _client(tmp_path: Path, *, portal: bool = True, transelec: bool = True) -> TestClient:
+def _client(
+    tmp_path: Path, *, portal: bool = True, transelec: bool = True, rodales: bool = True
+) -> TestClient:
     app = FastAPI()
 
     @app.get("/api/ping")
     def ping() -> dict[str, str]:
         return {"ok": "yes"}
 
-    prefixed = (
-        [
+    prefixed = []
+    if transelec:
+        prefixed.append(
             PrefixedDashboard(
                 "transelec", _build(tmp_path, "transelec", "transelec shell"), TRANSELEC_PAGES
             )
-        ]
-        if transelec
-        else []
-    )
+        )
+    if rodales:
+        prefixed.append(
+            PrefixedDashboard(
+                "rodales", _build(tmp_path, "rodales", "rodales shell"), RODALES_PAGES
+            )
+        )
     mount_dashboards(
         app,
         root_dist=_build(tmp_path, "portal", "portal shell") if portal else None,
@@ -61,7 +68,7 @@ def test_root_serves_the_portal(tmp_path: Path) -> None:
 
 def test_unknown_top_level_path_falls_back_to_the_portal(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    for path in ("/rodales", "/rodales/mapa", "/cualquier-cosa"):
+    for path in ("/cualquier-cosa", "/otra/ruta"):
         response = client.get(path)
         assert response.status_code == 200, path
         assert "portal shell" in response.text, path
@@ -81,6 +88,22 @@ def test_each_build_serves_its_own_asset_with_the_same_name(tmp_path: Path) -> N
     client = _client(tmp_path)
     assert "portal shell" in client.get("/assets/index-abc123.js").text
     assert "transelec shell" in client.get("/transelec/assets/index-abc123.js").text
+
+
+def test_rodales_serves_its_shell_and_assets_under_its_own_prefix(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for path in ("/rodales", "/rodales/"):
+        response = client.get(path)
+        assert response.status_code == 200, path
+        assert "rodales shell" in response.text, path
+    assert "rodales shell" in client.get("/rodales/assets/index-abc123.js").text
+    assert client.get("/rodales/mapa").status_code == 404
+
+
+def test_rodales_without_a_build_is_a_404_not_the_portal(tmp_path: Path) -> None:
+    client = _client(tmp_path, rodales=False)
+    assert client.get("/rodales/").status_code == 404
+    assert "portal shell" in client.get("/").text
 
 
 def test_unknown_path_under_transelec_is_a_404_not_a_shell(tmp_path: Path) -> None:

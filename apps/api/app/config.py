@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -86,6 +86,17 @@ class Settings(BaseSettings):
         default=None, validation_alias="TRANSELEC_BOOTSTRAP_ADMIN_EMAIL"
     )
 
+    # First-admin bootstrap per product, as comma-separated
+    # ``product:email`` pairs (e.g. ``forestry:ana@campodigital.cl``). At
+    # Google sign-in, that email receives ADMIN on that product only, and
+    # only while the product has no admin at all and the user holds no grant
+    # for it (app.access_repository.maybe_grant_configured_product_admins).
+    # Validated at startup, so a typo fails the deploy instead of silently
+    # granting nothing.
+    platform_bootstrap_admins: str | None = Field(
+        default=None, validation_alias="PLATFORM_BOOTSTRAP_ADMINS"
+    )
+
     platform_bootstrap_admin_tenant_id: str | None = Field(
         default=None, validation_alias="PLATFORM_BOOTSTRAP_ADMIN_TENANT_ID"
     )
@@ -111,6 +122,12 @@ class Settings(BaseSettings):
         gt=0,
     )
 
+    @field_validator("platform_bootstrap_admins")
+    @classmethod
+    def _validate_platform_bootstrap_admins(cls, value: str | None) -> str | None:
+        parse_bootstrap_admins(value)
+        return value
+
     @property
     def database_url(self) -> URL:
         """Build the SQLAlchemy PostgreSQL URL without manual string assembly."""
@@ -123,6 +140,33 @@ class Settings(BaseSettings):
             port=self.postgres_port,
             database=self.postgres_db,
         )
+
+
+BOOTSTRAP_PRODUCT_KEYS = frozenset({"lidar", "forestry", "transelect"})
+
+
+def parse_bootstrap_admins(value: str | None) -> tuple[tuple[str, str], ...]:
+    """Parse ``PLATFORM_BOOTSTRAP_ADMINS`` into ``(product_key, email)`` pairs.
+
+    Emails are casefolded; an unknown product key or a malformed entry
+    raises ``ValueError``.
+    """
+
+    pairs: list[tuple[str, str]] = []
+    for raw_entry in (value or "").split(","):
+        entry = raw_entry.strip()
+        if not entry:
+            continue
+        product_key, separator, email = (part.strip() for part in entry.partition(":"))
+        if not separator or not email or "@" not in email:
+            raise ValueError(f"PLATFORM_BOOTSTRAP_ADMINS entry {entry!r} is not product:email.")
+        if product_key not in BOOTSTRAP_PRODUCT_KEYS:
+            raise ValueError(
+                f"PLATFORM_BOOTSTRAP_ADMINS product {product_key!r} is not one of "
+                f"{sorted(BOOTSTRAP_PRODUCT_KEYS)}."
+            )
+        pairs.append((product_key, email.casefold()))
+    return tuple(pairs)
 
 
 @lru_cache

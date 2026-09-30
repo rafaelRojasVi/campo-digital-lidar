@@ -3,9 +3,10 @@
 A production container packages one FastAPI process together with the
 Campo Digital front door (``apps/portal``, served at ``/``) and each hosted
 product's React build under its own first path segment (Transelec at
-``/transelec/``), so there is no separate frontend origin and no CORS surface
-to secure (see ``docs/superpowers/specs/2026-09-28-unified-platform-design.md``
-and the Dockerfile at the repo root). Local development is unaffected: every
+``/transelec/``, Rodales at ``/rodales/``), so there is no separate frontend
+origin and no CORS surface to secure (see
+``docs/superpowers/specs/2026-09-28-unified-platform-design.md`` and the
+Dockerfile at the repo root). Local development is unaffected: every
 frontend normally runs via its own Vite dev server, and this module is a no-op
 whenever no built ``dist/`` directory is present, which is always true in
 local dev and in CI/test, since ``dist/`` is gitignored and only produced by
@@ -27,8 +28,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 PORTAL_DIST_ENV = "CAMPO_PORTAL_DIST"
 TRANSELEC_DIST_ENV = "CAMPO_TRANSELEC_DASHBOARD_DIST"
+RODALES_DIST_ENV = "CAMPO_RODALES_DASHBOARD_DIST"
 DEFAULT_PORTAL_DIST = _REPO_ROOT / "apps" / "portal" / "dist"
 DEFAULT_TRANSELEC_DIST = _REPO_ROOT / "products" / "transelect" / "dashboard" / "dist"
+DEFAULT_RODALES_DIST = _REPO_ROOT / "products" / "forestry" / "dashboard" / "dist"
 
 
 def dist_dir_from_environment(env_var: str, default: Path) -> Path | None:

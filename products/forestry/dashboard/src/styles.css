@@ -182,6 +182,34 @@ button {
   white-space: nowrap;
 }
 
+.header__end {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+
+.header__projects {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-inverse);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: var(--radius);
+  transition: background-color 120ms var(--ease);
+}
+
+.header__projects:hover {
+  background: rgb(255 255 255 / 0.12);
+}
+
+.header__projects:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .header__provenance {
   display: flex;
   gap: 20px;
@@ -1187,6 +1215,17 @@ button {
   margin: 0;
   font-size: 13.5px;
   color: var(--ink-2);
+}
+
+.status__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+a.button {
+  text-decoration: none;
 }
 
 .status__text--secondary {

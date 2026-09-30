@@ -1,8 +1,9 @@
-"""The forestry read API has no authentication yet, so ``app.main`` mounts it
-only in ``development`` and CI's ``test``, never in the deployed staging and
-production environments.
+"""The forestry read API is mounted in every ``APP_ENV``, production included.
 
-Runs ``app.main`` in a subprocess because ``APP_ENV`` is read at import time.
+It was limited to ``development`` and ``test`` until every route required a
+session and a ``forestry`` grant (``app.routers.forestry.require_forestry_viewer``;
+see test_forestry_route_access.py). Runs ``app.main`` in a subprocess because
+``APP_ENV`` is read at import time.
 """
 
 from __future__ import annotations
@@ -19,11 +20,15 @@ _CHECK_SCRIPT = """
 import sys
 sys.path.insert(0, {api_root!r})
 from app.main import app
-print(any(p.startswith("/api/forestry") for p in app.openapi()["paths"]))
+from app.routers.forestry import require_forestry_viewer, router
+paths = [p for p in app.openapi()["paths"] if p.startswith("/api/forestry")]
+guarded = require_forestry_viewer in {{d.dependency for d in router.dependencies}}
+print(len(paths), guarded)
 """
 
 
-def _forestry_mounted(app_env: str) -> bool:
+@pytest.mark.parametrize("app_env", ["development", "test", "staging", "production"])
+def test_every_environment_mounts_the_guarded_forestry_api(app_env: str) -> None:
     result = subprocess.run(
         [sys.executable, "-c", _CHECK_SCRIPT.format(api_root=str(API_ROOT))],
         capture_output=True,
@@ -32,14 +37,4 @@ def _forestry_mounted(app_env: str) -> bool:
         cwd=API_ROOT,
         check=True,
     )
-    return result.stdout.strip() == "True"
-
-
-@pytest.mark.parametrize("app_env", ["development", "test"])
-def test_undeployed_environments_mount_the_forestry_api(app_env: str) -> None:
-    assert _forestry_mounted(app_env) is True
-
-
-@pytest.mark.parametrize("app_env", ["staging", "production"])
-def test_other_environments_do_not_mount_the_forestry_api(app_env: str) -> None:
-    assert _forestry_mounted(app_env) is False
+    assert result.stdout.split() == ["9", "True"]

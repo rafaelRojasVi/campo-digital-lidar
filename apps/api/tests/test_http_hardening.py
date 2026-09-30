@@ -16,6 +16,7 @@ from typing import Any
 from app.deps import SESSION_COOKIE_NAME
 from app.http_hardening import (
     DASHBOARD_CONTENT_SECURITY_POLICY,
+    RODALES_CONTENT_SECURITY_POLICY,
     RequestBodyLimitMiddleware,
     SecurityHeadersMiddleware,
 )
@@ -334,6 +335,22 @@ def _headers_app(app_env: str) -> TestClient:
     def transelec_asset() -> PlainTextResponse:
         return PlainTextResponse("console.log(2)")
 
+    @app.get("/rodales/")
+    def rodales_shell() -> PlainTextResponse:
+        return PlainTextResponse("<html></html>")
+
+    @app.get("/rodales/assets/index-abc.js")
+    def rodales_asset() -> PlainTextResponse:
+        return PlainTextResponse("console.log(3)")
+
+    @app.get("/rodalesx")
+    def lookalike() -> PlainTextResponse:
+        return PlainTextResponse("x")
+
+    @app.get("/api/forestry/snapshots")
+    def forestry_api() -> dict[str, str]:
+        return {"ok": "yes"}
+
     @app.get("/explicit")
     def explicit() -> JSONResponse:
         return JSONResponse({}, headers={"Cache-Control": "max-age=60"})
@@ -413,3 +430,40 @@ def test_interactive_docs_keep_only_the_framing_restriction() -> None:
     response = TestClient(main_app).get("/docs")
 
     assert response.headers["content-security-policy"] == "frame-ancestors 'none'"
+
+
+def _directives(policy: str) -> dict[str, str]:
+    return dict(directive.split(" ", 1) for directive in policy.split("; "))
+
+
+def test_rodales_pages_may_load_only_the_two_basemap_tile_origins() -> None:
+    client = _headers_app("production")
+    for path in ("/rodales/", "/rodales/assets/index-abc.js"):
+        policy = client.get(path).headers["content-security-policy"]
+        assert policy == RODALES_CONTENT_SECURITY_POLICY, path
+
+    directives = _directives(RODALES_CONTENT_SECURITY_POLICY)
+    assert directives["img-src"] == (
+        "'self' data: https://tile.openstreetmap.org https://services.arcgisonline.com"
+    )
+    # Only images widen: scripts, styles, data calls and framing stay same-origin.
+    for name in ("default-src", "script-src", "style-src", "connect-src", "font-src"):
+        assert directives[name] == "'self'", name
+    assert directives["frame-ancestors"] == "'none'"
+    assert "unsafe-inline" not in RODALES_CONTENT_SECURITY_POLICY
+    assert RODALES_CONTENT_SECURITY_POLICY.count("data:") == 1
+
+
+def test_other_paths_keep_the_same_origin_image_policy() -> None:
+    assert "data:" not in DASHBOARD_CONTENT_SECURITY_POLICY
+    client = _headers_app("production")
+    for path in ("/api/forestry/snapshots", "/api/transelec/summary", "/rodalesx"):
+        response = client.get(path)
+        assert response.headers["content-security-policy"] == DASHBOARD_CONTENT_SECURITY_POLICY
+        assert response.headers["cache-control"] == "no-store", path
+
+
+def test_rodales_hashed_assets_stay_cacheable_and_its_shell_does_not() -> None:
+    client = _headers_app("production")
+    assert "cache-control" not in client.get("/rodales/assets/index-abc.js").headers
+    assert client.get("/rodales/").headers["cache-control"] == "no-store"
