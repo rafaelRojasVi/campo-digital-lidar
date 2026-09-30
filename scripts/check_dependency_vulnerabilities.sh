@@ -69,3 +69,21 @@ npm \
   audit \
   --omit=dev \
   --audit-level=high
+
+echo
+echo "=== Rodales dashboard production dependencies ==="
+
+npm \
+  --prefix products/forestry/dashboard \
+  audit \
+  --omit=dev \
+  --audit-level=high
+
+echo
+echo "=== Front door (portal) production dependencies ==="
+
+npm \
+  --prefix apps/portal \
+  audit \
+  --omit=dev \
+  --audit-level=high
