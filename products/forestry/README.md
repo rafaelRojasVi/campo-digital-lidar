@@ -104,6 +104,11 @@ All workflow semantics remain future slices.
 - [Dashboard V1](docs/dashboard-v1.md) — the implemented read-only visual
   application: information architecture, map stack/projection, visual
   encoding, launcher, QA and performance results.
+- [Upload, review, publish V1](docs/upload-review-publish-v1.md) — shapefile
+  ZIP upload, review against the published version, Publicar/Restaurar,
+  migration 0010 and its deployment steps.
+- [Cargar, revisar y publicar](docs/es/carga-y-publicacion.md) — Spanish
+  stakeholder summary of the upload workflow.
 - [Resumen del visor para Campo Digital](docs/es/dashboard-v1.md) — Spanish
   stakeholder summary of the dashboard.
 - [Preguntas para Javier](docs/es/preguntas-campo-digital.md) — Spanish

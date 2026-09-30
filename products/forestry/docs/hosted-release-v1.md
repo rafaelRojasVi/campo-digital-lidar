@@ -223,7 +223,8 @@ proxy; ask first.
 
 ## LIMITATIONS
 
-- The dashboard shows the *latest ingested* snapshot. That is why the import
+- (Superseded by [Upload, review, publish V1](upload-review-publish-v1.md):
+  the dashboard now shows the *published* snapshot.) The dashboard shows the *latest ingested* snapshot. That is why the import
   script refuses a database holding any other Forestry snapshot. A second
   snapshot needs the publish marker (later PR).
 - `feature-collection` returns about 9 MB of uncompressed JSON on every

@@ -26,8 +26,9 @@ underlying semantics are not confirmed. It does **not** establish:
 - workflow status, approval, progress, or management-plan request state;
 - species or land-class meanings of use codes (values are served literally);
 - geometry repair (invalid source geometry is served as stored, labeled);
-- authoritative current forest state: `latest-ingested` is a fact about
-  ingestion order only, not supersession semantics.
+- authoritative current forest state: `published` is the version an
+  operator or admin chose to show (an audited decision), not a claim that
+  the source is the official estate state.
 
 ## Endpoints
 
@@ -38,7 +39,7 @@ projections `apps/api/app/forestry_reads.py`.
 | Endpoint | Returns |
 |---|---|
 | `/snapshots` | Persisted snapshots in ingestion order |
-| `/snapshots/latest-ingested` | Most recently ingested snapshot (ingestion order only) |
+| `/snapshots/published` | The published snapshot (replaced `/snapshots/latest-ingested` on 2026-09-30; see [Upload, review, publish V1](upload-review-publish-v1.md)) |
 | `/snapshots/{id}` | Per-snapshot summary: counts, areas, bbox, validity counts, quality-flag counts, dead-column count |
 | `/snapshots/{id}/predio-distribution` | Source predio code/name pairs with feature counts and area sums |
 | `/snapshots/{id}/use-distribution?field=uso_2024\|uso_2026` | Distribution of one year-stamped source use-class column |
