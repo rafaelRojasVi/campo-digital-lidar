@@ -59,5 +59,7 @@ and the audit that produced them are recorded in:
 - [Planilla del 09-sept: seguimiento AEF y revisión de columnas (español)](docs/es/2026-09-26-planilla-09sept-seguimiento-aef.md)
 - [Dashboard usability pass — 2026-09-26](docs/design/2026-09-26-dashboard-usability-pass.md)
 - [Panel Transelec: mejoras de uso y preguntas (español)](docs/es/2026-09-26-panel-usabilidad.md)
+- [Post-launch backlog V1 — 2026-10-02](docs/design/2026-10-02-post-launch-backlog-v1.md)
+- [Reunión del 02-10-2026: cambios pedidos y preguntas (español)](docs/es/2026-10-02-reunion-cambios-y-preguntas.md)
 
 Run it locally with `make transelec-dev` from the repository root.
