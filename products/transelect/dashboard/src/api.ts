@@ -199,6 +199,9 @@ export interface ResumenRow {
   numero_ingreso: string | null
   fecha_90_dias: string | null
   hoy_raw: string | null
+  /** Second ingreso pair (30-Sept-2026 layout); null when the source had no such column or the cell was blank. */
+  fecha_ingreso_2: string | null
+  numero_ingreso_2: string | null
   empresa: string | null
   id_predio_unico_ii: string | null
   id_pmf: string | null

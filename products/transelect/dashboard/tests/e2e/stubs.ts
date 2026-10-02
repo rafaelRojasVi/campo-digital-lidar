@@ -178,6 +178,8 @@ export function makeApiRow(index: number, overrides: Record<string, unknown> = {
     numero_ingreso: `ING-${index}`,
     fecha_90_dias: '2026-05-10',
     hoy_raw: null,
+    fecha_ingreso_2: null,
+    numero_ingreso_2: null,
     empresa: 'Forestal Austral',
     id_predio_unico_ii: null,
     id_pmf: null,

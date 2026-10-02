@@ -23,7 +23,13 @@ export function SourceDate({
   missing,
 }: {
   row: ResumenRow
-  field: 'fecha_ingreso' | 'fecha_90_dias' | 'fecha_solicitud' | 'fecha_corta' | 'fecha_termino'
+  field:
+    | 'fecha_ingreso'
+    | 'fecha_ingreso_2'
+    | 'fecha_90_dias'
+    | 'fecha_solicitud'
+    | 'fecha_corta'
+    | 'fecha_termino'
   missing: string
 }) {
   const evidence = row.source_text_dates?.[field]

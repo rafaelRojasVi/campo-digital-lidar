@@ -972,7 +972,7 @@ def test_v2_workbook_imports_with_its_review_report_and_is_not_published(
     assert (mapped["aef"], mapped["carpeta_source"], mapped["carpeta_normalizada"]) == (
         "A",
         "J",
-        "AH",
+        "AJ",
     )
 
     with integration_engine.connect() as connection:
@@ -1035,7 +1035,7 @@ def test_ambiguous_or_conflicting_layout_is_refused_with_references_and_no_value
     issue = next(i for i in rejected.json()["report"]["issues"] if i["severity"] == "error")
     assert (issue["code"], issue["columns"], issue["rows"]) == (
         "encabezado_duplicado_conflictivo",
-        ["M", "AJ"],
+        ["M", "AL"],
         [3],
     )
     assert secret not in rejected.text

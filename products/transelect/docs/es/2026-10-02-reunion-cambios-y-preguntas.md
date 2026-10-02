@@ -20,8 +20,11 @@ se publicó).
   encuentra `N Ingreso`, que es una columna esencial, y rechaza la
   importación. Es el comportamiento previsto cuando cambia la estructura:
   se detiene y avisa en vez de leer mal.
-- Hasta que el panel aprenda los nombres nuevos (primer cambio del plan),
-  la versión publicada sigue siendo la del 09 de septiembre.
+- El primer cambio del plan (que el panel reconozca los nombres nuevos y lea
+  el segundo ingreso) ya está programado y probado; falta publicarlo en el
+  servidor. Hasta entonces la versión publicada sigue siendo la del 09 de
+  septiembre. Detalle en
+  [la nota de la planilla del 30-sept](2026-10-02-planilla-30sep-segundo-ingreso.md).
 
 También contamos lo que hay en esas columnas, sin mirar valores de negocio:
 

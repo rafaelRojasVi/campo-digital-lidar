@@ -43,6 +43,7 @@ import {
   chronologyLabel,
   hasAefTracking,
 } from '../lib/aef'
+import { ingreso2InSource } from '../lib/ingreso'
 import { classifyFailure, type FailureView } from '../lib/apiState'
 import { Drawer } from '../ui/Drawer'
 import { AlertBanner, LoadingBlock } from './StateViews'
@@ -213,6 +214,7 @@ export function RowDetailDrawer({
   sourceFields?: readonly string[] | null
 }) {
   const sourceHasAef = aefInSource(sourceFields)
+  const sourceHasIngreso2 = ingreso2InSource(sourceFields)
   const [current, setCurrent] = useState<ResumenRow>(row)
   const [openedFrom, setOpenedFrom] = useState<ResumenRow>(row)
   const [detail, setDetail] = useState<TranselecPmfDetail | null>(null)
@@ -323,13 +325,34 @@ export function RowDetailDrawer({
               {cell(current.tipo_rechazo, 'Sin motivo registrado')}
             </Fact>
             <Fact label="N.º ingreso">{cell(current.numero_ingreso, 'Sin ingreso')}</Fact>
-            <Fact label="PAS">{cell(current.pas, 'Sin información')}</Fact>
             <Fact label="Fecha ingreso">
               <SourceDate row={current} field="fecha_ingreso" missing="Sin fecha" />
             </Fact>
+            {sourceHasIngreso2 === false ? (
+              <Fact label="Segundo ingreso" wide>
+                <span className="hint" data-testid="drawer-ingreso-2-absent">
+                  La planilla publicada no incluye las columnas «Fecha de ingreso2» y «N
+                  Ingreso2».
+                </span>
+              </Fact>
+            ) : (
+              <>
+                <Fact label="N.º ingreso 2">
+                  <span data-testid="drawer-numero-ingreso-2">
+                    {cell(current.numero_ingreso_2, 'Sin segundo ingreso')}
+                  </span>
+                </Fact>
+                <Fact label="Fecha ingreso 2">
+                  <span data-testid="drawer-fecha-ingreso-2">
+                    <SourceDate row={current} field="fecha_ingreso_2" missing="Sin fecha" />
+                  </span>
+                </Fact>
+              </>
+            )}
             <Fact label="90 días">
               <SourceDate row={current} field="fecha_90_dias" missing="Sin fecha" />
             </Fact>
+            <Fact label="PAS">{cell(current.pas, 'Sin información')}</Fact>
             <Fact label="Empresa">{cell(current.empresa, 'Sin información')}</Fact>
             <Fact label="Propietario">{cell(current.tipo_propietario, 'Sin información')}</Fact>
           </dl>

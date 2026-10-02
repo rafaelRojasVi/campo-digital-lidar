@@ -3,9 +3,15 @@
 ## Status
 
 Implemented (`transelec_ingestion.resumen_layout`, parser
-`transelec_ingestion.resumen_layout@2`, schema contract `transelec-resumen-v2`).
+`transelec_ingestion.resumen_layout@3`, schema contract `transelec-resumen-v2`).
 Supersedes the positional A:AD gate of [Source Contract V1](source-contract-v1.md);
 V1's observations about identity, status and auxiliary worksheets still stand.
+
+Amended 2026-10-02 for the 30-Sept-2026 workbook (parser `@2` → `@3`): the
+first ingreso pair is recognized under its renamed headers and a second
+ingreso pair is read. See "Evidence from the 30-Sept-2026 workbook" and the
+DECISION there. The planning record is
+[Transelec post-launch backlog V1](design/2026-10-02-post-launch-backlog-v1.md).
 
 ## Why V1 had to change
 
@@ -53,6 +59,57 @@ FACT (reproducible with the opt-in private test
 - Regression: for every row, each of the 30 legacy fields read by V2 equals a
   V1-style positional read shifted right by five columns.
 
+## Evidence from the 30-Sept-2026 workbook
+
+FACT (reproducible with the opt-in private test
+`test_private_30_sept_2026_workbook`, run with
+`TRANSELEC_PRIVATE_WORKBOOK_30SEP=<path>`; the workbook
+`PlanillaMaestra-CD_30sep2026.xlsx` was received 2026-10-02 and stays outside
+the repository):
+
+- 729 rows with PMF. Header row 2; the AEF block at A:E and `PMF` at I as in
+  the 09-Sept layout.
+- Column Y is headed `Fecha de ingreso1` and Z `N Ingreso1` (the 09-Sept
+  headers were `Fecha de ingreso` and `N Ingreso`). `90 dias` (AA) and `Hoy`
+  (AB) are unchanged.
+- Two new columns follow `Hoy`: AC `Fecha de ingreso2` and AD `N Ingreso2`,
+  **blank on every row**. `Empresa` therefore moves from AC to AE, `Sector`
+  from AI to AK, and the auxiliary regions start at AM.
+- Before this amendment the parser reported `columna_no_reconocida` for Y, Z,
+  AC and AD, `columna_esperada_ausente` for `fecha_ingreso` and
+  `columna_esencial_ausente` for `numero_ingreso`: the workbook could not be
+  imported. That is the intended V1/V2 behaviour for a renamed essential
+  column — stop and ask — and it is what this amendment resolves.
+- The text cells of the 09-Sept workbook are still there: `Fecha de ingreso1`
+  holds 64 single Spanish written-out dates, 58 cells with two dates and 2
+  `-`; `90 dias` holds 58 cells with two dates. `N Ingreso1` holds 562 cells
+  shaped `n/n-n/n`, 101 plain numbers and about 58 cells with two such
+  numbers separated by a space or a line break.
+
+INFERENCE: the 58 two-value cells line up across `Fecha de ingreso1`,
+`N Ingreso1` and `90 dias`. They most plausibly hold the first ingreso and the
+reingreso of the same plan in one cell, and the new `…2` columns are the
+source's way of separating them. Campo Digital has not confirmed this.
+
+DECISION (2026-10-02):
+
+- `Fecha de ingreso1` and `N Ingreso1` are documented aliases of
+  `fecha_ingreso` and `numero_ingreso`. Both spellings bind the same field;
+  the canonical headers stay `Fecha de ingreso` / `N Ingreso` (they name the
+  fields in messages, the CSV export and the dashboard's rule copy).
+- `Fecha de ingreso2` (date) and `N Ingreso2` (text) are new fields
+  `fecha_ingreso_2` and `numero_ingreso_2`, tier **optional**: like the AEF
+  block, they are absent from the 14-Aug and 09-Sept layouts, and a warning
+  would force every re-publish of the live 09-Sept import through
+  acknowledgement for a column its source never had. Text in
+  `Fecha de ingreso2` follows "Rows and cells" unchanged and lands in
+  `source_text_dates`.
+- Nothing splits a two-value cell of the `…1` columns into the `…2` fields.
+  Which value is the ingreso and which the reingreso is not established, and
+  the source now has columns of its own for the second value.
+- The parser version becomes `@3`: identical bytes now project two more
+  columns. The schema contract string stays `transelec-resumen-v2`.
+
 ## Layout recognition
 
 1. **Worksheet.** Exactly one sheet whose name normalizes to `resumen`.
@@ -92,7 +149,7 @@ FACT (reproducible with the opt-in private test
 | identity   | error `columna_esencial_ausente` | `PMF`, `ID_Predo_Unico`, `Rol`, `N Predio` |
 | required   | error `columna_esencial_ausente` | `Estado`, `Estado resumido`, `Tipo de propietario`, `Superficie de corta`, `N Ingreso`, `Empresa` |
 | expected   | warning `columna_esperada_ausente` | every other V1 field |
-| optional   | info `columna_opcional_ausente` | the five AEF tracking fields |
+| optional   | info `columna_opcional_ausente` | the five AEF tracking fields; `Fecha de ingreso2`, `N Ingreso2` |
 
 DECISION: identity fields feed `predio_group_key`; required fields feed the
 published status/summary computations. Losing either would make published
@@ -111,6 +168,8 @@ Documented aliases (besides the canonical header):
 | `carpeta_source`         | `Carpeta origen` |
 | `carpeta_normalizada`    | `Carpeta normalizada` |
 | `superficie_total_corta` | `Superficie total de corta` |
+| `fecha_ingreso`          | `Fecha de ingreso1` (30-Sept-2026 header) |
+| `numero_ingreso`         | `N Ingreso1` (30-Sept-2026 header) |
 | `id_predio_unico`        | `ID_Predio_Unico` (the source spells `ID_Predo_Unico`) |
 
 The aliases are platform-defined, not observed in a source; adding one is a
@@ -213,6 +272,11 @@ Migration `0009` (expand-only):
 - `transelec_import` gains `mapping_report` (JSONB, NULL for V1 imports) and
   `warning_count`.
 
+Migration `0011` (expand-only, 2026-10-02): `transelec_resumen_row` gains
+`fecha_ingreso_2` (date) and `numero_ingreso_2` (text), nullable, no index.
+NULL means the source row had no value or the source layout had no such
+column; rows of earlier imports stay NULL.
+
 The original upload stays content-addressed in the object store
 (`source_snapshot`), and every row keeps its `source_row_number`. Imports made
 under V1 report the 30 legacy fields as their source fields.
@@ -230,11 +294,16 @@ under V1 report the 30 legacy fields as their source fields.
 - Shared filters gain `aef` and `quien_solicita` multi-selects. They stay
   row-level: `aef=Presentado` matches the row that holds the value.
 - Every row view gains the five fields, `chronology_flags` and
-  `source_text_dates`.
+  `source_text_dates`. Since 2026-10-02 it also carries `fecha_ingreso_2` and
+  `numero_ingreso_2`; `source_fields` of the active import says whether the
+  published version's source had those columns, and the dashboard's row
+  drawer shows the second ingreso only when it did.
 - CSV export: the two folder columns are headed `Carpeta PMF` and `Carpeta
   normalizada` (they were `Carpeta (col. E)` / `Carpeta (col. AC)`, letters
   that became J/AH in this layout). `Fecha de ingreso` exports the raw text
-  when the cell's text was not resolved to a date, instead of a blank.
+  when the cell's text was not resolved to a date, instead of a blank. Since
+  2026-10-02 the export has 20 columns: `Fecha de ingreso2` and `N Ingreso2`
+  follow `N Ingreso`, blank for versions whose source had no such columns.
 
 ## Interpretation
 
@@ -258,6 +327,9 @@ error.
   `90 dias` now take part in the 90-day overdue view.
 - The PMF-level presentation rests on the observed layout and a team
   decision, not on a confirmed definition of AEF.
+- The 30-Sept-2026 `…2` columns are blank, so nothing yet exercises the
+  second ingreso with real data; the 58 two-value cells of the `…1` columns
+  remain unresolved raw text until the source moves the second value.
 
 ## Open questions for Campo Digital
 
@@ -268,3 +340,7 @@ error.
 - Should text dates in `Fecha de ingreso` / `90 dias` be converted at source?
 - In a cell with two dates, what does each date mean, and which one is the
   column's value?
+- Is `Fecha de ingreso2` / `N Ingreso2` always the reingreso after a
+  rejection? Will the two-value cells of `Fecha de ingreso1` / `N Ingreso1`
+  be split into those columns at source? Can a plan have more than two
+  ingresos?

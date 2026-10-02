@@ -197,10 +197,14 @@ def test_contract_violation_never_touches_the_database(tmp_path: Path) -> None:
 
 
 def test_projection_covers_every_contract_field() -> None:
-    """The 30 legacy fields plus the five AEF tracking fields, in the
-    resolver's registry order."""
+    """The 30 legacy fields, the five AEF tracking fields and the second
+    ingreso pair of the 30-Sept-2026 layout, in the resolver's registry
+    order."""
 
-    assert len(RESUMEN_ROW_PROJECTION) == 35
+    assert len(RESUMEN_ROW_PROJECTION) == 37
+    projected = {spec.contract_field: spec.column for spec in RESUMEN_ROW_PROJECTION}
+    assert projected["fecha_ingreso_2"] == "fecha_ingreso_2"
+    assert projected["numero_ingreso_2"] == "numero_ingreso_2"
     assert tuple(spec.contract_field for spec in RESUMEN_ROW_PROJECTION) == tuple(
         field_name for _, field_name in CURRENT_RESUMEN_COLUMNS
     )

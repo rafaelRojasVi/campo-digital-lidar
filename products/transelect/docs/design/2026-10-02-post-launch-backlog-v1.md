@@ -2,7 +2,9 @@
 
 ## Status
 
-Planning record. Nothing in this document is implemented. It orders the
+Planning record. PR-0 below is implemented on `feat/transelec-ingreso-2-columns`
+(migration `0011`, parser `@3`; see the contract amendment of 2026-10-02).
+PR-1 to PR-3 are not started. The document orders the
 changes requested by Campo Digital after the pilot went live
 (see [Panel Transelec: el piloto está en uso](../es/2026-09-28-piloto-en-uso.md))
 and records what was verified against the code and against the planilla
