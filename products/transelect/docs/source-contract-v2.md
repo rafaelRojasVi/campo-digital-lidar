@@ -99,9 +99,10 @@ DECISION (2026-10-02):
   fields in messages, the CSV export and the dashboard's rule copy).
 - `Fecha de ingreso2` (date) and `N Ingreso2` (text) are new fields
   `fecha_ingreso_2` and `numero_ingreso_2`, tier **optional**: like the AEF
-  block, they are absent from the 14-Aug and 09-Sept layouts, and a warning
-  would force every re-publish of the live 09-Sept import through
-  acknowledgement for a column its source never had. Text in
+  block, they are absent from the 14-Aug and 09-Sept layouts (and from the
+  "30 Sept" copy published on 2026-10-02, which keeps the old headers), and a
+  warning would force every re-publish of those imports through
+  acknowledgement for a column their source never had. Text in
   `Fecha de ingreso2` follows "Rows and cells" unchanged and lands in
   `source_text_dates`.
 - Nothing splits a two-value cell of the `…1` columns into the `…2` fields.

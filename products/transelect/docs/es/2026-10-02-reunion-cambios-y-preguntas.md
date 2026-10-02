@@ -15,16 +15,21 @@ se publicó).
 
 - Las columnas `Fecha de ingreso` y `N Ingreso` ahora se llaman
   **`Fecha de ingreso1`** y **`N Ingreso1`**, y aparecen dos columnas nuevas,
-  **`Fecha de ingreso2`** y **`N Ingreso2`**, vacías en las 728 filas.
+  **`Fecha de ingreso2`** y **`N Ingreso2`**, vacías en las 729 filas.
 - El panel reconoce las columnas por su nombre exacto. Con el nombre nuevo no
   encuentra `N Ingreso`, que es una columna esencial, y rechaza la
   importación. Es el comportamiento previsto cuando cambia la estructura:
   se detiene y avisa en vez de leer mal.
 - El primer cambio del plan (que el panel reconozca los nombres nuevos y lea
   el segundo ingreso) ya está programado y probado; falta publicarlo en el
-  servidor. Hasta entonces la versión publicada sigue siendo la del 09 de
-  septiembre. Detalle en
+  servidor. Detalle en
   [la nota de la planilla del 30-sept](2026-10-02-planilla-30sep-segundo-ingreso.md).
+- **Ojo:** el 02-10-2026 a las 12:37 (hora de Chile) Javier publicó en el
+  panel una planilla también llamada «30 Sept» (729 filas, 6 advertencias
+  reconocidas). El panel publicado la aceptó, así que esa copia conserva los
+  nombres antiguos `Fecha de ingreso` y `N Ingreso`. La copia que recibimos
+  por correo, con los nombres `…1` y las columnas `…2`, es otra revisión.
+  Necesitamos saber cuál es la vigente (pregunta 11).
 
 También contamos lo que hay en esas columnas, sin mirar valores de negocio:
 
@@ -104,6 +109,10 @@ se muestran tal como vienen. **Si esos valores se pasan a las columnas
    descargada?
 10. Para `N Ingreso`: 101 celdas son números sueltos y 562 tienen la forma
     `n/n-n/n`. ¿Hay un formato oficial (oficina/número-año)?
+11. Hay dos planillas «30 Sept»: la que Javier publicó el 02-10-2026 (nombres
+    antiguos de columnas) y la que recibimos con `Fecha de ingreso1/2` y
+    `N Ingreso1/2`. ¿Cuál es la vigente, y la planilla maestra seguirá con
+    los nombres nuevos?
 
 Hasta recibir estas respuestas, el panel conserva las reglas actuales y
 muestra cómo llega a cada cifra. Las preguntas anteriores sobre AEF, celdas con

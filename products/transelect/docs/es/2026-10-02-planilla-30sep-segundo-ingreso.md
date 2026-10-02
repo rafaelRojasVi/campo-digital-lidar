@@ -40,8 +40,13 @@ cuando cambia la estructura: se detiene y avisa en vez de leer mal.
 
 - Ninguna regla de estado, pendientes ni plazos usa todavía el segundo
   ingreso. Eso se definirá con las respuestas de la reunión del 02-10-2026.
-- La planilla no se publicó en este cambio. Publicarla sigue siendo una
-  decisión explícita de Campo Digital desde «Datos → Importar».
+- Esta copia de la planilla no se publicó en este cambio. Publicarla sigue
+  siendo una decisión explícita de Campo Digital desde «Datos → Importar».
+- Lo que hoy está publicado (02-10-2026, 12:37 hora de Chile, por Javier) es
+  otra planilla también llamada «30 Sept», con los nombres antiguos de las
+  columnas de ingreso: el panel en producción, que todavía no tiene este
+  cambio, la aceptó con 6 advertencias reconocidas. Cuando este cambio se
+  publique en el servidor, ambas variantes se leerán.
 
 ## Preguntas para Campo Digital
 

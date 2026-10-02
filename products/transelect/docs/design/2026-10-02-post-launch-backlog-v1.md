@@ -12,6 +12,17 @@ received on 2026-10-02 (`PlanillaMaestra-CD_30sep2026.xlsx`, kept outside the
 repository). The Spanish counterpart for Campo Digital is
 [Reunión del 02-10-2026: cambios pedidos y preguntas](../es/2026-10-02-reunion-cambios-y-preguntas.md).
 
+FACT (production database, read through `railway ssh` on 2026-10-02): the
+active Transelec version is import 3, published by Javier on 2026-10-02 at
+15:37 UTC from a workbook also named "30 Sept" (729 rows, 6 acknowledged
+warnings). Production runs parser `@2`, which refuses the renamed headers, so
+that copy still carries `Fecha de ingreso` / `N Ingreso`. The copy in Rafael's
+Downloads with `…1` / `…2` headers is therefore a different revision
+(INFERENCE: same data, later header edit). Which one is current is open
+question 11 of the Spanish note. Also FACT: no Rodales snapshot is published
+(`forestry.publication_state` null, zero events, zero uploads), and the
+migration head is `0010`.
+
 Evidence labels follow [the documentation policy](../../../../docs/DOCUMENTATION_POLICY.md).
 
 ## 1. Evidence from the 30-Sept-2026 workbook
