@@ -117,6 +117,8 @@ export function makeRow(overrides: Partial<ResumenRow> = {}): ResumenRow {
     numero_ingreso: 'ING-900',
     fecha_90_dias: '2026-06-02',
     hoy_raw: null,
+    fecha_ingreso_2: null,
+    numero_ingreso_2: null,
     empresa: 'Forestal Austral',
     id_predio_unico_ii: null,
     id_pmf: null,

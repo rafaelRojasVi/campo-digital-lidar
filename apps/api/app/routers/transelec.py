@@ -823,7 +823,8 @@ class SourceTextDateView(BaseModel):
 
 class ResumenRowView(BaseModel):
     """One full ``transelec_resumen_row`` — every contract field (the 30 V1
-    fields plus the five V2 AEF tracking fields), the derived
+    fields, the five V2 AEF tracking fields and the second ingreso pair of
+    the 30-Sept-2026 layout), the derived
     ``predio_group_key``, the 1-indexed ``source_row_number``, and the
     row's AEF date-order inconsistencies (``chronology_flags``, reported
     as found and never corrected), and ``source_text_dates``: for each date
@@ -863,6 +864,8 @@ class ResumenRowView(BaseModel):
     numero_ingreso: str | None
     fecha_90_dias: str | None
     hoy_raw: str | None
+    fecha_ingreso_2: str | None
+    numero_ingreso_2: str | None
     empresa: str | None
     id_predio_unico_ii: str | None
     id_pmf: str | None
@@ -923,6 +926,8 @@ def _resumen_row_view(row: Row[Any]) -> ResumenRowView:
         numero_ingreso=row.numero_ingreso,
         fecha_90_dias=row.fecha_90_dias.isoformat() if row.fecha_90_dias else None,
         hoy_raw=row.hoy_raw,
+        fecha_ingreso_2=_iso(row.fecha_ingreso_2),
+        numero_ingreso_2=row.numero_ingreso_2,
         empresa=row.empresa,
         id_predio_unico_ii=row.id_predio_unico_ii,
         id_pmf=row.id_pmf,

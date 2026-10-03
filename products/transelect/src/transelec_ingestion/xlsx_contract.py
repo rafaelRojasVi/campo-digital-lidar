@@ -18,6 +18,7 @@ from python_calamine import CalamineWorkbook
 from transelec_ingestion.resumen_layout import (
     AEF_TRACKING_FIELDS,
     FIELD_SPECS,
+    INGRESO_2_FIELDS,
     LayoutIssue,
     LayoutReport,
     TextDateEvidence,
@@ -45,12 +46,15 @@ class TranselecWorkbookError(ValueError):
 # at A:AD). Kept as the documented legacy layout; tests use it to prove that
 # layout still imports. Header text, not position, binds a column now.
 RESUMEN_COLUMNS: tuple[tuple[str, str], ...] = tuple(
-    (spec.header, spec.name) for spec in FIELD_SPECS if spec.name not in AEF_TRACKING_FIELDS
+    (spec.header, spec.name)
+    for spec in FIELD_SPECS
+    if spec.name not in AEF_TRACKING_FIELDS and spec.name not in INGRESO_2_FIELDS
 )
 
 EXPECTED_RESUMEN_HEADERS = tuple(header for header, _ in RESUMEN_COLUMNS)
 
-# The 09-Sept-2026 layout: the AEF tracking block at A:E, then the 30 fields.
+# The 30-Sept-2026 layout: the AEF tracking block at A:E, the 30 fields, with
+# the second ingreso pair (AC:AD) between "Hoy" and "Empresa".
 CURRENT_RESUMEN_COLUMNS: tuple[tuple[str, str], ...] = tuple(
     (spec.header, spec.name) for spec in FIELD_SPECS
 )

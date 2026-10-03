@@ -33,6 +33,7 @@ from transelec_ingestion.resumen_layout import (
 from transelec_ingestion.xlsx_contract import (
     CURRENT_RESUMEN_COLUMNS,
     EXPECTED_RESUMEN_HEADERS,
+    RESUMEN_COLUMNS,
     TranselecWorkbook,
     TranselecWorkbookError,
     load_transelec_workbook,
@@ -179,6 +180,9 @@ def _mapped(workbook: TranselecWorkbook) -> dict[str, str]:
         ("  ID_Predo_Unico ", "id predo unico"),
         ("Fecha Término", "fecha termino"),
         ("QUIEN  SOLICITA", "quien solicita"),
+        # Digits are significant: the 30-Sept-2026 workbook's "Fecha de
+        # ingreso1" is a different header from "Fecha de ingreso".
+        ("Fecha de ingreso1", "fecha de ingreso1"),
         (None, ""),
     ],
 )
@@ -189,6 +193,11 @@ def test_normalize_header(raw: Any, normalized: str) -> None:
 def test_alias_index_is_unambiguous_and_distinguishes_near_identical_ids() -> None:
     assert ALIAS_INDEX["id predo unico"] == "id_predio_unico"
     assert ALIAS_INDEX["id predio unicoii"] == "id_predio_unico_ii"
+    # 30-Sept-2026: the first ingreso pair was renamed, the second is new.
+    assert ALIAS_INDEX["fecha de ingreso1"] == "fecha_ingreso"
+    assert ALIAS_INDEX["n ingreso1"] == "numero_ingreso"
+    assert ALIAS_INDEX["fecha de ingreso2"] == "fecha_ingreso_2"
+    assert ALIAS_INDEX["n ingreso2"] == "numero_ingreso_2"
     # The bare "Carpeta" header is never resolved by alias: only by position.
     assert "carpeta" not in ALIAS_INDEX
     assert len({spec.name for spec in FIELD_SPECS}) == len(FIELD_SPECS)
@@ -221,8 +230,8 @@ def test_current_layout_maps_aef_block_and_both_carpeta_columns(tmp_path: Path) 
     assert mapped["fecha_termino"] == "E"
     assert mapped["pmf"] == "I"
     assert mapped["carpeta_source"] == "J"
-    assert mapped["carpeta_normalizada"] == "AH"
-    assert mapped["sector"] == "AI"
+    assert mapped["carpeta_normalizada"] == "AJ"
+    assert mapped["sector"] == "AK"
 
     first, second = workbook.resumen_rows
     assert first.values["aef"] == "Presentado"
@@ -237,7 +246,7 @@ def test_current_layout_maps_aef_block_and_both_carpeta_columns(tmp_path: Path) 
 
 
 def test_legacy_thirty_column_layout_still_imports(tmp_path: Path) -> None:
-    fields = tuple(field for _, field in CURRENT_RESUMEN_COLUMNS[5:])
+    fields = tuple(field for _, field in RESUMEN_COLUMNS)
     path = _write(
         tmp_path / "legacy.xlsx",
         list(EXPECTED_RESUMEN_HEADERS),
@@ -250,8 +259,121 @@ def test_legacy_thirty_column_layout_still_imports(tmp_path: Path) -> None:
     assert _mapped(workbook)["carpeta_source"] == "E"
     assert _mapped(workbook)["carpeta_normalizada"] == "AC"
     assert workbook.resumen_rows[0].values["aef"] is None
+    assert workbook.resumen_rows[0].values["fecha_ingreso_2"] is None
     assert {code for code, *_ in _issues(workbook, "info")} == {"columna_opcional_ausente"}
     assert _issues(workbook, "warning") == []
+
+
+def _thirty_sept_headers() -> tuple[str, ...]:
+    """The 30-Sept-2026 header row: the first ingreso pair renamed ``…1``;
+    ``Fecha de ingreso2`` / ``N Ingreso2`` are already the canonical headers
+    of the two new fields, so only the two renames differ from
+    ``CURRENT_HEADERS``."""
+
+    renamed = {"Fecha de ingreso": "Fecha de ingreso1", "N Ingreso": "N Ingreso1"}
+    return tuple(renamed.get(header, header) for header in CURRENT_HEADERS)
+
+
+def test_30_sept_layout_binds_ingreso1_aliases_and_ingreso2_fields(tmp_path: Path) -> None:
+    headers = _thirty_sept_headers()
+    fields = tuple(field for _, field in CURRENT_RESUMEN_COLUMNS)
+    rows = [
+        _base_values(
+            fecha_ingreso=dt.date(2024, 4, 17),
+            numero_ingreso="ING-1",
+            fecha_ingreso_2=dt.date(2025, 2, 3),
+            numero_ingreso_2="ING-1-R",
+        ),
+        _base_values(pmf="MP002", fecha_ingreso=dt.date(2024, 5, 2), numero_ingreso="ING-2"),
+    ]
+    path = _write(tmp_path / "30sept.xlsx", list(headers), [_row(headers, fields, r) for r in rows])
+
+    workbook = load_transelec_workbook(path)
+
+    mapped = _mapped(workbook)
+    assert (mapped["fecha_ingreso"], mapped["numero_ingreso"]) == ("Y", "Z")
+    assert (mapped["fecha_ingreso_2"], mapped["numero_ingreso_2"]) == ("AC", "AD")
+    assert mapped["empresa"] == "AE"
+    assert _issues(workbook, "error") == []
+    assert _issues(workbook, "warning") == []
+    first, second = workbook.resumen_rows
+    assert first.values["fecha_ingreso"] == dt.date(2024, 4, 17)
+    assert first.values["numero_ingreso"] == "ING-1"
+    assert first.values["fecha_ingreso_2"] == dt.date(2025, 2, 3)
+    assert first.values["numero_ingreso_2"] == "ING-1-R"
+    # A blank second ingreso stays blank; nothing is copied from the first.
+    assert second.values["fecha_ingreso_2"] is None
+    assert second.values["numero_ingreso_2"] is None
+    aliased = {
+        decision.column: decision.note
+        for decision in workbook.layout.columns
+        if decision.column in {"Y", "Z"}
+    }
+    assert aliased == {
+        "Y": "Alias documentado de «Fecha de ingreso».",
+        "Z": "Alias documentado de «N Ingreso».",
+    }
+
+
+def test_09_sept_layout_without_the_second_ingreso_still_imports(tmp_path: Path) -> None:
+    """The 09-Sept-2026 workbook (the live import) has no ``…2`` columns:
+    their absence is information, not a warning that would force the
+    operator to acknowledge anything on a re-publish."""
+
+    ingreso_2 = {"fecha_ingreso_2", "numero_ingreso_2"}
+    columns = [(h, f) for h, f in CURRENT_RESUMEN_COLUMNS if f not in ingreso_2]
+    headers = tuple(h for h, _ in columns)
+    fields = tuple(f for _, f in columns)
+    path = _write(tmp_path / "09sept.xlsx", list(headers), [_row(headers, fields, _base_values())])
+
+    workbook = load_transelec_workbook(path)
+
+    assert _issues(workbook, "error") == []
+    assert _issues(workbook, "warning") == []
+    optional = [
+        issue for issue in workbook.layout.issues if issue.code == "columna_opcional_ausente"
+    ]
+    assert {issue.field for issue in optional} == ingreso_2
+    assert workbook.resumen_rows[0].values["fecha_ingreso_2"] is None
+    assert "fecha_ingreso_2" not in _mapped(workbook)
+
+
+def test_text_in_the_second_ingreso_date_is_classified_like_the_first(tmp_path: Path) -> None:
+    rows = [
+        _base_values(fecha_ingreso_2="3 de febrero de 2025", numero_ingreso_2="ING-1-R"),
+        _base_values(pmf="MP002", fecha_ingreso_2="20-12-2024 09-06-26", numero_ingreso_2="X"),
+    ]
+    path = _current_layout(tmp_path / "text-ingreso-2.xlsx", rows)
+
+    validated = read_validated_workbook(path)
+
+    columns = [row.columns for row in validated.rows]
+    assert [c["fecha_ingreso_2"] for c in columns] == [dt.date(2025, 2, 3), None]
+    assert json.loads(columns[0]["source_text_dates"])["fecha_ingreso_2"] == {
+        "raw": "3 de febrero de 2025",
+        "resolution": "parsed_spanish_long",
+        "parsed": "2025-02-03",
+    }
+    assert json.loads(columns[1]["source_text_dates"])["fecha_ingreso_2"] == {
+        "raw": "20-12-2024 09-06-26",
+        "resolution": "multiple_dates",
+        "parsed": None,
+    }
+    issues = {
+        (issue["code"], issue["field"]): issue["rows"]
+        for issue in validated.mapping_report["issues"]
+        if issue["code"].startswith("fecha_")
+    }
+    assert issues == {
+        ("fecha_texto_interpretada", "fecha_ingreso_2"): [2],
+        ("fecha_texto_multiple", "fecha_ingreso_2"): [3],
+    }
+    multiple = next(
+        issue
+        for issue in validated.mapping_report["issues"]
+        if issue["code"] == "fecha_texto_multiple"
+    )
+    assert "«Fecha de ingreso2»" in multiple["message"]
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +403,7 @@ def test_reordered_block_and_aliases_are_mapped_by_name(tmp_path: Path) -> None:
     """The AEF block moved to the end, headers spelled with accents and
     documented aliases; the Carpeta pair keeps its neighbours."""
 
-    legacy_fields = [field for _, field in CURRENT_RESUMEN_COLUMNS[5:]]
+    legacy_fields = [field for _, field in RESUMEN_COLUMNS]
     headers = [
         *EXPECTED_RESUMEN_HEADERS,
         "Estado AEF",
@@ -339,9 +461,9 @@ def test_moved_separator_and_pivot_region_are_ignored(tmp_path: Path) -> None:
     workbook = load_transelec_workbook(path)
 
     separators = [d.column for d in workbook.layout.columns if d.status == "separator"]
-    assert separators == ["AJ"]
+    assert separators == ["AL"]
     assert [(r.first_column, r.last_column) for r in workbook.layout.auxiliary_regions] == [
-        ("AK", "AM")
+        ("AM", "AO")
     ]
     assert workbook.resumen_rows[0].values["estado"] == "En Evaluacion"
     assert _issues(workbook, "error") == []
@@ -378,15 +500,17 @@ def test_blank_rows_are_skipped_and_rows_without_pmf_are_reported(tmp_path: Path
 
 
 def test_identical_duplicate_header_is_ignored_with_a_warning(tmp_path: Path) -> None:
-    headers = [*CURRENT_HEADERS[:30], "Empresa", *CURRENT_HEADERS[30:]]
+    at = CURRENT_HEADERS.index("Empresa")
+    headers = [*CURRENT_HEADERS[:at], "Empresa", *CURRENT_HEADERS[at:]]
     fields: list[str | None] = [field for _, field in CURRENT_RESUMEN_COLUMNS]
-    fields = [*fields[:30], "empresa", *fields[30:]]
+    fields = [*fields[:at], "empresa", *fields[at:]]
     path = _write(tmp_path / "dup.xlsx", headers, [_values(fields, _base_values())])
 
     workbook = load_transelec_workbook(path)
 
-    assert ("encabezado_duplicado_identico", "AC", "AE") in _issues(workbook, "warning")
-    assert _mapped(workbook)["empresa"] == "AC"
+    first, second = column_letter(at), column_letter(at + 1)
+    assert ("encabezado_duplicado_identico", first, second) in _issues(workbook, "warning")
+    assert _mapped(workbook)["empresa"] == first
 
 
 def test_formula_cells_use_cached_values_and_flag_missing_ones(tmp_path: Path) -> None:
@@ -798,7 +922,7 @@ def test_duplicate_header_with_conflicting_values_is_refused(tmp_path: Path) -> 
     report = caught.value.report
     assert report is not None
     issue = next(i for i in report.issues if i.code == "encabezado_duplicado_conflictivo")
-    assert (issue.columns, issue.rows, issue.row_count) == (("M", "AJ"), (3,), 1)
+    assert (issue.columns, issue.rows, issue.row_count) == (("M", "AL"), (3,), 1)
     # Structural only: never a business value in the message.
     assert "Aprobado" not in issue.message
 
@@ -852,8 +976,6 @@ def test_private_09_sept_2026_workbook() -> None:
     references only, never a business value."""
 
     from python_calamine import CalamineWorkbook
-
-    from transelec_ingestion.xlsx_contract import RESUMEN_COLUMNS
 
     assert _PRIVATE_WORKBOOK is not None
     workbook = load_transelec_workbook(_PRIVATE_WORKBOOK)
@@ -944,3 +1066,48 @@ def test_private_09_sept_2026_workbook() -> None:
                 and isinstance(expected, str)
                 and expected.strip() in {"#N/A", "#REF!", "#VALUE!"}
             ), (row.source_row_number, field_name)
+
+
+# ---------------------------------------------------------------------------
+# Private: the real 30-Sept-2026 workbook (opt-in, never committed)
+# ---------------------------------------------------------------------------
+
+_PRIVATE_WORKBOOK_30SEP = os.environ.get("TRANSELEC_PRIVATE_WORKBOOK_30SEP")
+
+
+@pytest.mark.skipif(
+    not _PRIVATE_WORKBOOK_30SEP, reason="TRANSELEC_PRIVATE_WORKBOOK_30SEP not set (private data)"
+)
+def test_private_30_sept_2026_workbook() -> None:
+    """Structural facts about the 30-Sept-2026 workbook: the first ingreso
+    pair renamed ``…1`` at Y/Z, the new ``…2`` pair at AC/AD and still
+    blank. Counts and cell references only, never a business value."""
+
+    assert _PRIVATE_WORKBOOK_30SEP is not None
+    workbook = load_transelec_workbook(_PRIVATE_WORKBOOK_30SEP)
+    rows = workbook.resumen_rows
+
+    assert len(rows) == 729
+    assert _issues(workbook, "error") == []
+
+    mapped = _mapped(workbook)
+    assert (mapped["fecha_ingreso"], mapped["numero_ingreso"]) == ("Y", "Z")
+    assert (mapped["fecha_ingreso_2"], mapped["numero_ingreso_2"]) == ("AC", "AD")
+    assert (mapped["fecha_90_dias"], mapped["hoy"], mapped["empresa"]) == ("AA", "AB", "AE")
+    assert (mapped["aef"], mapped["pmf"], mapped["sector"]) == ("A", "I", "AK")
+
+    filled = {coverage.field: coverage.filled_rows for coverage in workbook.layout.fields}
+    assert filled["fecha_ingreso_2"] == 0
+    assert filled["numero_ingreso_2"] == 0
+    assert all(row.values["fecha_ingreso_2"] is None for row in rows)
+    assert all(row.values["numero_ingreso_2"] is None for row in rows)
+
+    # The two-value cells of the first ingreso are still there: the source
+    # has not yet moved the second value into the new columns.
+    text_dates = Counter(
+        (name, evidence.resolution) for row in rows for name, evidence in row.text_dates.items()
+    )
+    assert text_dates[("fecha_ingreso", "multiple_dates")] == 58
+    assert text_dates[("fecha_90_dias", "multiple_dates")] == 58
+    assert text_dates[("fecha_ingreso", "parsed_spanish_long")] == 64
+    assert not any(name == "fecha_ingreso_2" for name, _ in text_dates)

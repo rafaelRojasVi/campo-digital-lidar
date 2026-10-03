@@ -42,7 +42,9 @@ both):
    always renders blank.
 
 Net result: **18 columns, not a literal 17** — the corrected matrix's
-TR-FUNC-037 row documents why. This is still a single named constant, so a
+TR-FUNC-037 row documents why. Contract V2's 2026-10-02 amendment adds the
+second ingreso pair (``Fecha de ingreso2``, ``N Ingreso2``) right after the
+first, so the export now has **20 columns**. This is still a single named constant, so a
 future correction (e.g. Javier confirming a preference between the two
 ``Carpeta`` columns) is a one-place change.
 
@@ -101,13 +103,20 @@ EXPORT_FIELDS_V1: tuple[tuple[str, str], ...] = (
     ("superficie_corta", "Superficie de corta"),
     ("fecha_ingreso", "Fecha de ingreso"),
     ("numero_ingreso", "N Ingreso"),
+    # The second ingreso pair of the 30-Sept-2026 layout, right after the
+    # first so a reader sees both entries of a plan together. Blank for
+    # versions whose source had no such columns.
+    ("fecha_ingreso_2", "Fecha de ingreso2"),
+    ("numero_ingreso_2", "N Ingreso2"),
     ("empresa", "Empresa"),
     ("id_predio_unico", "ID_Predo_Unico"),
     ("sector", "Sector"),
     (_OBSERVACION_AUXILIAR_RESERVED_COLUMN, "Observación auxiliar"),
 )
 
-assert len(EXPORT_FIELDS_V1) == 18  # 17 Actualizable fields, Carpeta split into 2, net +1
+# 17 Actualizable fields, Carpeta split into 2 (net +1), plus the second
+# ingreso pair of the 30-Sept-2026 layout (+2).
+assert len(EXPORT_FIELDS_V1) == 20
 
 _DANGEROUS_LEADING_CHARACTERS = ("=", "+", "-", "@", "\t", "\r")
 

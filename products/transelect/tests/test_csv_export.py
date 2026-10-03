@@ -6,7 +6,7 @@ set. The field set itself is now the exact, ordered Actualizable list
 confirmed by direct read of `exportCSV()` (source forensic audit, "Exact
 field list, confirmed by direct read"), with Carpeta split into its two
 source columns (headed by meaning, not by column letter) and Observación
-auxiliar shipped always-empty — 18 columns, not a literal 17.
+auxiliar shipped always-empty — 18 columns, not a literal 17; 20 since the second ingreso pair.
 """
 
 from __future__ import annotations
@@ -23,7 +23,9 @@ from transelec_ingestion.csv_export import (
 
 
 def test_export_field_set_matches_the_corrected_actualizable_list() -> None:
-    assert len(EXPORT_FIELDS_V1) == 18
+    assert len(EXPORT_FIELDS_V1) == 20
+    headers = [header for _, header in EXPORT_FIELDS_V1]
+    assert headers[headers.index("N Ingreso") + 1 :][:2] == ["Fecha de ingreso2", "N Ingreso2"]
     columns = [column for column, _ in EXPORT_FIELDS_V1]
     headers = [header for _, header in EXPORT_FIELDS_V1]
 

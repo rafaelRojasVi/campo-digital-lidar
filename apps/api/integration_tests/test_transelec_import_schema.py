@@ -70,6 +70,9 @@ EXPECTED_TRANSELEC_RESUMEN_ROW_COLUMNS = {
     "fecha_termino",
     # 0009: raw text found in date columns, with its classification.
     "source_text_dates",
+    # 0011: the second ingreso pair of the 30-Sept-2026 layout.
+    "fecha_ingreso_2",
+    "numero_ingreso_2",
 }
 
 EXPECTED_TRANSELEC_PUBLISH_EVENT_COLUMNS = {

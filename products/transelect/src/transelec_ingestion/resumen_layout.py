@@ -53,7 +53,7 @@ from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import Any, Literal
 
-PARSER_VERSION = "transelec_ingestion.resumen_layout@2"
+PARSER_VERSION = "transelec_ingestion.resumen_layout@3"
 
 RESUMEN_SHEET_NAME = "Resumen"
 
@@ -99,7 +99,7 @@ class FieldSpec:
     aliases: tuple[str, ...] = ()
 
 
-# Registry order is the 09-Sept-2026 source order. It is documentation of the
+# Registry order is the 30-Sept-2026 source order. It is documentation of the
 # observed layout; nothing below depends on position.
 FIELD_SPECS: tuple[FieldSpec, ...] = (
     # AEF tracking block, new in the 09-Sept-2026 workbook (A:E). Optional so
@@ -141,12 +141,19 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "number",
         ("Superficie total de corta",),
     ),
-    FieldSpec("fecha_ingreso", "Fecha de ingreso", "expected", "date"),
-    FieldSpec("numero_ingreso", "N Ingreso", "required", "text"),
+    # The 30-Sept-2026 workbook renamed the first ingreso pair "…1" and added
+    # a second pair (AC:AD) for the reingreso; the renamed headers are
+    # documented aliases so both spellings bind the same field.
+    FieldSpec("fecha_ingreso", "Fecha de ingreso", "expected", "date", ("Fecha de ingreso1",)),
+    FieldSpec("numero_ingreso", "N Ingreso", "required", "text", ("N Ingreso1",)),
     FieldSpec("fecha_90_dias", "90 dias", "expected", "date"),
     # "Hoy" is kept as raw text: the V1 audit found it type-inconsistent, and
     # it is never observation time.
     FieldSpec("hoy", "Hoy", "expected", "text"),
+    # Second ingreso pair, new in the 30-Sept-2026 workbook. Optional so the
+    # 09-Sept-2026 and 14-Aug-2026 layouts still import without warnings.
+    FieldSpec("fecha_ingreso_2", "Fecha de ingreso2", "optional", "date"),
+    FieldSpec("numero_ingreso_2", "N Ingreso2", "optional", "text"),
     FieldSpec("empresa", "Empresa", "required", "text"),
     FieldSpec("id_predio_unico_ii", "ID_Predio_UnicoII", "expected", "text"),
     FieldSpec("id_pmf", "ID_PMF", "expected", "text"),
@@ -171,6 +178,10 @@ AEF_TRACKING_FIELDS: tuple[str, ...] = (
     "fecha_corta",
     "fecha_termino",
 )
+
+# The second ingreso pair (30-Sept-2026). Like the AEF block, absent from the
+# documented legacy layouts and optional there.
+INGRESO_2_FIELDS: tuple[str, ...] = ("fecha_ingreso_2", "numero_ingreso_2")
 
 # The shared bare header. Neither Carpeta field is recognized from it through
 # the alias index; it is resolved only by _resolve_carpeta_columns.

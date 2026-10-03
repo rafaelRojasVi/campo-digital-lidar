@@ -965,8 +965,13 @@ def test_export_csv_field_set_and_bom_and_delimiter(
     text_body = response.content.decode("utf-8-sig")
     reader = csv.reader(io.StringIO(text_body), delimiter=";")
     header = next(reader)
-    # 17 Actualizable fields, Carpeta split into 2 positional columns: 18.
-    assert len(header) == 18
+    # 17 Actualizable fields, Carpeta split into 2 (18), plus the second
+    # ingreso pair of the 30-Sept-2026 layout: 20.
+    assert len(header) == 20
+    assert header[header.index("N Ingreso") + 1 : header.index("N Ingreso") + 3] == [
+        "Fecha de ingreso2",
+        "N Ingreso2",
+    ]
     assert "PMF" in header
     assert "Predio Ref" in header  # Actualizable's addition
     assert "Estado" not in header  # raw Estado excluded, per Actualizable

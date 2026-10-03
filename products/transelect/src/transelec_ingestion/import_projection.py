@@ -117,6 +117,10 @@ RESUMEN_ROW_PROJECTION: tuple[ColumnProjection, ...] = (
     # used as ingestion time — observation time belongs to shared source
     # provenance.
     ColumnProjection("hoy", "hoy_raw", "text"),
+    # Second ingreso pair (30-Sept-2026 layout); NULL when the source layout
+    # had no such column or the cell was blank.
+    ColumnProjection("fecha_ingreso_2", "fecha_ingreso_2", "date"),
+    ColumnProjection("numero_ingreso_2", "numero_ingreso_2", "text"),
     ColumnProjection("empresa", "empresa", "text"),
     ColumnProjection("id_predio_unico_ii", "id_predio_unico_ii", "text"),
     ColumnProjection("id_pmf", "id_pmf", "text"),

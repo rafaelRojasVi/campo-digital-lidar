@@ -28,6 +28,8 @@ function row(overrides: Partial<ResumenRow> & { source_row_number: number }): Re
     numero_ingreso: null,
     fecha_90_dias: null,
     hoy_raw: null,
+    fecha_ingreso_2: null,
+    numero_ingreso_2: null,
     empresa: null,
     id_predio_unico_ii: null,
     id_pmf: null,
