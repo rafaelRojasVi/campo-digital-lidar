@@ -53,6 +53,7 @@ from app.deps import ensure_can, get_current_app_user, get_db_connection, get_ob
 from app.object_store import ObjectStore, ObjectStoreError
 from app.routers.ingestion import UploadResponse
 from app.routers.ingestion import upload as generic_upload
+from app.transelec_overrides import retire_incorporated_overrides, source_fields
 from app.transelec_publication import (
     TRANSELEC_PRODUCT_KEY,
     ActivationEventType,
@@ -102,7 +103,7 @@ from transelec_ingestion.plazo_conaf import (
 from transelec_ingestion.resumen_layout import AEF_TRACKING_FIELDS, PmfFieldValue
 from transelec_ingestion.status_rollups import RolledRow, estado_resumido_first_row
 from transelec_ingestion.summary_view import SummaryInputRow, build_summary
-from transelec_ingestion.xlsx_contract import RESUMEN_COLUMNS, TranselecWorkbookError
+from transelec_ingestion.xlsx_contract import TranselecWorkbookError
 
 logger = logging.getLogger(__name__)
 
@@ -504,6 +505,12 @@ def _activate(
                 actor_user_id=user.id,
                 event_type=event_type,
             )
+            # Edits the newly active planilla already carries retire in the
+            # same transaction; otherwise a later change in the planilla would
+            # read as a conflict (spec §2). Audit carries the count only.
+            incorporated = retire_incorporated_overrides(
+                activation, import_id=import_id, actor_app_user_id=user.id
+            )
             record_audit_event(
                 activation,
                 actor_app_user_id=user.id,
@@ -515,6 +522,7 @@ def _activate(
                     "event_type": event_type,
                     "previous_import_id": result.previous_import_id,
                     "publish_event_id": result.publish_event_id,
+                    "incorporated_overrides": incorporated,
                     **(extra_audit_metadata or {}),
                 },
             )
@@ -627,7 +635,10 @@ def restore_import(
 # Every route below requires only Action.VIEW (granted to VIEWER/OPERATOR/
 # ADMIN alike) and none carries app.csrf.require_csrf — GET routes never
 # need it (Task 3's own reminder, apps/api/app/routers/transelec.py history).
-# All read the active import's transelec_resumen_row projection; none
+# All read the active import's rows through platform.transelec_effective_row
+# — the transelec_resumen_row projection with its applied web edits
+# (migration 0012), so a filter, a search and every status basis see an
+# edited value exactly as the dashboard shows it; none
 # invents a canonical PMF/predio status rollup — every status-dependent
 # number is computed via one of the three explicitly named, evidenced legacy
 # bases in transelec_ingestion.status_rollups (estado_resumido_first_row,
@@ -640,13 +651,15 @@ def restore_import(
 # silently drift from the schema.
 _CONTRACT_FIELDS: tuple[str, ...] = tuple(spec.column for spec in RESUMEN_ROW_PROJECTION)
 
-# Every persisted transelec_resumen_row column this router selects for a
-# "full row" read (list/detail/pending/export). Order matches the contract.
+# Every column this router selects for a "full row" read (list/detail/
+# pending/export), from platform.transelec_effective_row: the source row with
+# its applied web edits (migration 0012). Order matches the contract.
 _RESUMEN_ROW_COLUMNS: tuple[str, ...] = (
     "source_row_number",
     *_CONTRACT_FIELDS,
     "predio_group_key",
     "source_text_dates",
+    "web_fields",
 )
 
 # TR-FUNC-017-022: the 5 AND'd multi-selects, OR'd within each.
@@ -799,7 +812,7 @@ def _fetch_filtered_rows(
     statement = text(
         f"""
         SELECT {", ".join(_RESUMEN_ROW_COLUMNS)}
-        FROM platform.transelec_resumen_row
+        FROM platform.transelec_effective_row
         WHERE import_id = :import_id{where_sql}
         ORDER BY source_row_number ASC
         """
@@ -904,6 +917,9 @@ class ResumenRowView(BaseModel):
     fecha_termino: str | None
     chronology_flags: list[str]
     source_text_dates: dict[str, SourceTextDateView] = Field(default_factory=dict)
+    # The editable fields whose shown value came from a web edit (spec §3).
+    # Empty for a row nobody edited.
+    web_fields: list[str] = Field(default_factory=list)
 
 
 def _iso(value: Any) -> str | None:
@@ -969,6 +985,7 @@ def _resumen_row_view(row: Row[Any]) -> ResumenRowView:
             name: SourceTextDateView(**evidence)
             for name, evidence in (row.source_text_dates or {}).items()
         },
+        web_fields=list(row.web_fields or []),
     )
 
 
@@ -1181,7 +1198,7 @@ def list_pmf_rows(
 
     total_count = connection.execute(
         text(
-            f"SELECT count(*) FROM platform.transelec_resumen_row "
+            f"SELECT count(*) FROM platform.transelec_effective_row "
             f"WHERE import_id = :import_id{where_sql}"
         ),
         params,
@@ -1197,7 +1214,7 @@ def list_pmf_rows(
     statement = text(
         f"""
         SELECT {", ".join(_RESUMEN_ROW_COLUMNS)}
-        FROM platform.transelec_resumen_row
+        FROM platform.transelec_effective_row
         WHERE import_id = :import_id{where_sql}{cursor_clause}
         ORDER BY source_row_number ASC
         LIMIT :fetch_limit
@@ -1242,7 +1259,7 @@ def get_pmf_detail(
     statement = text(
         f"""
         SELECT {", ".join(_RESUMEN_ROW_COLUMNS)}
-        FROM platform.transelec_resumen_row
+        FROM platform.transelec_effective_row
         WHERE import_id = :import_id AND pmf = :pmf
         ORDER BY source_row_number ASC
         """
@@ -2112,11 +2129,7 @@ def _source_fields(
     present. A V2 import states its mapped fields in its report.
     """
 
-    if mapping_report is None:
-        if schema_contract_version == "transelec-resumen-v1":
-            return [name for _, name in RESUMEN_COLUMNS]
-        return []
-    return [entry["field"] for entry in mapping_report.get("fields", []) if entry.get("column")]
+    return source_fields(schema_contract_version, mapping_report)
 
 
 @router.get(

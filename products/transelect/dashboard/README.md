@@ -14,7 +14,8 @@ The [functional parity matrix](../docs/audit/2026-09-02-functional-parity-matrix
 | `/transelec/pendientes` | viewer+ | Redirects to `/transelec/estado` (kept one release from 2026-10-04) |
 | `/transelec/seguimiento-aef` | viewer+ | AEF tracking by PMF with source rows |
 | `/transelec/calidad` | viewer+ | Data-quality findings, reforestation limits and report |
-| `/transelec/datos` | operator/admin | Import, versions and (admin only) access management |
+| `/transelec/datos` | operator/admin | Import, versions, web edits and (admin only) access management |
+| `/transelec/ediciones` | operator/admin | Web edits against the published version and the planilla download marked «web» |
 | `/transelec/importar`, `/transelec/versiones`, `/transelec/accesos` | role-gated | Direct links to the corresponding Datos panes |
 
 Estado details for operators: the table highlights «Rechazado, esperando recurso»; the legacy «Pendientes prioritarios (regla anterior)» disclosure is full width and closed by default; the Calidad block links to Estado with «Buscar … en Estado», which is a text search, not an exact filter. The design is `docs/superpowers/specs/2026-10-04-transelec-estado-lifecycle-design.md`.

@@ -6,6 +6,8 @@ import {
   canPublish,
   checkGoogleSignIn,
   devLogin,
+  downloadOverridesXlsx,
+  filenameFromDisposition,
   exportCsvUrl,
   filterParams,
   filtersActive,
@@ -394,5 +396,74 @@ describe('onUnauthorized (session ended while in use)', () => {
     answer(401)
     await getActiveImport()
     expect(listener).not.toHaveBeenCalled()
+  })
+})
+
+describe('downloadOverridesXlsx', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    resetApiClientState()
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('returns the blob and the file name from Content-Disposition', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('xlsx-bytes', {
+        status: 200,
+        headers: {
+          'content-disposition':
+            'attachment; filename="export.xlsx"; filename*=UTF-8\'\'planilla%20con%20ediciones%20%C3%B1.xlsx',
+        },
+      }),
+    )
+    const result = await downloadOverridesXlsx()
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/transelec/export.xlsx')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.filename).toBe('planilla con ediciones ñ.xlsx')
+    expect(await result.data.blob.text()).toBe('xlsx-bytes')
+  })
+
+  it('surfaces the server Spanish message and code on a 409', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { detail: 'Esta versión se importó sin el mapa de columnas.', code: 'mapping_report_missing' },
+        { status: 409 },
+      ),
+    )
+    const result = await downloadOverridesXlsx()
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: 'Esta versión se importó sin el mapa de columnas.',
+      payload: { detail: 'Esta versión se importó sin el mapa de columnas.', code: 'mapping_report_missing' },
+    })
+  })
+
+  it('surfaces a 422 and a network failure', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ detail: 'No se pudo preparar la planilla.', code: 'workbook_unpatchable' }, { status: 422 }),
+    )
+    const failed = await downloadOverridesXlsx()
+    expect(failed.ok).toBe(false)
+    if (!failed.ok) expect(failed.status).toBe(422)
+
+    fetchMock.mockRejectedValueOnce(new TypeError('offline'))
+    expect(await downloadOverridesXlsx()).toEqual({ ok: false, status: 0, error: NETWORK_ERROR })
+  })
+})
+
+describe('filenameFromDisposition', () => {
+  it('prefers filename*, falls back to filename, then to the default', () => {
+    expect(filenameFromDisposition("attachment; filename*=UTF-8''a%20b.xlsx", 'x.xlsx')).toBe('a b.xlsx')
+    expect(filenameFromDisposition('attachment; filename="plain.xlsx"', 'x.xlsx')).toBe('plain.xlsx')
+    expect(filenameFromDisposition('attachment; filename=bare.xlsx', 'x.xlsx')).toBe('bare.xlsx')
+    expect(filenameFromDisposition(null, 'x.xlsx')).toBe('x.xlsx')
   })
 })

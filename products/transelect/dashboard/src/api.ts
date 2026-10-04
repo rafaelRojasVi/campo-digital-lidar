@@ -217,6 +217,8 @@ export interface ResumenRow {
   chronology_flags: ChronologyFlag[]
   /** Per date field whose cell held text; absent or `{}` when none did. */
   source_text_dates?: Record<string, SourceTextDate>
+  /** Editable fields whose shown value came from a web edit; absent or `[]` when none. */
+  web_fields?: string[]
 }
 
 export interface TranselecRowsPage {
@@ -1055,4 +1057,155 @@ export function grantTranselecRole(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email.trim().toLowerCase(), role }),
   })
+}
+
+// ---------------------------------------------------------------------------
+// Web edits (field overrides)
+//
+// docs/superpowers/specs/2026-10-04-transelec-web-edits-xlsx-design.md §4.
+// The server gates PUT/DELETE/keep and the download on Action.EDIT
+// (operator/admin) and re-checks every value; this client only shapes calls.
+// ---------------------------------------------------------------------------
+
+export type EditableFieldName =
+  | 'estado'
+  | 'estado_resumido'
+  | 'tipo_rechazo'
+  | 'reingreso_tec'
+  | 'reingreso_legal'
+  | 'reingreso_recrep'
+  | 'numero_ingreso'
+  | 'numero_ingreso_2'
+  | 'fecha_ingreso'
+  | 'fecha_ingreso_2'
+  | 'fecha_90_dias'
+
+export type OverrideStatus = 'aplicada' | 'incorporada' | 'en_conflicto' | 'huerfana'
+
+export interface TranselecOverride {
+  id: number
+  field: EditableFieldName
+  field_label: string
+  status: OverrideStatus
+  pmf: string
+  rol: string | null
+  numero_predio: string | null
+  numero_area_corta: string | null
+  source_row_number: number | null
+  web_value: string | null
+  planilla_value_at_edit: string | null
+  planilla_value_now: string | null
+  created_by_display_name: string
+  created_at: string
+}
+
+export interface OverrideSaveInput {
+  importId: number
+  sourceRowNumber: number
+  field: EditableFieldName
+  value: string | null
+  expectedValue: string | null
+}
+
+export interface OverrideSaveResult {
+  override_id: number | null
+  changed: boolean
+  row: ResumenRow
+}
+
+export type OverrideConflictCode = 'version_changed' | 'value_changed' | 'not_in_conflict'
+
+/** The `code` of a 409 from the override routes, or null for any other failure. */
+export function overrideConflictCode(payload: unknown): OverrideConflictCode | null {
+  if (payload && typeof payload === 'object' && 'code' in payload) {
+    const code = (payload as { code?: unknown }).code
+    if (code === 'version_changed' || code === 'value_changed' || code === 'not_in_conflict') {
+      return code
+    }
+  }
+  return null
+}
+
+/** OPERATOR/ADMIN gate for editing and the «web» download (server re-enforces). */
+export function canEdit(me: Me | null): boolean {
+  const role = transelecRole(me)
+  return role === 'admin' || role === 'operator'
+}
+
+export function listOverrides(
+  options: { status?: OverrideStatus; pmf?: string } = {},
+): Promise<ApiResult<TranselecOverride[]>> {
+  const params = new URLSearchParams()
+  if (options.status) params.set('status', options.status)
+  if (options.pmf) params.set('pmf', options.pmf)
+  return request<TranselecOverride[]>(withParams('/api/transelec/overrides', params))
+}
+
+export function saveOverride(input: OverrideSaveInput): Promise<ApiResult<OverrideSaveResult>> {
+  return request<OverrideSaveResult>('/api/transelec/overrides', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      import_id: input.importId,
+      source_row_number: input.sourceRowNumber,
+      field: input.field,
+      value: input.value,
+      expected_value: input.expectedValue,
+    }),
+  })
+}
+
+export function discardOverride(id: number): Promise<ApiResult<void>> {
+  return request<void>(`/api/transelec/overrides/${id}`, { method: 'DELETE' })
+}
+
+export function keepOverride(id: number): Promise<ApiResult<{ override_id: number }>> {
+  return request<{ override_id: number }>(`/api/transelec/overrides/${id}/keep`, {
+    method: 'POST',
+  })
+}
+
+/** The planilla with the applied edits marked «web». */
+export function exportXlsxUrl(): string {
+  return '/api/transelec/export.xlsx'
+}
+
+/** The file name from a Content-Disposition header (`filename*` UTF-8 first, then `filename`). */
+export function filenameFromDisposition(header: string | null, fallback: string): string {
+  if (!header) return fallback
+  const star = /filename\*\s*=\s*([^']*)'[^']*'([^;]+)/i.exec(header)
+  if (star) {
+    try {
+      const name = decodeURIComponent(star[2].trim().replace(/^"|"$/g, ''))
+      if (name) return name
+    } catch {
+      // malformed percent-encoding: try the plain filename instead
+    }
+  }
+  const plain = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(header)
+  const name = (plain?.[1] ?? plain?.[2] ?? '').trim()
+  return name || fallback
+}
+
+/** Fetches the planilla with the edits so a failure can be shown instead of a dead download. */
+export async function downloadOverridesXlsx(): Promise<
+  ApiResult<{ blob: Blob; filename: string }>
+> {
+  try {
+    const response = await send(exportXlsxUrl(), undefined)
+    if (!response.ok) {
+      const failure = await readFailure(response)
+      return failure.payload === undefined
+        ? { ok: false, status: response.status, error: failure.error }
+        : { ok: false, status: response.status, error: failure.error, payload: failure.payload }
+    }
+    const blob = await response.blob()
+    const filename = filenameFromDisposition(
+      response.headers.get('Content-Disposition'),
+      'planilla_con_ediciones.xlsx',
+    )
+    return { ok: true, data: { blob, filename } }
+  } catch {
+    return { ok: false, status: 0, error: NETWORK_ERROR }
+  }
 }

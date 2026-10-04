@@ -799,6 +799,8 @@ a.status-card .status-card-go {
 
 .datos-tabs {
   display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: var(--s-1);
   padding: var(--s-1);
   border: 1px solid var(--line);
@@ -991,7 +993,7 @@ a.status-card .status-card-go {
   }
 
   .datos-tabs a {
-    flex: 1;
+    flex: 1 1 auto;
     text-align: center;
   }
 }
@@ -1107,3 +1109,4 @@ a.status-card .status-card-go {
 .review-list li + li {
   margin-top: var(--s-3);
 }
+

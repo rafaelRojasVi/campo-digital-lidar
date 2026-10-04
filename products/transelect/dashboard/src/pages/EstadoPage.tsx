@@ -46,16 +46,21 @@ import { Chip, SectionHeader } from '../ui/Primitives'
 export function EstadoPage({
   filterController,
   sourceFields = null,
+  activeImportId = null,
+  canEdit = false,
 }: {
   filterController: FilterController
   /** Contract fields the published workbook had, for the detail drawer. */
   sourceFields?: readonly string[] | null
+  activeImportId?: number | null
+  /** Operator/admin: the drawer offers web edits. */
+  canEdit?: boolean
 }) {
   const { filters, replaceFilters, reset } = filterController
   const { hash } = useRouter()
   const key = JSON.stringify(filters)
 
-  const { data, loading, failure } = useReads<TranselecLifecycle>(
+  const { data, loading, failure, reload } = useReads<TranselecLifecycle>(
     useCallback(
       () => getLifecycle(filters),
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -271,6 +276,13 @@ export function EstadoPage({
           plazoStatus={plazoStatus}
           onClose={() => setOpenRow(null)}
           sourceFields={sourceFields}
+          canEdit={canEdit}
+          activeImportId={activeImportId}
+          // An edit can move the PMF to another group or change its term.
+          onRowEdited={() => {
+            reload()
+            plazos.reload()
+          }}
         />
       )}
     </div>

@@ -120,7 +120,7 @@ def test_migration_0010_extends_0009() -> None:
     assert down_revision == "0009"
 
 
-def test_migration_0011_extends_0010_as_the_single_head() -> None:
+def test_migration_0011_extends_0010() -> None:
     """0011 (Transelec second ingreso pair) extends 0010 directly."""
 
     root = Path(__file__).resolve().parents[3]
@@ -130,6 +130,17 @@ def test_migration_0011_extends_0010_as_the_single_head() -> None:
     down_revision, _ = revisions["0011"]
     assert down_revision == "0010"
 
+
+def test_migration_0012_extends_0011_as_the_single_head() -> None:
+    """0012 (Transelec field overrides + effective-row view) extends 0011 directly."""
+
+    root = Path(__file__).resolve().parents[3]
+    revisions = _load_all_migrations(root)
+
+    assert "0012" in revisions, "Expected migration 0012 to be present."
+    down_revision, _ = revisions["0012"]
+    assert down_revision == "0011"
+
     down_revisions = {down for down, _ in revisions.values() if down is not None}
     heads = set(revisions) - down_revisions
-    assert heads == {"0011"}
+    assert heads == {"0012"}

@@ -22,6 +22,7 @@ import { Link, ROUTES, type Route } from '../router'
 import { StateBlock } from '../components/StateViews'
 import { SectionHeader } from '../ui/Primitives'
 import { AccesosPage } from './AccesosPage'
+import { EdicionesPage } from './EdicionesPage'
 import { ImportarPage } from './ImportarPage'
 import { VersionesPage } from './VersionesPage'
 
@@ -30,14 +31,22 @@ export function DatosPage({
   activeImport,
   onActiveVersionChanged,
   isAdmin,
+  activeImportId = null,
 }: {
   route: Route
   activeImport: TranselecActiveImport | null
   onActiveVersionChanged: () => void
   isAdmin: boolean
+  activeImportId?: number | null
 }) {
   const pane =
-    route === ROUTES.versiones ? 'versiones' : route === ROUTES.accesos ? 'accesos' : 'importar'
+    route === ROUTES.versiones
+      ? 'versiones'
+      : route === ROUTES.accesos
+        ? 'accesos'
+        : route === ROUTES.ediciones
+          ? 'ediciones'
+          : 'importar'
 
   const content = () => {
     if (pane === 'importar') {
@@ -47,6 +56,12 @@ export function DatosPage({
       return (
         <VersionesPage activeImport={activeImport} onActiveVersionChanged={onActiveVersionChanged} />
       )
+    }
+    if (pane === 'ediciones') {
+      return <EdicionesPage
+          activeImportId={activeImportId}
+          sourceFields={activeImport?.source_fields ?? null}
+        />
     }
     if (!isAdmin) {
       return (
@@ -76,6 +91,9 @@ export function DatosPage({
         </Link>
         <Link to={ROUTES.versiones} current={pane === 'versiones'}>
           Versiones
+        </Link>
+        <Link to={ROUTES.ediciones} current={pane === 'ediciones'}>
+          Ediciones web
         </Link>
         {isAdmin && (
           <Link to={ROUTES.accesos} current={pane === 'accesos'}>

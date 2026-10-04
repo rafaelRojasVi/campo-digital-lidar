@@ -52,12 +52,15 @@ export function ExploradorPage({
   filterController,
   activeImportId,
   sourceFields = null,
+  canEdit = false,
 }: {
   filterController: FilterController
   /** Filter option lists are rebuilt when the published version changes. */
   activeImportId: number | null
   /** Contract fields the published workbook had; null while unknown. */
   sourceFields?: readonly string[] | null
+  /** Operator/admin: the drawer offers web edits. */
+  canEdit?: boolean
 }) {
   const { filters, draftQuery, setQuery, setField, replaceFilters, reset } = filterController
   const key = JSON.stringify(filters)
@@ -332,6 +335,16 @@ export function ExploradorPage({
           row={openRow}
           onClose={() => setOpenRow(null)}
           sourceFields={sourceFields}
+          canEdit={canEdit}
+          activeImportId={activeImportId}
+          onRowEdited={(updated) =>
+            setRows(
+              (current) =>
+                current?.map((entry) =>
+                  entry.source_row_number === updated.source_row_number ? updated : entry,
+                ) ?? current,
+            )
+          }
         />
       )}
     </div>

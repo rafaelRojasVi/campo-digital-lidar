@@ -45,7 +45,7 @@ test('a viewer sees the dashboard but not the administration section', async ({ 
     }),
   ).toHaveCount(0)
 
-  for (const path of ['/transelec/datos', '/transelec/importar', '/transelec/versiones']) {
+  for (const path of ['/transelec/datos', '/transelec/importar', '/transelec/versiones', '/transelec/ediciones']) {
     await page.goto(path)
     await expect(page.locator('[data-state-kind="forbidden"]')).toBeVisible()
     await expect(page.getByText('Sin autorización')).toBeVisible()

@@ -1,7 +1,7 @@
 # Transelec: CONAF's 90-business-day deadline
 
-Date: 2026-10-04. Status: design approved in conversation with Rafael; this
-file awaits his review before a plan is written. Backlog item PR-2 of
+Date: 2026-10-04. Status: implemented in PR #82
+([plan](../plans/2026-10-04-transelec-plazo-90-habiles.md)). Backlog item PR-2 of
 [the post-launch backlog](../../../products/transelect/docs/design/2026-10-02-post-launch-backlog-v1.md).
 Sibling specs, built in parallel:
 [Estado](2026-10-04-transelec-estado-lifecycle-design.md) and

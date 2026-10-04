@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RowDetailDrawer } from "./RowDetailDrawer";
 import { makeLifecycleRow, makePlazoPmf, makePlazos, makeRow } from "../test/factories";
@@ -7,10 +8,11 @@ import type { AefPmf, AefPmfField, TranselecAef } from "../api";
 
 vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
-  return { ...actual, getPmfDetail: vi.fn(), getAef: vi.fn() };
+  return { ...actual, getPmfDetail: vi.fn(), getAef: vi.fn(), listOverrides: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+    discardOverride: vi.fn().mockResolvedValue({ ok: true, data: undefined }) };
 });
 
-const { getPmfDetail, getAef } = await import("../api");
+const { getPmfDetail, getAef, listOverrides } = await import("../api");
 
 const tracked = makeRow({
   source_row_number: 2,
@@ -558,5 +560,90 @@ describe("RowDetailDrawer — Plazo CONAF (plazo_conaf_90_habiles_v1)", () => {
       />,
     );
     expect(screen.getByTestId("drawer-plazo")).toHaveTextContent("Este PMF no tiene plazo calculado");
+  });
+});
+
+describe("RowDetailDrawer — web edits", () => {
+  beforeEach(() => {
+    vi.mocked(getPmfDetail).mockReset();
+    vi.mocked(getAef).mockReset();
+    vi.mocked(listOverrides).mockReset();
+    vi.mocked(listOverrides).mockResolvedValue({ ok: true, data: [] });
+    vi.mocked(getAef).mockResolvedValue({
+      ok: true,
+      data: { pmfs: [] } as unknown as TranselecAef,
+    });
+    vi.mocked(getPmfDetail).mockResolvedValue({
+      ok: true,
+      data: {
+        pmf: "BN001",
+        row_count: 1,
+        basis_estado_resumido: "estado_resumido_first_row",
+        estado_resumido: "En tramite",
+        rows: [untracked],
+      },
+    });
+  });
+
+  it("offers Editar to an editor and Escape closes the editor, not the drawer", async () => {
+    const onClose = vi.fn();
+    render(
+      <RowDetailDrawer row={untracked} onClose={onClose} canEdit activeImportId={7} />,
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Editar Estado vigente" }),
+    );
+    expect(screen.getByLabelText("Nuevo valor de Estado vigente")).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
+    expect(
+      screen.queryByLabelText("Nuevo valor de Estado vigente"),
+    ).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows a viewer the chip but no Editar", async () => {
+    const edited = makeRow({ source_row_number: 3, pmf: "BN001", web_fields: ["estado"] });
+    render(<RowDetailDrawer row={edited} onClose={() => {}} />);
+    // One in «Tramitación», one in the editable block.
+    expect(await screen.findAllByTestId("web-chip")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /Editar/ })).not.toBeInTheDocument();
+  });
+
+  it("hands the refreshed row to the page after going back to the planilla value", async () => {
+    const edited = makeRow({ source_row_number: 3, pmf: "BN001", estado: "Nuevo", web_fields: ["estado"] });
+    const fresh = { ...edited, estado: "Original", web_fields: [] };
+    vi.mocked(listOverrides).mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 9, field: "estado", field_label: "Estado vigente", status: "aplicada", pmf: "BN001",
+          source_row_number: 3, web_value: "Nuevo", planilla_value_at_edit: "Original",
+          created_by_display_name: "Ana", created_at: "2026-10-03T15:00:00Z",
+        },
+      ] as unknown as never,
+    });
+    vi.mocked(getPmfDetail).mockResolvedValue({
+      ok: true,
+      data: {
+        pmf: "BN001", row_count: 1, basis_estado_resumido: "estado_resumido_first_row",
+        estado_resumido: "En tramite", rows: [edited],
+      },
+    });
+    const onRowEdited = vi.fn();
+    render(<RowDetailDrawer row={edited} onClose={() => {}} canEdit activeImportId={7} onRowEdited={onRowEdited} />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Volver al valor de la planilla de Estado vigente" }),
+    );
+    vi.mocked(getPmfDetail).mockResolvedValue({
+      ok: true,
+      data: {
+        pmf: "BN001", row_count: 1, basis_estado_resumido: "estado_resumido_first_row",
+        estado_resumido: "En tramite", rows: [fresh],
+      },
+    });
+    await userEvent.click(screen.getByTestId("confirm-accept"));
+    await waitFor(() => expect(onRowEdited).toHaveBeenCalledWith(expect.objectContaining({ estado: "Original" })));
   });
 });

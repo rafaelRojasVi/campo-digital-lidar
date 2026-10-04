@@ -340,7 +340,7 @@ test.describe('role differences', () => {
     }
     await expect(nav(page).getByRole('link', { name: 'Datos' })).toHaveCount(0)
 
-    for (const path of ['/transelec/datos', '/transelec/importar', '/transelec/versiones']) {
+    for (const path of ['/transelec/datos', '/transelec/importar', '/transelec/versiones', '/transelec/ediciones']) {
       await page.goto(path)
       await expect(page.locator('[data-state-kind="forbidden"]')).toBeVisible()
     }

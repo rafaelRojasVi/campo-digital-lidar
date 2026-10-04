@@ -31,6 +31,10 @@ class Action(StrEnum):
     # (running work on an upload) because publishing changes what every
     # viewer sees, which is an operational decision, not a pipeline step.
     PUBLISH = "publish"
+    # Changing a field of the published version through the dashboard (a web
+    # edit) and downloading the planilla with those edits. Distinct from
+    # PUBLISH: it changes values, not which version every viewer is served.
+    EDIT = "edit"
     MANAGE_ACCESS = "manage_access"
 
 
@@ -41,12 +45,14 @@ _ALLOWED: frozenset[tuple[Role, Action]] = frozenset(
         (Role.ADMIN, Action.PROCESS),
         (Role.ADMIN, Action.RETRY),
         (Role.ADMIN, Action.PUBLISH),
+        (Role.ADMIN, Action.EDIT),
         (Role.ADMIN, Action.MANAGE_ACCESS),
         (Role.OPERATOR, Action.VIEW),
         (Role.OPERATOR, Action.UPLOAD),
         (Role.OPERATOR, Action.PROCESS),
         (Role.OPERATOR, Action.RETRY),
         (Role.OPERATOR, Action.PUBLISH),
+        (Role.OPERATOR, Action.EDIT),
         (Role.VIEWER, Action.VIEW),
     }
 )

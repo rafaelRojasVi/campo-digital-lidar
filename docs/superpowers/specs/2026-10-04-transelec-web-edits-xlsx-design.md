@@ -1,7 +1,7 @@
 # Transelec: edit values in the dashboard and download the planilla marked «web»
 
-Date: 2026-10-04. Status: design approved in conversation with Rafael,
-section by section; this file awaits his review before a plan is written.
+Date: 2026-10-04. Status: implemented in PR #83
+([plan](../plans/2026-10-04-transelec-web-edits-xlsx.md)).
 Backlog item PR-3 of
 [the post-launch backlog](../../../products/transelect/docs/design/2026-10-02-post-launch-backlog-v1.md).
 Sibling specs, built in parallel:
