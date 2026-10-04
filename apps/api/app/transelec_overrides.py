@@ -157,6 +157,41 @@ def _import_source_fields(connection: Connection, *, import_id: int) -> set[str]
     return set(source_fields(row.schema_contract_version, row.mapping_report))
 
 
+def _lock_cell(
+    connection: Connection,
+    *,
+    pmf: str,
+    rol: str | None,
+    numero_predio: str | None,
+    numero_area_corta: str | None,
+    key_ordinal: int,
+    field: str,
+) -> None:
+    """Serialize every edit of one cell for the rest of the transaction.
+
+    Lock order in every edit path: the dashboard-state singleton (FOR SHARE),
+    then this advisory lock, then rows. Activation takes the singleton FOR
+    UPDATE and never an advisory lock, so no cycle can form. The effective
+    value must be read only after this lock, or ``expected`` is checked
+    against a value another transaction is about to end.
+    """
+
+    identity = "|".join(
+        [
+            pmf,
+            "" if rol is None else "v" + rol,
+            "" if numero_predio is None else "v" + numero_predio,
+            "" if numero_area_corta is None else "v" + numero_area_corta,
+            str(key_ordinal),
+            field,
+        ]
+    )
+    connection.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:identity, 0))"),
+        {"identity": identity},
+    )
+
+
 def _end(connection: Connection, *, override_id: int, reason: str, actor: int) -> None:
     connection.execute(
         text(
@@ -198,6 +233,15 @@ def save_override(
     if source is None:
         raise RowNotFoundError()
 
+    _lock_cell(
+        connection,
+        pmf=source.pmf,
+        rol=source.rol,
+        numero_predio=source.numero_predio,
+        numero_area_corta=source.numero_area_corta,
+        key_ordinal=source.key_ordinal,
+        field=field.name,
+    )
     effective = connection.execute(
         text(
             f"SELECT {field.name} AS value, source_text_dates "
@@ -256,9 +300,36 @@ def save_override(
     return SaveOutcome(override_id=int(new_id), ended_override_id=active_id, changed=True)
 
 
+def _lock_cell_of_override(connection: Connection, *, override_id: int) -> None:
+    """Take the cell lock for an edit found by id (no row lock yet)."""
+
+    key = connection.execute(
+        text(
+            "SELECT pmf, rol, numero_predio, numero_area_corta, key_ordinal, field "
+            "FROM platform.transelec_field_override WHERE id = :id"
+        ),
+        {"id": override_id},
+    ).one_or_none()
+    if key is None:
+        raise OverrideNotFoundError()
+    _lock_cell(
+        connection,
+        pmf=key.pmf,
+        rol=key.rol,
+        numero_predio=key.numero_predio,
+        numero_area_corta=key.numero_area_corta,
+        key_ordinal=key.key_ordinal,
+        field=key.field,
+    )
+
+
 def discard_override(connection: Connection, *, override_id: int, actor_app_user_id: int) -> None:
     """Return the cell to the planilla value."""
 
+    connection.execute(
+        text("SELECT 1 FROM platform.transelec_dashboard_state WHERE id = 1 FOR SHARE")
+    )
+    _lock_cell_of_override(connection, override_id=override_id)
     ended = connection.execute(
         text(
             """
@@ -278,6 +349,7 @@ def keep_override(connection: Connection, *, override_id: int, actor_app_user_id
     """Keep a conflicting web value: re-anchor it to the current planilla value."""
 
     import_id = _locked_active_import(connection)
+    _lock_cell_of_override(connection, override_id=override_id)
     current = connection.execute(
         text(
             "SELECT * FROM platform.transelec_field_override "

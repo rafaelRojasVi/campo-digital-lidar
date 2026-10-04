@@ -25,6 +25,7 @@ from app.transelec_overrides import (
     NotInConflictError,
     ValueChangedError,
     VersionChangedError,
+    discard_override,
     keep_override,
     list_overrides,
     save_override,
@@ -628,3 +629,68 @@ def test_a_v1_import_has_no_second_ingreso_columns() -> None:
     present = set(source_fields("transelec-resumen-v1", None))
     assert {"numero_ingreso", "fecha_ingreso"} <= present
     assert not {"numero_ingreso_2", "fecha_ingreso_2"} & present
+
+
+def _race_setup(client: TestClient, tmp_path: Path) -> tuple[int, int, int]:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+    outcome = _save(
+        client.engine,
+        import_id=import_id,
+        row=row,
+        field="estado",
+        value="Web",
+        expected="En evaluacion",
+    )
+    assert outcome.override_id is not None
+    return import_id, row, outcome.override_id
+
+
+@pytest.mark.parametrize("stale_value", ["Otro", "En evaluacion"])
+def test_a_save_racing_a_discard_is_refused_not_silently_applied(
+    client: TestClient, tmp_path: Path, stale_value: str
+) -> None:
+    """A discards the active edit and holds its transaction open; B, who still
+    saw the web value, must wait for A and then fail ``value_changed``."""
+
+    import threading
+
+    import_id, row, override_id = _race_setup(client, tmp_path)
+    actor = _actor(client.engine)
+    outcome: dict[str, Any] = {}
+    started = threading.Event()
+
+    def attempt() -> None:
+        try:
+            with client.engine.begin() as conn:
+                started.set()
+                outcome["result"] = save_override(
+                    conn,
+                    import_id=import_id,
+                    source_row_number=row,
+                    field=EDITABLE_BY_NAME["estado"],
+                    value=stale_value,
+                    expected="Web",
+                    actor_app_user_id=actor,
+                )
+        except Exception as exc:  # noqa: BLE001 - asserted below
+            outcome["error"] = exc
+
+    with client.engine.connect() as conn_a:
+        with conn_a.begin():
+            discard_override(conn_a, override_id=override_id, actor_app_user_id=actor)
+            worker = threading.Thread(target=attempt)
+            worker.start()
+            assert started.wait(5)
+            worker.join(0.5)
+            assert worker.is_alive(), "B must block on A's cell lock"
+        worker.join(10)
+
+    assert not worker.is_alive()
+    assert isinstance(outcome.get("error"), ValueChangedError), outcome
+    with client.engine.connect() as conn:
+        active = conn.execute(
+            text("SELECT count(*) FROM platform.transelec_field_override WHERE ended_at IS NULL")
+        ).scalar_one()
+    assert active == 0
