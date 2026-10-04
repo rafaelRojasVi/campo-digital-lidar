@@ -14,7 +14,6 @@ from types import SimpleNamespace
 from typing import Any
 
 from app.routers.transelec import _closed_pmfs
-from fastapi.routing import APIRoute
 
 
 def _row(source_row_number: int, pmf: str, estado_resumido: str, estado: str) -> Any:
@@ -44,6 +43,8 @@ def test_closed_pmfs_are_the_approved_descartado_and_desistido_ones() -> None:
 def test_no_transelec_api_path_is_also_a_dashboard_page_path() -> None:
     from app.main import TRANSELEC_SPA_PAGE_PATHS, app
 
-    api_paths = {route.path.lstrip("/") for route in app.routes if isinstance(route, APIRoute)}
+    # ``app.routes`` nests included routers; the OpenAPI schema lists every path.
+    api_paths = {path.lstrip("/") for path in app.openapi()["paths"]}
 
+    assert "api/transelec/lifecycle" in api_paths
     assert api_paths & TRANSELEC_SPA_PAGE_PATHS == set()
