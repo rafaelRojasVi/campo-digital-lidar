@@ -208,6 +208,9 @@ describe('EditableFieldsSection', () => {
     expect(screen.getByTestId('text-date-fecha_ingreso')).toHaveTextContent(
       'La planilla tiene texto: «por confirmar»',
     )
+    expect(screen.getByLabelText('Nuevo valor de Fecha ingreso')).toHaveAccessibleDescription(
+      /La planilla tiene texto/,
+    )
     await userEvent.type(screen.getByLabelText('Nuevo valor de Fecha ingreso'), '2026-05-06')
     await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
     expect(saveOverride).toHaveBeenCalledWith(

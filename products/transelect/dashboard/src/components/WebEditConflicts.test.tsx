@@ -59,4 +59,38 @@ describe("WebEditConflicts", () => {
     await waitFor(() => expect(listOverrides).toHaveBeenCalledTimes(2));
     expect(failed.container).toBeEmptyDOMElement();
   });
+
+  it("words only the non-zero counts, in the singular when it is one", async () => {
+    vi.mocked(listOverrides).mockResolvedValue({
+      ok: true,
+      data: [entry(1, "en_conflicto")] as never,
+    });
+    const { container } = renderBlock();
+    await screen.findByText("Ediciones web en conflicto");
+    expect(container).toHaveTextContent(
+      "1 edición difiere de la planilla publicada.",
+    );
+    expect(container).not.toHaveTextContent("0");
+
+    vi.mocked(listOverrides).mockResolvedValue({
+      ok: true,
+      data: [entry(2, "huerfana"), entry(3, "huerfana")] as never,
+    });
+    const orphans = renderBlock();
+    await waitFor(() =>
+      expect(orphans.container).toHaveTextContent(
+        "2 ediciones ya no tienen fila en la planilla publicada.",
+      ),
+    );
+  });
+
+  it("offers no link to someone who cannot edit", async () => {
+    vi.mocked(listOverrides).mockResolvedValue({
+      ok: true,
+      data: [entry(1, "en_conflicto")] as never,
+    });
+    renderBlock(false);
+    await screen.findByText("Ediciones web en conflicto");
+    expect(screen.queryByRole("link")).toBeNull();
+  });
 });

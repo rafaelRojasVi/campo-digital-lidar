@@ -247,7 +247,11 @@ export function EditableFieldsSection({
                 {isEditing ? (
                   <>
                   {spec.kind === 'date' && row[spec.name] == null && row.source_text_dates?.[spec.name] && (
-                    <span className="editable-provenance" data-testid={`text-date-${spec.name}`}>
+                    <span
+                      className="editable-provenance"
+                      id={`text-date-${spec.name}-note`}
+                      data-testid={`text-date-${spec.name}`}
+                    >
                       La planilla tiene texto: «{row.source_text_dates[spec.name].raw}». Al guardar una
                       fecha se reemplaza.
                     </span>
@@ -266,6 +270,11 @@ export function EditableFieldsSection({
                       onChange={(event) => setDraft(event.target.value)}
                       list={spec.suggest ? `suggest-${spec.name}` : undefined}
                       aria-label={`Nuevo valor de ${spec.label}`}
+                      aria-describedby={
+                        spec.kind === 'date' && row[spec.name] == null && row.source_text_dates?.[spec.name]
+                          ? `text-date-${spec.name}-note`
+                          : undefined
+                      }
                       maxLength={500}
                       autoFocus
                     />

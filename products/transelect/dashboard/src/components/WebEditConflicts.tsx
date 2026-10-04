@@ -34,6 +34,16 @@ export function WebEditConflicts({ canEdit }: { canEdit: boolean }) {
 
   if (!counts || counts.conflicts + counts.orphans === 0) return null;
 
+  const clauses: string[] = [];
+  if (counts.conflicts > 0)
+    clauses.push(
+      `${formatInteger(counts.conflicts)} ${counts.conflicts === 1 ? "edición difiere" : "ediciones difieren"} de la planilla publicada`,
+    );
+  if (counts.orphans > 0)
+    clauses.push(
+      `${formatInteger(counts.orphans)} ${counts.orphans === 1 ? "edición ya no tiene fila" : "ediciones ya no tienen fila"} en la planilla publicada`,
+    );
+
   return (
     <section
       className="ruled"
@@ -46,13 +56,11 @@ export function WebEditConflicts({ canEdit }: { canEdit: boolean }) {
         meta="La planilla publicada manda: el panel muestra su valor hasta que alguien decida."
       />
       <p className="prose">
-        {formatInteger(counts.conflicts)}{" "}
-        {counts.conflicts === 1 ? "edición difiere" : "ediciones difieren"} de
-        la planilla publicada y {formatInteger(counts.orphans)}{" "}
-        {counts.orphans === 1 ? "ya no tiene fila" : "ya no tienen fila"} en
-        ella.{" "}
+        {clauses.join(" y ")}.{" "}
         {canEdit && (
-          <Link to={ROUTES.ediciones}>Revisarlas en Datos → Ediciones web</Link>
+          <Link to={ROUTES.ediciones} className="quality-go">
+            Revisarlas en Datos → Ediciones web
+          </Link>
         )}
       </p>
     </section>
