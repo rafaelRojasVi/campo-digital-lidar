@@ -254,6 +254,39 @@ export interface TranselecPending {
   rows: PendingRow[]
 }
 
+/** `lifecycle_pmf_v1` — see transelec_ingestion/lifecycle_view.py. */
+export type LifecycleGroup = 'aprobado' | 'en_tramite' | 'descartado' | 'desistido' | 'sin_clasificar'
+
+export type LifecycleStep =
+  | 'sin_ingreso'
+  | 'en_evaluacion'
+  | 'rechazado_esperando_recurso'
+  | 'en_recurso_reposicion'
+  | 'en_recurso_jerarquico'
+
+export type LifecycleReason =
+  | 'resumido_desconocido'
+  | 'estado_desconocido'
+  | 'estado_y_resumido_no_coinciden'
+
+export type LifecycleFlag = 'filas_no_coinciden'
+
+/** One PMF: its first row (every contract field), plus where it stands. */
+export type LifecycleRow = ResumenRow & {
+  lifecycle_group: LifecycleGroup
+  lifecycle_step: LifecycleStep | null
+  lifecycle_reason: LifecycleReason | null
+  lifecycle_flags: LifecycleFlag[]
+}
+
+export interface TranselecLifecycle {
+  basis: string
+  total_pmf_count: number
+  groups: Record<LifecycleGroup, number>
+  steps: Record<LifecycleStep, number>
+  rows: LifecycleRow[]
+}
+
 export interface OwnerStatusRow {
   tipo_propietario: string | null
   owner_stage: string | null
@@ -870,6 +903,14 @@ export function getPmfDetail(pmf: string): Promise<ApiResult<TranselecPmfDetail>
 
 export function getPending(filters: TranselecFilterState): Promise<ApiResult<TranselecPending>> {
   return request<TranselecPending>(withParams('/api/transelec/pending', filterParams(filters)))
+}
+
+/**
+ * `GET /transelec/lifecycle` — the «Estado» section's read. Not `/estado`:
+ * that is the dashboard page's own address (see the router's comment).
+ */
+export function getLifecycle(filters: TranselecFilterState): Promise<ApiResult<TranselecLifecycle>> {
+  return request<TranselecLifecycle>(withParams('/api/transelec/lifecycle', filterParams(filters)))
 }
 
 export function getOwnerStatus(

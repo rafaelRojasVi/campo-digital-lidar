@@ -55,7 +55,7 @@ interface NavItem {
 const NAV: readonly NavItem[] = [
   { to: ROUTES.resumen, label: 'Resumen', filtered: true },
   { to: ROUTES.explorador, label: 'Explorador', filtered: true },
-  { to: ROUTES.pendientes, label: 'Pendientes', filtered: true },
+  { to: ROUTES.estado, label: 'Estado', filtered: true, also: [ROUTES.pendientes] },
   { to: ROUTES.aef, label: 'AEF', filtered: true },
   { to: ROUTES.calidad, label: 'Calidad', filtered: true },
   {

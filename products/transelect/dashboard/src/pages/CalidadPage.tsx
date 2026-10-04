@@ -23,14 +23,17 @@
  */
 import { useCallback } from 'react'
 import {
+  type TranselecLifecycle,
   type TranselecOwnerStatus,
   type TranselecReport,
   type TranselecSummary,
+  getLifecycle,
   getOwnerStatus,
   getReport,
   getSummary,
 } from '../api'
 import { ConflictPanel } from '../components/ConflictPanel'
+import { LifecycleQualityPanel } from '../components/LifecycleQualityPanel'
 import { OwnerStatusTable } from '../components/OwnerStatusTable'
 import { QualityPanel } from '../components/QualityPanel'
 import { ReforestacionPanel } from '../components/ReforestacionPanel'
@@ -67,6 +70,16 @@ export function CalidadPage({ filterController }: { filterController: FilterCont
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [key]),
+    [key],
+  )
+
+  // Its own read: if the lifecycle fails, the other blocks keep rendering.
+  const lifecycleRead = useReads<TranselecLifecycle>(
+    useCallback(
+      () => getLifecycle(filters),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [key],
+    ),
     [key],
   )
 
@@ -128,6 +141,23 @@ export function CalidadPage({ filterController }: { filterController: FilterCont
               basis={data.summary.basis_estado_resumido}
               filters={filters}
             />
+          </section>
+
+          <section className="ruled" aria-labelledby="lifecycle-review-title">
+            <SectionHeader
+              id="lifecycle-review-title"
+              title="PMF que la regla de «Estado» no pudo clasificar"
+              meta="Valores que la regla no reconoce, estados que se contradicen y filas que no coinciden."
+            />
+            {lifecycleRead.data ? (
+              <LifecycleQualityPanel lifecycle={lifecycleRead.data} filters={filters} />
+            ) : lifecycleRead.failure ? (
+              <AlertBanner title="No se pudo leer el estado de los PMF">
+                {lifecycleRead.failure.message}
+              </AlertBanner>
+            ) : (
+              <LoadingBlock label="Cargando los PMF por revisar…" lines={2} />
+            )}
           </section>
 
           <section className="ruled" aria-labelledby="owner-title">

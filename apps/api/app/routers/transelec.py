@@ -73,6 +73,16 @@ from transelec_ingestion.import_projection import (
     ImportProjectionResult,
     validate_and_project,
 )
+from transelec_ingestion.lifecycle_view import (
+    CLOSED_GROUPS,
+    LifecycleFlag,
+    LifecycleGroup,
+    LifecycleInputRow,
+    LifecycleReason,
+    LifecycleStep,
+    LifecycleSummary,
+    build_lifecycle,
+)
 from transelec_ingestion.owner_status_view import OwnerStatusInputRow, build_owner_status
 from transelec_ingestion.pending_view import PendingInputRow, build_pending
 from transelec_ingestion.resumen_layout import AEF_TRACKING_FIELDS, PmfFieldValue
@@ -1496,6 +1506,117 @@ def get_pending(
         stage_basis=result.stage_basis,  # type: ignore[arg-type]
         stages=PendingStageCountsView(**asdict(result.stages)),
         rows=detail_rows,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /lifecycle — lifecycle_pmf_v1, the «Estado» section
+#
+# Deliberately not "/estado": this router is also mounted without the /api
+# prefix (app.main), and "transelec/estado" is a dashboard page path
+# (TRANSELEC_SPA_PAGE_PATHS). A shared path would answer a page reload with
+# JSON — the reason the AEF page is "seguimiento-aef", not "aef".
+# ---------------------------------------------------------------------------
+
+
+class LifecycleGroupCountsView(BaseModel):
+    aprobado: int
+    en_tramite: int
+    descartado: int
+    desistido: int
+    sin_clasificar: int
+
+
+class LifecycleStepCountsView(BaseModel):
+    sin_ingreso: int
+    en_evaluacion: int
+    rechazado_esperando_recurso: int
+    en_recurso_reposicion: int
+    en_recurso_jerarquico: int
+
+
+class LifecyclePmfRowView(ResumenRowView):
+    """A PMF's first row — every contract field, for the table and the
+    drawer — plus where the PMF stands under ``lifecycle_pmf_v1``."""
+
+    lifecycle_group: LifecycleGroup
+    lifecycle_step: LifecycleStep | None
+    lifecycle_reason: LifecycleReason | None
+    lifecycle_flags: list[LifecycleFlag]
+
+
+class TranselecLifecycleResponse(BaseModel):
+    basis: Literal["lifecycle_pmf_v1"]
+    total_pmf_count: int
+    groups: LifecycleGroupCountsView
+    steps: LifecycleStepCountsView
+    rows: list[LifecyclePmfRowView]
+
+
+def _to_lifecycle_input_row(row: Row[Any]) -> LifecycleInputRow:
+    return LifecycleInputRow(
+        source_row_number=row.source_row_number,
+        pmf=row.pmf,
+        estado=row.estado,
+        estado_resumido=row.estado_resumido,
+        numero_ingreso=row.numero_ingreso,
+        numero_ingreso_2=row.numero_ingreso_2,
+    )
+
+
+def _lifecycle_of(rows: Sequence[Row[Any]]) -> LifecycleSummary:
+    return build_lifecycle(_to_lifecycle_input_row(row) for row in rows)
+
+
+def _closed_pmfs(rows: Sequence[Row[Any]]) -> frozenset[str]:
+    """PMFs whose ``lifecycle_pmf_v1`` group ends CONAF's process
+    (``CLOSED_GROUPS``). ``GET /plazos`` answers «no aplica» for these; pass
+    it the same rows ``_fetch_filtered_rows`` returned for the request."""
+
+    return frozenset(
+        entry.pmf for entry in _lifecycle_of(rows).pmfs if entry.group in CLOSED_GROUPS
+    )
+
+
+@router.get(
+    "/lifecycle",
+    response_model=TranselecLifecycleResponse,
+    dependencies=[Depends(require_transelec_grant(Action.VIEW))],
+)
+def get_lifecycle(
+    connection: Annotated[Connection, Depends(get_db_connection)],
+    filters: Annotated[TranselecFilters, Depends(_transelec_filters)],
+) -> TranselecLifecycleResponse:
+    """Each PMF of the filtered scope, once, with its lifecycle group and step.
+
+    Rows come only from ``_fetch_filtered_rows`` so the shared filter
+    contract — and whatever relation that function reads — applies here as
+    it does to every other read.
+
+    Each PMF's "first row" is taken within the filtered scope, not across the
+    whole import.
+    """
+
+    import_id = _require_active_import_id(connection)
+    rows = _fetch_filtered_rows(connection, import_id=import_id, filters=filters)
+    rows_by_number = {row.source_row_number: row for row in rows}
+    summary = _lifecycle_of(rows)
+
+    return TranselecLifecycleResponse(
+        basis=summary.basis,  # type: ignore[arg-type]
+        total_pmf_count=summary.total_pmf_count,
+        groups=LifecycleGroupCountsView(**summary.groups),
+        steps=LifecycleStepCountsView(**summary.steps),
+        rows=[
+            LifecyclePmfRowView(
+                **_resumen_row_view(rows_by_number[entry.source_row_number]).model_dump(),
+                lifecycle_group=entry.group,
+                lifecycle_step=entry.step,
+                lifecycle_reason=entry.reason,
+                lifecycle_flags=list(entry.flags),
+            )
+            for entry in summary.pmfs
+        ],
     )
 
 

@@ -198,6 +198,16 @@ bar with direct labels, not twice. Below it the pending rows as a work queue. Th
 90-day consultation becomes a toggle on this page rather than a card on the Resumen,
 with its scope and its server-clock reference stated as they are today.
 
+**Superseded 2026-10-04 (DECISION).** «Pendientes» became «Estado»
+(`/transelec/estado`), per the Estado lifecycle design
+(`docs/superpowers/specs/2026-10-04-transelec-estado-lifecycle-design.md`).
+The page leads with each PMF's lifecycle group and step (`lifecycle_pmf_v1`)
+and highlights «Rechazado, esperando recurso» in the table. The
+pending-priority zone described above is kept unchanged, full width, inside a
+closed «Pendientes prioritarios (regla anterior)» disclosure. The 90-day toggle
+stays on the page. Calidad links to it with «Buscar … en Estado» (a search,
+not an exact filter). The old address redirects for one release.
+
 ### 4.4 Calidad y reportes (`/transelec/calidad`)
 
 Three quality indicators, the reforestation predios, the owner-status table and the

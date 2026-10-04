@@ -40,8 +40,15 @@ async function openFilters(page: Page) {
   await expect(page.getByRole('button', { name: 'Sector', exact: true })).toBeVisible()
 }
 
-async function openPendientes(page: Page) {
-  await page.goto('/transelec/pendientes')
+async function openEstado(page: Page) {
+  await page.goto('/transelec/estado')
+  await expect(page.getByTestId('estado-zone')).toBeVisible()
+}
+
+/** The old «Pendientes prioritarios» rule, closed by default inside Estado. */
+async function openLegacyPending(page: Page) {
+  await openEstado(page)
+  await page.getByText('Pendientes prioritarios (regla anterior)').click()
   await expect(page.getByTestId('pending-zone')).toBeVisible()
 }
 
@@ -204,48 +211,96 @@ test('TR-FUNC-023: Limpiar clears every filter, from the toolbar and from a chip
   await expect(page.getByTestId('rows-total')).toContainText('60 áreas de corta')
 })
 
-test('TR-FUNC-024/032: the Resumen attention card and the Pendientes section agree', async ({
+test('TR-FUNC-024/032: the Resumen attention card and the old pending rule agree', async ({
   page,
 }) => {
   await openResumen(page)
   await expect(page.getByTestId('kpi-pendientes')).toHaveText('5')
 
   await page.getByRole('link', { name: /Ver la cola de trabajo/ }).click()
-  await expect(page.getByTestId('pending-zone')).toBeVisible()
+  await expect(page).toHaveURL(/\/transelec\/estado#pendientes-prioritarios$/)
+  await expect(page.getByTestId('estado-zone')).toBeVisible()
+  // The card lands on the queue itself: open, in view, no click on the disclosure.
+  await expect(page.getByTestId('legacy-pending')).toHaveJSProperty('open', true)
   await expect(page.getByTestId('pending-count')).toHaveText('5 de 12')
+  await expect(page.getByTestId('pending-count')).toBeInViewport()
+  await expect(page.getByText('Pendientes prioritarios (regla anterior)')).toBeFocused()
 
   // Unfiltered, there is nothing to clear, so no button pretends to act.
-  await expect(page.getByTestId('clear-pending-filters')).toHaveCount(0)
+  await expect(page.getByTestId('clear-estado-filters')).toHaveCount(0)
 })
 
-test('Pendientes: a narrowed scope offers one button that clears it', async ({ page }) => {
-  await page.goto('/transelec/pendientes?q=legal')
-  await expect(page.getByTestId('pending-zone')).toBeVisible()
-  await page.getByTestId('clear-pending-filters').click()
-  await expect(page).toHaveURL(/\/transelec\/pendientes$/)
-  await expect(page.getByTestId('clear-pending-filters')).toHaveCount(0)
+test('Estado: a narrowed scope offers one button that clears it', async ({ page }) => {
+  await page.goto('/transelec/estado?q=legal')
+  await expect(page.getByTestId('estado-zone')).toBeVisible()
+  await page.getByTestId('clear-estado-filters').click()
+  await expect(page).toHaveURL(/\/transelec\/estado$/)
+  await expect(page.getByTestId('clear-estado-filters')).toHaveCount(0)
 })
 
-test('Pendientes: every queue row opens the PMF detail, by mouse and by keyboard', async ({
-  page,
-}) => {
-  await page.goto('/transelec/pendientes')
-  const row = page.getByTestId('pending-row-2')
-  await row.click()
+test('Estado: every PMF row opens the PMF detail, by mouse and by keyboard', async ({ page }) => {
+  await openEstado(page)
+  const row = page.getByTestId('estado-row-2')
+  // The first cell, not the row's centre: the last column holds the
+  // Oficina Virtual link, which deliberately does not open the drawer.
+  await row.locator('td').first().click()
   const drawer = page.getByTestId('row-drawer')
   await expect(drawer).toBeVisible()
   await expect(drawer).toContainText('PMF-002')
   await expect(page.getByTestId('drawer-provenance')).toHaveText(
     'Fila de origen 2 de la hoja «Resumen»',
   )
+  await expect(page.getByTestId('drawer-lifecycle')).toContainText('En evaluación')
   await expect(row).toHaveAttribute('aria-selected', 'true')
   await page.getByTestId('row-drawer-close').click()
   await expect(drawer).toBeHidden()
   await expect(row).toBeFocused()
 
-  await page.getByTestId('pending-row-3').focus()
+  await page.getByTestId('estado-row-3').focus()
   await page.keyboard.press('Enter')
   await expect(drawer).toContainText('PMF-003')
+})
+
+test('Estado: groups, steps and the table come from lifecycle_pmf_v1', async ({ page }) => {
+  await openEstado(page)
+  await expect(page.getByTestId('estado-group-aprobado')).toHaveText('1')
+  await expect(page.getByTestId('estado-group-en_tramite')).toHaveText('4')
+  await expect(page.getByTestId('estado-group-sin_clasificar')).toHaveText('1')
+  await expect(page.getByTestId('estado-step-rechazado_esperando_recurso')).toHaveText('1')
+  await expect(page.getByTestId('estado-table').locator('tbody tr')).toHaveCount(6)
+  await expect(page.getByTestId('estado-row-1')).toContainText('Rechazado, esperando recurso')
+  await expect(page.getByTestId('estado-row-1')).toContainText('Legal')
+  await expect(page.getByTestId('estado-row-6')).toContainText('Sin clasificar')
+  await expect(page.getByTestId('estado-how')).toContainText('lifecycle_pmf_v1')
+})
+
+test('Estado: the old Pendientes address lands on Estado with its filters', async ({ page }) => {
+  await page.goto('/transelec/pendientes?q=legal')
+  await expect(page).toHaveURL(/\/transelec\/estado\?q=legal$/)
+  await expect(page.getByTestId('estado-zone')).toBeVisible()
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Secciones de Transelec' })
+      .getByRole('link', { name: 'Estado' }),
+  ).toHaveAttribute('aria-current', 'page')
+})
+
+test('Estado: the Oficina Virtual opens CONAF in a new tab and the N.º can be copied', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await openEstado(page)
+  const link = page.getByTestId('estado-ov-3-link')
+  await expect(link).toHaveAttribute('href', 'https://oficinavirtual.conaf.cl/consultas/index.php')
+  await expect(link).toHaveAttribute('target', '_blank')
+  await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+
+  await page.getByTestId('estado-ov-3-copy').click()
+  // Copying inside a row must not open the drawer behind it.
+  await expect(page.getByTestId('row-drawer')).toHaveCount(0)
+  // The most recent ingreso is the one copied.
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('ING-3-R')
 })
 
 test('Resumen: the work-queue rows open the PMF detail', async ({ page }) => {
@@ -260,7 +315,7 @@ test('no section shows a raw rule identifier in its reading text', async ({ page
   for (const path of [
     '/transelec',
     '/transelec/explorador',
-    '/transelec/pendientes',
+    '/transelec/estado',
     '/transelec/seguimiento-aef',
     '/transelec/calidad',
   ]) {
@@ -270,7 +325,9 @@ test('no section shows a raw rule identifier in its reading text', async ({ page
     // innerText leaves out the body of a closed <details>: the identifiers
     // are still there for audit, one «Cómo se calcula» away.
     const text = await page.locator('main').innerText()
-    expect(text, path).not.toMatch(/_legacy|_first_row|pmf_from_source_rows|canónic|deduplica/)
+    expect(text, path).not.toMatch(
+      /_legacy|_first_row|pmf_from_source_rows|lifecycle_pmf|canónic|deduplica/,
+    )
   }
 })
 
@@ -291,10 +348,7 @@ test('TR-FUNC-025: the Explorador’s search is the N.º de ingreso lookup, and 
   await openExplorador(page)
   const search = page.getByLabel('Búsqueda general')
   await expect(search).toBeVisible()
-  await expect(search).toHaveAttribute(
-    'placeholder',
-    'PMF, rol, N.º de ingreso, predio, empresa…',
-  )
+  await expect(search).toHaveAttribute('placeholder', 'PMF, rol, N.º de ingreso, predio, empresa…')
 
   await search.fill('ING-1')
   await expect(page.getByTestId('rows-total')).toContainText('8 áreas de corta')
@@ -352,7 +406,7 @@ test('TR-FUNC-030: the company preset opens the Empresa filter and nothing else'
 test('TR-FUNC-031: the overdue consultation uses a computed reference date, never a frozen literal', async ({
   page,
 }) => {
-  await openPendientes(page)
+  await openEstado(page)
   await page.getByRole('button', { name: '¿Qué ingresos superaron 90 días?' }).click()
 
   const panel = page.getByTestId('overdue-panel')
@@ -370,8 +424,8 @@ test('TR-FUNC-031: the overdue consultation uses a computed reference date, neve
 test('TR-FUNC-017/031: the overdue panel follows a filter change instead of going stale', async ({
   page,
 }) => {
-  await page.goto('/transelec/pendientes')
-  await expect(page.getByTestId('pending-zone')).toBeVisible()
+  await page.goto('/transelec/estado')
+  await expect(page.getByTestId('estado-zone')).toBeVisible()
   await page.getByRole('button', { name: '¿Qué ingresos superaron 90 días?' }).click()
 
   const panel = page.getByTestId('overdue-panel')
@@ -381,8 +435,8 @@ test('TR-FUNC-017/031: the overdue panel follows a filter change instead of goin
 
   // The panel's own copy claims its scope is the active filters. Arriving
   // with a filter in the URL must move it with the rest of the section.
-  await page.goto('/transelec/pendientes?q=rechaz')
-  await expect(page.getByTestId('pending-zone')).toBeVisible()
+  await page.goto('/transelec/estado?q=rechaz')
+  await expect(page.getByTestId('estado-zone')).toBeVisible()
   await page.getByRole('button', { name: '¿Qué ingresos superaron 90 días?' }).click()
   await expect(page.getByTestId('overdue-count')).toContainText('(8 ')
   await expect(page.getByTestId('overdue-panel')).toContainText(
@@ -390,10 +444,10 @@ test('TR-FUNC-017/031: the overdue panel follows a filter change instead of goin
   )
 })
 
-test('TR-FUNC-032/033: Pendientes shows the count, the stages once, and the detail table', async ({
+test('TR-FUNC-032/033: the old pending rule keeps its count, its stages once, and its detail table', async ({
   page,
 }) => {
-  await openPendientes(page)
+  await openLegacyPending(page)
 
   await expect(page.getByTestId('pending-count')).toHaveText('5 de 12')
   await expect(page.getByTestId('pending-stage-preparacion')).toHaveText('2')
@@ -540,9 +594,7 @@ test('no workbook-derived value is ever rendered as markup', async ({ page }) =>
 test('the status headline answers the recurring question at PMF grain', async ({ page }) => {
   await openResumen(page)
 
-  await expect(
-    page.getByRole('heading', { name: 'Estado de los planes de manejo' }),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Estado de los planes de manejo' })).toBeVisible()
   await expect(page.getByTestId('kpi-pmf-total')).toHaveText('12')
 
   // The buckets account for every plan: 6 + 3 + 3 = 12, hand-computed in stubs.
@@ -616,4 +668,14 @@ test('a PMF with two summarized states is disclosed, not double counted', async 
 
   await expect(page.getByTestId('status-conflict-note')).toContainText('PMF-002')
   await expect(page.getByTestId('status-reconciliation-warning')).toHaveCount(0)
+})
+
+test('Calidad: the PMFs the Estado rule could not place are listed with their reason', async ({
+  page,
+}) => {
+  await openCalidad(page)
+  await expect(page.getByTestId('lifecycle-review-count')).toHaveText('1')
+  await expect(page.getByTestId('lifecycle-review-6')).toContainText(
+    '«Estado» y «Estado resumido» no coinciden',
+  )
 })

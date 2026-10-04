@@ -386,6 +386,7 @@ READ_ROUTES = (
     "/transelec/summary",
     "/transelec/pmfs",
     "/transelec/pending",
+    "/transelec/lifecycle",
     "/transelec/owner-status",
     "/transelec/report",
     "/transelec/export.csv",
@@ -459,6 +460,7 @@ def test_data_dependent_routes_404_with_a_clear_message_when_nothing_is_publishe
         "/transelec/summary",
         "/transelec/pmfs",
         "/transelec/pending",
+        "/transelec/lifecycle",
         "/transelec/owner-status",
         "/transelec/report",
         "/transelec/export.csv",
@@ -652,6 +654,114 @@ def test_pending_section_matches_the_hand_computed_fixture(
         "MP004": "preparacion",
         "MP005": "recurso_rechazo",
     }
+
+
+# ---------------------------------------------------------------------------
+# GET /lifecycle — lifecycle_pmf_v1 («Estado»)
+# ---------------------------------------------------------------------------
+
+
+# 9 rows / 8 PMFs, one per lifecycle_pmf_v1 case. The status labels are the
+# vocabulary recorded in the 2026-10-04 Estado spec; PMF codes, roles and
+# numbers are synthetic.
+#
+#  LC001 Aprobado / Aprobado (first row) + Recurso reposicion aprobado
+#        → aprobado, flagged filas_no_coinciden
+#  LC002 En tramite / En Evaluacion           → en_tramite · en_evaluacion
+#  LC003 En tramite / Rechazado, «Legal»      → en_tramite · rechazado_esperando_recurso
+#  LC004 Rechazado / Recurso jerarquico       → en_tramite · en_recurso_jerarquico
+#  LC005 Descartado / Descartado              → descartado
+#  LC006 Aprobado / Recurso reposicion        → sin_clasificar · estado_y_resumido_no_coinciden
+#  LC007 En tramite / Recurso reposicion, no N Ingreso → en_tramite · sin_ingreso
+#  LC008 Tachado / Tachado                    → sin_clasificar · resumido_desconocido
+def _lifecycle_fixture_workbook(tmp_path: Path) -> bytes:
+    def row(index: int, pmf: str, estado_resumido: str, estado: str, **extra: Any) -> list[Any]:
+        values: dict[str, Any] = {
+            "pmf": pmf,
+            "rol": f"9{index}",
+            "numero_predio": str(index),
+            "estado": estado,
+            "estado_resumido": estado_resumido,
+            "numero_ingreso": f"ING-L{index}",
+            "tipo_propietario": "Empresa Forestal",
+            "sector": "Sector Norte",
+            "pas": "PAS-A",
+            "empresa": "Forestal Sur",
+            "superficie_corta": 1.0,
+        }
+        values.update(extra)
+        return _source_row(**values)
+
+    rows = [
+        row(1, "LC001", "Aprobado", "Aprobado"),
+        row(2, "LC001", "Aprobado", "Recurso reposicion aprobado"),
+        row(3, "LC002", "En tramite", "En Evaluacion"),
+        row(4, "LC003", "En tramite", "Rechazado", tipo_rechazo="Legal", reingreso_legal="1"),
+        row(5, "LC004", "Rechazado", "Recurso jerarquico"),
+        row(6, "LC005", "Descartado", "Descartado"),
+        row(7, "LC006", "Aprobado", "Recurso reposicion"),
+        row(8, "LC007", "En tramite", "Recurso reposicion", numero_ingreso=None),
+        row(9, "LC008", "Tachado", "Tachado"),
+    ]
+    return _workbook_bytes(tmp_path, "lifecycle.xlsx", rows)
+
+
+def test_lifecycle_places_each_pmf_by_its_first_row(
+    client: TestClient, integration_engine: Engine, tmp_path: Path
+) -> None:
+    _login(client, "dev-admin")
+    _publish_fixture(client, integration_engine, _lifecycle_fixture_workbook(tmp_path))
+
+    body = client.get("/transelec/lifecycle").json()
+
+    assert body["basis"] == "lifecycle_pmf_v1"
+    assert body["total_pmf_count"] == 8
+    assert body["groups"] == {
+        "aprobado": 1,
+        "en_tramite": 4,
+        "descartado": 1,
+        "desistido": 0,
+        "sin_clasificar": 2,
+    }
+    assert body["steps"] == {
+        "sin_ingreso": 1,
+        "en_evaluacion": 1,
+        "rechazado_esperando_recurso": 1,
+        "en_recurso_reposicion": 0,
+        "en_recurso_jerarquico": 1,
+    }
+    assert [row["pmf"] for row in body["rows"]] == [f"LC00{n}" for n in range(1, 9)]
+
+    by_pmf = {row["pmf"]: row for row in body["rows"]}
+    # The first row is the one hydrated, and the disagreeing second row flags it.
+    assert by_pmf["LC001"]["estado"] == "Aprobado"
+    assert by_pmf["LC001"]["lifecycle_group"] == "aprobado"
+    assert by_pmf["LC001"]["lifecycle_flags"] == ["filas_no_coinciden"]
+    # Rejection is a step, with its type and the raw reingreso flag.
+    assert by_pmf["LC003"]["lifecycle_group"] == "en_tramite"
+    assert by_pmf["LC003"]["lifecycle_step"] == "rechazado_esperando_recurso"
+    assert by_pmf["LC003"]["tipo_rechazo"] == "Legal"
+    assert by_pmf["LC003"]["reingreso_legal"] == "1"
+    assert by_pmf["LC004"]["lifecycle_step"] == "en_recurso_jerarquico"
+    assert by_pmf["LC005"]["lifecycle_group"] == "descartado"
+    assert by_pmf["LC006"]["lifecycle_reason"] == "estado_y_resumido_no_coinciden"
+    assert by_pmf["LC007"]["lifecycle_step"] == "sin_ingreso"
+    assert by_pmf["LC008"]["lifecycle_reason"] == "resumido_desconocido"
+
+
+def test_lifecycle_follows_the_shared_filter_contract(
+    client: TestClient, integration_engine: Engine, tmp_path: Path
+) -> None:
+    _login(client, "dev-admin")
+    _publish_fixture(client, integration_engine, _lifecycle_fixture_workbook(tmp_path))
+
+    narrowed = client.get("/transelec/lifecycle", params={"estado_resumido": "En tramite"}).json()
+    assert narrowed["total_pmf_count"] == 3
+    assert {row["pmf"] for row in narrowed["rows"]} == {"LC002", "LC003", "LC007"}
+    assert narrowed["groups"]["en_tramite"] == 3
+
+    searched = client.get("/transelec/lifecycle", params={"q": "recurso jerarquico"}).json()
+    assert [row["pmf"] for row in searched["rows"]] == ["LC004"]
 
 
 def test_owner_status_shows_the_documented_internal_inconsistency(

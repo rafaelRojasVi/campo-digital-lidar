@@ -61,8 +61,8 @@ export function QualityPanel({
                 <b>Qué revisar:</b> completar «N Ingreso» en la planilla, o confirmar que el plan
                 todavía no se ha presentado.
               </p>
-              <Link to={`${ROUTES.pendientes}${search}`} className="quality-go">
-                Ver en Pendientes →
+              <Link to={`${ROUTES.estado}${search}`} className="quality-go">
+                Ver en Estado →
               </Link>
             </>
           )}

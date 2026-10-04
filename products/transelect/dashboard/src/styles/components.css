@@ -439,7 +439,7 @@
 
 .composition-seg[data-tone='none'] {
   background: var(--st-none);
-  color: var(--ink-2);
+  color: var(--ink);
 }
 
 .composition-legend {
@@ -1659,5 +1659,54 @@
 }
 
 .drawer-rows td:last-child {
+  overflow-wrap: anywhere;
+}
+
+/* «Abrir Oficina Virtual CONAF» + «Copiar N.º», beside an N.º de ingreso. */
+.oficina-virtual {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-2) var(--s-4);
+  margin-left: var(--s-3);
+  font-size: var(--t-small);
+  max-width: 100%;
+}
+
+/* Touch targets: at least 24x24 px, the primary action of the feature. */
+.oficina-virtual a,
+.oficina-virtual .btn-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.oficina-virtual .hint {
+  overflow-wrap: anywhere;
+}
+
+/* The panel's link colour, like «Copiar N.º» beside it (author rule also beats UA :visited). */
+.oficina-virtual a {
+  color: var(--forest-deep);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.oficina-virtual a:hover,
+.oficina-virtual .btn-link:hover {
+  /* Stays forest-deep (4.5:1 on hovered and selected rows); hover shows as a thicker underline. */
+  color: var(--forest-deep);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* An empty live region stays in the accessibility tree but takes no flex slot (or gap). */
+.oficina-virtual [role='status']:empty {
+  position: absolute;
+}
+
+/* Long reason and flag labels wrap inside the drawer instead of widening it. */
+.drawer-section .hint {
   overflow-wrap: anywhere;
 }
