@@ -738,6 +738,12 @@ a.status-card .status-card-go {
   text-underline-offset: 3px;
 }
 
+/* Inline in a list line next to bold text: colour alone must not mark it as a link. */
+.variant-list .quality-go {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .quality-item .how {
   margin-top: auto;
 }
