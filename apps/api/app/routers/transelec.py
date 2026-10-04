@@ -627,7 +627,10 @@ def restore_import(
 # Every route below requires only Action.VIEW (granted to VIEWER/OPERATOR/
 # ADMIN alike) and none carries app.csrf.require_csrf — GET routes never
 # need it (Task 3's own reminder, apps/api/app/routers/transelec.py history).
-# All read the active import's transelec_resumen_row projection; none
+# All read the active import's rows through platform.transelec_effective_row
+# — the transelec_resumen_row projection with its applied web edits
+# (migration 0012), so a filter, a search and every status basis see an
+# edited value exactly as the dashboard shows it; none
 # invents a canonical PMF/predio status rollup — every status-dependent
 # number is computed via one of the three explicitly named, evidenced legacy
 # bases in transelec_ingestion.status_rollups (estado_resumido_first_row,
@@ -640,13 +643,15 @@ def restore_import(
 # silently drift from the schema.
 _CONTRACT_FIELDS: tuple[str, ...] = tuple(spec.column for spec in RESUMEN_ROW_PROJECTION)
 
-# Every persisted transelec_resumen_row column this router selects for a
-# "full row" read (list/detail/pending/export). Order matches the contract.
+# Every column this router selects for a "full row" read (list/detail/
+# pending/export), from platform.transelec_effective_row: the source row with
+# its applied web edits (migration 0012). Order matches the contract.
 _RESUMEN_ROW_COLUMNS: tuple[str, ...] = (
     "source_row_number",
     *_CONTRACT_FIELDS,
     "predio_group_key",
     "source_text_dates",
+    "web_fields",
 )
 
 # TR-FUNC-017-022: the 5 AND'd multi-selects, OR'd within each.
@@ -799,7 +804,7 @@ def _fetch_filtered_rows(
     statement = text(
         f"""
         SELECT {", ".join(_RESUMEN_ROW_COLUMNS)}
-        FROM platform.transelec_resumen_row
+        FROM platform.transelec_effective_row
         WHERE import_id = :import_id{where_sql}
         ORDER BY source_row_number ASC
         """
@@ -904,6 +909,9 @@ class ResumenRowView(BaseModel):
     fecha_termino: str | None
     chronology_flags: list[str]
     source_text_dates: dict[str, SourceTextDateView] = Field(default_factory=dict)
+    # The editable fields whose shown value came from a web edit (spec §3).
+    # Empty for a row nobody edited.
+    web_fields: list[str] = Field(default_factory=list)
 
 
 def _iso(value: Any) -> str | None:
@@ -969,6 +977,7 @@ def _resumen_row_view(row: Row[Any]) -> ResumenRowView:
             name: SourceTextDateView(**evidence)
             for name, evidence in (row.source_text_dates or {}).items()
         },
+        web_fields=list(row.web_fields or []),
     )
 
 
@@ -1181,7 +1190,7 @@ def list_pmf_rows(
 
     total_count = connection.execute(
         text(
-            f"SELECT count(*) FROM platform.transelec_resumen_row "
+            f"SELECT count(*) FROM platform.transelec_effective_row "
             f"WHERE import_id = :import_id{where_sql}"
         ),
         params,
@@ -1197,7 +1206,7 @@ def list_pmf_rows(
     statement = text(
         f"""
         SELECT {", ".join(_RESUMEN_ROW_COLUMNS)}
-        FROM platform.transelec_resumen_row
+        FROM platform.transelec_effective_row
         WHERE import_id = :import_id{where_sql}{cursor_clause}
         ORDER BY source_row_number ASC
         LIMIT :fetch_limit
@@ -1242,7 +1251,7 @@ def get_pmf_detail(
     statement = text(
         f"""
         SELECT {", ".join(_RESUMEN_ROW_COLUMNS)}
-        FROM platform.transelec_resumen_row
+        FROM platform.transelec_effective_row
         WHERE import_id = :import_id AND pmf = :pmf
         ORDER BY source_row_number ASC
         """

@@ -4,7 +4,7 @@ comparing an edited value with the planilla's cell.
 Spec: docs/superpowers/specs/2026-10-04-transelec-web-edits-xlsx-design.md
 ("Editable fields", §2). ``platform.transelec_norm_text`` (migration 0012)
 is ``normalize_text`` in SQL; the two must stay identical, and
-``apps/api/integration_tests/test_transelec_overrides.py`` checks they agree.
+``apps/api/integration_tests/test_transelec_override_schema.py`` checks they agree.
 """
 
 from __future__ import annotations

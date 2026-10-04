@@ -250,6 +250,7 @@ def _isolated_platform_tables(integration_engine: Engine) -> Generator[None, Non
     with integration_engine.begin() as conn:
         conn.execute(text("UPDATE platform.transelec_dashboard_state SET active_import_id = NULL"))
         for table in (
+            "transelec_field_override",
             "transelec_publish_event",
             "transelec_resumen_row",
             "transelec_import",
