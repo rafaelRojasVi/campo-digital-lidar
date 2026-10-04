@@ -45,8 +45,9 @@ _REL_TYPE_VML = f"{_REL_NS}/vmlDrawing"
 _CT_COMMENTS = "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"
 _CT_VML = "application/vnd.openxmlformats-officedocument.vmlDrawing"
 _COPY_CHUNK = 1024 * 1024
-# The edited worksheet is the one part read whole into memory (the real
-# «Resumen» is about 1 MB); every other part streams in _COPY_CHUNK pieces.
+# Untouched parts stream in _COPY_CHUNK pieces. The parts the patch rewrites
+# are read whole: small XML parts plus the edited worksheet (the real
+# «Resumen» is about 1 MB), which is refused above this size.
 MAX_EDITED_PART_BYTES = 64 * 1024 * 1024
 
 # Built-in number formats Excel renders as dates or times (ECMA-376 §18.8.30).
@@ -190,15 +191,43 @@ def _start_tag(xml: str, name: str) -> re.Match[str]:
     return match
 
 
-def _insert_before_first(xml: str, candidates: Sequence[str], closing: str, snippet: str) -> str:
-    """Insert ``snippet`` before the first ``<candidate`` element present, or
-    before ``closing`` when none is."""
+def _top_level_children(xml: str) -> list[tuple[str, int]]:
+    """``(local name, index in xml)`` of every direct child of the root.
 
-    positions = [
-        match.start()
-        for name in candidates
-        if (match := re.search(rf"<{name}[\s/>]", xml)) is not None
-    ]
+    A same-named element nested deeper (Excel 2010 data bars put an
+    ``<extLst>`` inside ``<cfRule>``) is not a placement anchor.
+    """
+
+    data = xml.encode("utf-8")
+    parser = expat.ParserCreate()
+    depth = 0
+    found: list[tuple[str, int]] = []
+
+    def start(name: str, _attrs: object) -> None:
+        nonlocal depth
+        depth += 1
+        if depth == 2:
+            found.append((name.rpartition(":")[2], parser.CurrentByteIndex))
+
+    def end(_name: str) -> None:
+        nonlocal depth
+        depth -= 1
+
+    parser.StartElementHandler = start
+    parser.EndElementHandler = end
+    try:
+        parser.Parse(data, True)
+    except expat.ExpatError as exc:
+        raise WorkbookPatchError(f"malformed XML: {exc}") from exc
+    return [(name, len(data[:index].decode("utf-8"))) for name, index in found]
+
+
+def _insert_before_first(xml: str, candidates: Sequence[str], closing: str, snippet: str) -> str:
+    """Insert ``snippet`` before the first direct child of the root named in
+    ``candidates``, or before ``closing`` when none is present."""
+
+    wanted = set(candidates)
+    positions = [index for name, index in _top_level_children(xml) if name in wanted]
     position = min(positions) if positions else xml.rfind(closing)
     if position < 0:
         raise WorkbookPatchError(f"cannot place {snippet[:30]!r}: {closing} not found")
@@ -373,14 +402,63 @@ def _cell_xml(edit: CellEdit, style: int, *, numeric_ok: bool, date1904: bool) -
     if edit.kind == "date":
         if not isinstance(edit.value, dt.date):
             raise WorkbookPatchError(f"{edit.ref}: a date edit needs a date value")
-        return f"{head}><v>{excel_serial(edit.value, date1904=date1904)}</v></c>"
+        day = edit.value.date() if isinstance(edit.value, dt.datetime) else edit.value
+        return f"{head}><v>{excel_serial(day, date1904=date1904)}</v></c>"
     text = _clean_text(str(edit.value))
     if numeric_ok and _PLAIN_NUMBER.match(text):
         return f"{head}><v>{text}</v></c>"
     return f'{head} t="inlineStr"><is><t xml:space="preserve">{escape(text)}</t></is></c>'
 
 
-def _patch_row(row_xml: str, edit: CellEdit, styles: _Styles, *, date1904: bool) -> str | None:
+def _column_styles(sheet_xml: str) -> list[tuple[int, int, int]]:
+    """``(min, max, style)`` of every ``<col>`` (1-based columns)."""
+
+    block = re.search(r"<cols>(.*?)</cols>", sheet_xml, re.S)
+    if block is None:
+        return []
+    styles: list[tuple[int, int, int]] = []
+    for col in re.finditer(r"<col\b[^>]*>", block.group(1)):
+        tag = col.group(0)
+        try:
+            low, high = int(_attr(tag, "min") or "0"), int(_attr(tag, "max") or "0")
+            styles.append((low, high, int(_attr(tag, "style") or "0")))
+        except ValueError as exc:
+            raise WorkbookPatchError(f"unexpected <col> shape: {tag}") from exc
+    return styles
+
+
+def _blank_cell_style(
+    row_tag: str, column: int, column_styles: Sequence[tuple[int, int, int]]
+) -> int:
+    """The style Excel shows for an absent cell at 1-based ``column``: the
+    row's when the row is custom-formatted, else its column's, else 0."""
+
+    if _attr(row_tag, "customFormat") in ("1", "true"):
+        return int(_attr(row_tag, "s") or "0")
+    return next((style for low, high, style in column_styles if low <= column <= high), 0)
+
+
+def _spans_cover(spans: str, column: int) -> bool:
+    """Whether the optional ``spans`` hint (e.g. ``"1:1 3:4"``) includes ``column``."""
+
+    for part in spans.split():
+        low, sep, high = part.partition(":")
+        try:
+            if sep and int(low) <= column <= int(high):
+                return True
+        except ValueError:
+            return False
+    return False
+
+
+def _patch_row(
+    row_xml: str,
+    edit: CellEdit,
+    styles: _Styles,
+    *,
+    date1904: bool,
+    column_styles: Sequence[tuple[int, int, int]] = (),
+) -> str | None:
     """Return the row with ``edit`` applied, or None when the cell is a formula."""
 
     open_match = re.match(r"<row\b[^>]*?(/?)>", row_xml)
@@ -408,8 +486,10 @@ def _patch_row(row_xml: str, edit: CellEdit, styles: _Styles, *, date1904: bool)
         replacement = _cell_xml(edit, new_style, numeric_ok=numeric_ok, date1904=date1904)
         body = body[: existing.start()] + replacement + body[existing.end() :]
     else:
-        # Excel omits blank, unstyled cells; a blank cell accepts a number.
-        new_style = styles.web_style(0, needs_date_format=edit.kind == "date")
+        # Excel omits blank cells; one accepts a number, and its highlight
+        # starts from the style Excel shows for it (row, else column).
+        blank_style = _blank_cell_style(row_tag, target + 1, column_styles)
+        new_style = styles.web_style(blank_style, needs_date_format=edit.kind == "date")
         replacement = _cell_xml(edit, new_style, numeric_ok=True, date1904=date1904)
         position = len(body)
         for candidate in cells:
@@ -419,10 +499,8 @@ def _patch_row(row_xml: str, edit: CellEdit, styles: _Styles, *, date1904: bool)
                 break
         body = body[:position] + replacement + body[position:]
         spans = _attr(row_tag, "spans")
-        if spans and ":" in spans:
-            low, high = (int(part) for part in spans.split(":", 1))
-            if not low <= target + 1 <= high:
-                row_tag = _remove_attr(row_tag, "spans")
+        if spans and not _spans_cover(spans, target + 1):
+            row_tag = _remove_attr(row_tag, "spans")  # an optional hint; drop it
 
     return row_tag + body + "</row>"
 
@@ -432,11 +510,14 @@ def _patch_cells(
 ) -> tuple[str, list[CellEdit], list[SkippedEdit]]:
     written: list[CellEdit] = []
     skipped: list[SkippedEdit] = []
+    column_styles = _column_styles(sheet_xml)
     for edit in edits:
         if not _CELL_REF.match(edit.ref):
             raise WorkbookPatchError(f"invalid cell reference {edit.ref!r}")
         start, end = _row_span(sheet_xml, edit.row)
-        patched = _patch_row(sheet_xml[start:end], edit, styles, date1904=date1904)
+        patched = _patch_row(
+            sheet_xml[start:end], edit, styles, date1904=date1904, column_styles=column_styles
+        )
         if patched is None:
             skipped.append(SkippedEdit(edit.row, edit.column, "formula_cell"))
             continue
@@ -655,9 +736,23 @@ def patch_workbook(
     byte-for-byte (after decompression), in its original order, streamed in
     chunks. Only the small parts the patch rewrites and the edited worksheet
     are read whole; a worksheet larger than ``max_edited_part_bytes``
-    (uncompressed) is refused rather than loaded.
+    (uncompressed) is refused rather than loaded. Every shape the patcher
+    cannot handle is refused with ``WorkbookPatchError``.
     """
 
+    try:
+        return _patch(source, destination, sheet_name, edits, max_edited_part_bytes)
+    except UnicodeDecodeError as exc:
+        raise WorkbookPatchError("a workbook part the patch rewrites is not UTF-8") from exc
+
+
+def _patch(
+    source: Path,
+    destination: Path,
+    sheet_name: str,
+    edits: Sequence[CellEdit],
+    max_edited_part_bytes: int,
+) -> PatchResult:
     refs = [edit.ref for edit in edits]
     if len(set(refs)) != len(refs):
         raise WorkbookPatchError("two edits target the same cell")
@@ -683,6 +778,8 @@ def patch_workbook(
         for rel in _relationships(parts.get(_rels_path(sheet), b"").decode("utf-8")):
             if rel.get("Type") in (_REL_TYPE_COMMENTS, _REL_TYPE_VML):
                 target = _resolve_target(sheet.rpartition("/")[0], rel["Target"])
+                if target not in names:
+                    raise WorkbookPatchError(f"{sheet} refers to a missing note part {target}")
                 parts[target] = archive.read(target)
 
         date1904 = bool(re.search(r'<workbookPr\b[^>]*\sdate1904="(?:1|true)"', workbook_xml))
