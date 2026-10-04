@@ -9,12 +9,14 @@
  */
 import type {
   LifecycleRow,
+  PlazoPmf,
   ResumenRow,
   TranselecActiveImport,
   TranselecImportHistoryRow,
   TranselecLifecycle,
   TranselecOwnerStatus,
   TranselecPending,
+  TranselecPlazos,
   TranselecReport,
   TranselecSummary,
 } from '../api'
@@ -285,6 +287,96 @@ export function makeLifecycle(overrides: Partial<TranselecLifecycle> = {}): Tran
         lifecycle_step: null,
         lifecycle_reason: 'estado_y_resumido_no_coinciden',
         lifecycle_flags: ['filas_no_coinciden'],
+      }),
+    ],
+    ...overrides,
+  }
+}
+
+export function makePlazoPmf(overrides: Partial<PlazoPmf> = {}): PlazoPmf {
+  return {
+    pmf: 'MP001',
+    source_row_number: 2,
+    estado: 'en_plazo',
+    base_field: 'fecha_ingreso',
+    base_date: '2026-08-03',
+    base_source_rows: [2],
+    deadline: '2026-12-10',
+    elapsed_business_days: 22,
+    remaining_business_days: 68,
+    planilla_90_dias: '2026-12-10',
+    cruce: 'coincide',
+    diferencia_dias: 0,
+    legacy_vencido: false,
+    ...overrides,
+  }
+}
+
+/** One entry per `makeLifecycle()` row (MP001 row 2 … MP004 row 7). */
+export function makePlazos(overrides: Partial<TranselecPlazos> = {}): TranselecPlazos {
+  return {
+    basis: 'plazo_conaf_90_habiles_v1',
+    legacy_basis: 'vencimiento_columna_90_dias_legacy',
+    observed_on: '2026-09-02',
+    calendar: { source: 'holidays', country: 'CL', version: '0.105' },
+    plazo_habiles: 90,
+    por_vencer_umbral: 10,
+    total_pmf_count: 4,
+    estados: {
+      vencido: 1,
+      por_vencer: 0,
+      en_plazo: 1,
+      sin_fecha: 0,
+      sin_fecha_texto: 0,
+      conflicto: 1,
+      no_aplica: 1,
+    },
+    cruce_difiere_count: 1,
+    legacy_vencido_row_count: 2,
+    pmfs: [
+      makePlazoPmf({
+        pmf: 'MP001',
+        source_row_number: 2,
+        estado: 'no_aplica',
+        base_date: '2026-03-04',
+        deadline: '2026-07-14',
+        elapsed_business_days: null,
+        remaining_business_days: null,
+        planilla_90_dias: '2026-07-14',
+      }),
+      makePlazoPmf({
+        pmf: 'MP002',
+        source_row_number: 3,
+        estado: 'vencido',
+        base_date: '2026-03-04',
+        base_source_rows: [3],
+        deadline: '2026-07-14',
+        elapsed_business_days: 125,
+        remaining_business_days: -35,
+        planilla_90_dias: '2026-06-02',
+        cruce: 'difiere',
+        diferencia_dias: -42,
+        legacy_vencido: true,
+      }),
+      makePlazoPmf({
+        pmf: 'MP003',
+        source_row_number: 5,
+        base_field: 'fecha_ingreso_2',
+        base_source_rows: [5],
+      }),
+      makePlazoPmf({
+        pmf: 'MP004',
+        source_row_number: 7,
+        estado: 'conflicto',
+        base_date: null,
+        base_source_rows: [7, 8],
+        deadline: null,
+        elapsed_business_days: null,
+        remaining_business_days: null,
+        planilla_90_dias: '2026-06-02',
+        cruce: 'sin_calculo',
+        diferencia_dias: null,
+        legacy_vencido: true,
       }),
     ],
     ...overrides,
