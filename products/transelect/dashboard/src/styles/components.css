@@ -1661,3 +1661,23 @@
 .drawer-rows td:last-child {
   overflow-wrap: anywhere;
 }
+
+/* «Abrir Oficina Virtual CONAF» + «Copiar N.º», beside an N.º de ingreso. */
+.oficina-virtual {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-3);
+  margin-left: var(--s-3);
+  font-size: var(--t-micro);
+  max-width: 100%;
+}
+
+.oficina-virtual .hint {
+  overflow-wrap: anywhere;
+}
+
+/* Long reason and flag labels wrap inside the drawer instead of widening it. */
+.drawer-section .hint {
+  overflow-wrap: anywhere;
+}

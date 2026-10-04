@@ -29,6 +29,7 @@ import {
   EMPTY_FILTERS,
   type AefPmf,
   type AefPmfField,
+  type LifecycleRow,
   type ResumenRow,
   type TranselecPmfDetail,
   getAef,
@@ -44,9 +45,16 @@ import {
   hasAefTracking,
 } from '../lib/aef'
 import { ingreso2InSource } from '../lib/ingreso'
+import {
+  LIFECYCLE_FLAG_LABELS,
+  LIFECYCLE_GROUP_LABELS,
+  LIFECYCLE_REASON_LABELS,
+  lifecycleStepText,
+} from '../lib/lifecycle'
 import { classifyFailure, type FailureView } from '../lib/apiState'
 import { Drawer } from '../ui/Drawer'
 import { AlertBanner, LoadingBlock } from './StateViews'
+import { OficinaVirtualLink } from './OficinaVirtualLink'
 import { SourceDate } from './SourceDate'
 import { StatusPill } from './StatusPill'
 
@@ -207,11 +215,14 @@ export function RowDetailDrawer({
   row,
   onClose,
   sourceFields,
+  lifecycle = null,
 }: {
   row: ResumenRow
   onClose: () => void
   /** The published version's source fields; null/undefined while unknown. */
   sourceFields?: readonly string[] | null
+  /** Where the PMF stands (`lifecycle_pmf_v1`), when the Estado section opens it. */
+  lifecycle?: LifecycleRow | null
 }) {
   const sourceHasAef = aefInSource(sourceFields)
   const sourceHasIngreso2 = ingreso2InSource(sourceFields)
@@ -315,6 +326,36 @@ export function RowDetailDrawer({
           </p>
         )}
 
+        {lifecycle && (
+          <section
+            className="drawer-section"
+            aria-labelledby="drawer-proceso"
+            data-testid="drawer-lifecycle"
+          >
+            <h3 id="drawer-proceso">
+              Proceso CONAF <span className="hint">(provisional)</span>
+            </h3>
+            <dl className="facts">
+              <Fact label="Grupo">{LIFECYCLE_GROUP_LABELS[lifecycle.lifecycle_group]}</Fact>
+              <Fact label="Paso">{lifecycleStepText(lifecycle)}</Fact>
+            </dl>
+            {lifecycle.lifecycle_flags.map((flag) => (
+              <p className="hint" key={flag}>
+                {LIFECYCLE_FLAG_LABELS[flag]}.
+              </p>
+            ))}
+            {lifecycle.lifecycle_reason && lifecycle.lifecycle_step === null && (
+              <p className="hint">
+                Para revisar en la planilla: {LIFECYCLE_REASON_LABELS[lifecycle.lifecycle_reason]}.
+              </p>
+            )}
+            <p className="hint">
+              Según la primera fila del PMF (fila {formatInteger(lifecycle.source_row_number)}).
+              Categorías provisionales hasta que Campo Digital las confirme.
+            </p>
+          </section>
+        )}
+
         <section className="drawer-section" aria-labelledby="drawer-tramitacion">
           <h3 id="drawer-tramitacion">Tramitación</h3>
           <dl className="facts">
@@ -324,7 +365,10 @@ export function RowDetailDrawer({
             <Fact label="Motivo" wide>
               {cell(current.tipo_rechazo, 'Sin motivo registrado')}
             </Fact>
-            <Fact label="N.º ingreso">{cell(current.numero_ingreso, 'Sin ingreso')}</Fact>
+            <Fact label="N.º ingreso">
+              {cell(current.numero_ingreso, 'Sin ingreso')}
+              <OficinaVirtualLink numero={current.numero_ingreso} testId="drawer-ov-1" />
+            </Fact>
             <Fact label="Fecha ingreso">
               <SourceDate row={current} field="fecha_ingreso" missing="Sin fecha" />
             </Fact>
@@ -341,6 +385,9 @@ export function RowDetailDrawer({
                   <span data-testid="drawer-numero-ingreso-2">
                     {cell(current.numero_ingreso_2, 'Sin segundo ingreso')}
                   </span>
+                  {current.numero_ingreso_2 && (
+                    <OficinaVirtualLink numero={current.numero_ingreso_2} testId="drawer-ov-2" />
+                  )}
                 </Fact>
                 <Fact label="Fecha ingreso 2">
                   <span data-testid="drawer-fecha-ingreso-2">

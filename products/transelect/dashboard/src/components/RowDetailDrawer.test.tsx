@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RowDetailDrawer } from "./RowDetailDrawer";
-import { makeRow } from "../test/factories";
+import { makeLifecycleRow, makeRow } from "../test/factories";
 import type { AefPmf, AefPmfField, TranselecAef } from "../api";
 
 vi.mock("../api", async (importOriginal) => {
@@ -336,5 +336,107 @@ describe("RowDetailDrawer — second ingreso (30-Sept-2026 layout)", () => {
     );
     expect(screen.queryByTestId("drawer-numero-ingreso-2")).toBeNull();
     expect(screen.queryByText("Sin segundo ingreso")).toBeNull();
+  });
+});
+
+describe("RowDetailDrawer — Proceso CONAF (lifecycle_pmf_v1)", () => {
+  beforeEach(() => {
+    vi.mocked(getPmfDetail).mockReset();
+    vi.mocked(getAef).mockReset();
+    vi.mocked(getAef).mockResolvedValue({
+      ok: true,
+      data: { pmfs: [] } as unknown as TranselecAef,
+    });
+    vi.mocked(getPmfDetail).mockResolvedValue({
+      ok: true,
+      data: {
+        pmf: "MP002",
+        row_count: 1,
+        basis_estado_resumido: "estado_resumido_first_row",
+        estado_resumido: "En tramite",
+        rows: [makeRow({ source_row_number: 3, pmf: "MP002" })],
+      },
+    });
+  });
+
+  it("shows where the PMF stands when the Estado section opens it", () => {
+    const lifecycle = makeLifecycleRow({
+      source_row_number: 3,
+      pmf: "MP002",
+      lifecycle_step: "rechazado_esperando_recurso",
+    });
+    render(<RowDetailDrawer row={lifecycle} lifecycle={lifecycle} onClose={() => {}} />);
+
+    const block = screen.getByTestId("drawer-lifecycle");
+    expect(block).toHaveTextContent("En trámite");
+    expect(block).toHaveTextContent("Rechazado, esperando recurso");
+    expect(block).toHaveTextContent("primera fila del PMF (fila 3)");
+    expect(block).toHaveTextContent("provisional");
+  });
+
+  it("says why a PMF is unclassified and that its rows disagree", () => {
+    const lifecycle = makeLifecycleRow({
+      source_row_number: 3,
+      pmf: "MP002",
+      lifecycle_group: "sin_clasificar",
+      lifecycle_step: null,
+      lifecycle_reason: "estado_y_resumido_no_coinciden",
+      lifecycle_flags: ["filas_no_coinciden"],
+    });
+    render(<RowDetailDrawer row={lifecycle} lifecycle={lifecycle} onClose={() => {}} />);
+
+    const block = screen.getByTestId("drawer-lifecycle");
+    expect(block).toHaveTextContent("Sin clasificar");
+    expect(block).toHaveTextContent("«Estado» y «Estado resumido» no coinciden");
+    expect(block).toHaveTextContent("Sus filas no tienen el mismo");
+  });
+
+  it("has no Proceso CONAF block from elsewhere, but always links the Oficina Virtual", () => {
+    render(
+      <RowDetailDrawer
+        row={makeRow({ source_row_number: 3, pmf: "MP002", numero_ingreso: "ING-7" })}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(screen.queryByTestId("drawer-lifecycle")).toBeNull();
+    const link = screen.getByTestId("drawer-ov-1-link");
+    expect(link).toHaveAttribute("href", "https://oficinavirtual.conaf.cl/consultas/index.php");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveAccessibleName(/pestaña nueva/);
+    expect(screen.getByTestId("drawer-ov-1-copy")).toHaveAccessibleName("Copiar el N.º ING-7");
+  });
+
+  it("copies the N.º and says so", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    try {
+      render(
+        <RowDetailDrawer
+          row={makeRow({ source_row_number: 3, pmf: "MP002", numero_ingreso: "ING-7" })}
+          onClose={() => {}}
+        />,
+      );
+      screen.getByTestId("drawer-ov-1-copy").click();
+
+      await waitFor(() => expect(screen.getByText("N.º copiado.")).toBeInTheDocument());
+      expect(writeText).toHaveBeenCalledWith("ING-7");
+      expect(screen.getByRole("status")).toHaveAttribute("aria-live", "polite");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("still closes with Escape pressed on the Oficina Virtual link", () => {
+    const onClose = vi.fn();
+    render(
+      <RowDetailDrawer
+        row={makeRow({ source_row_number: 3, pmf: "MP002", numero_ingreso: "ING-7" })}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.keyDown(screen.getByTestId("drawer-ov-1-link"), { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
   });
 });
