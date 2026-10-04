@@ -119,3 +119,52 @@ muestra cómo llega a cada cifra. Las preguntas anteriores sobre AEF, celdas con
 dos fechas y fechas con solo mes siguen abiertas en
 [la nota de la planilla del 09-sept](2026-09-26-planilla-09sept-seguimiento-aef.md)
 y en [la nota de usabilidad](2026-09-26-panel-usabilidad.md).
+
+## 5. Actualización del 04-10-2026: decisiones y preguntas nuevas
+
+Rafael respondió parte de las preguntas a partir de sus notas de la reunión.
+Los diseños técnicos (en inglés) están en
+[Estado](../../../../docs/superpowers/specs/2026-10-04-transelec-estado-lifecycle-design.md),
+[90 días hábiles](../../../../docs/superpowers/specs/2026-10-04-transelec-plazo-90-habiles-design.md)
+y [edición en el panel y descarga con marca «web»](../../../../docs/superpowers/specs/2026-10-04-transelec-web-edits-xlsx-design.md).
+Todavía no hay nada programado.
+
+Decidido:
+
+- **Ciclo (pregunta 1).** Un rechazo no es un final; termina en aprobado o
+  desistido. La planilla no usa «Desistido» sino «Descartado». El panel
+  muestra la palabra de la planilla y trata ambas como cierre (pregunta 12).
+- **Inicio del plazo (pregunta 5).** Los 90 días hábiles se cuentan desde el
+  ingreso más reciente: `Fecha de ingreso2` si existe, si no
+  `Fecha de ingreso1`.
+- **Días hábiles.** Lunes a viernes, sin feriados nacionales de Chile.
+- **Edición en el panel (pregunta 9).**
+  - *Campos:* se pueden editar `Estado`, `Estado resumido`,
+    `Tipo de rechazo`, los tres `Reingreso_*`, las fechas y números de
+    ingreso 1 y 2, y `90 dias`.
+  - *Quién:* editan operadores y administradores.
+  - *Marca «web»:* va por celda, con color de fondo y una nota de Excel que
+    dice quién, cuándo y el valor anterior. El resto de la planilla queda
+    igual.
+  - *Planilla nueva distinta:* si una planilla nueva trae otro valor en una
+    celda editada, manda la planilla y el panel lo avisa en Calidad.
+- **Oficina Virtual (pregunta 8, en parte).** La consulta de CONAF es un
+  formulario con el campo «N.º de solicitud». No existe un enlace directo
+  por número, así que el panel abrirá la página y permitirá copiar el número.
+
+Siguen abiertas las preguntas 2 a 4, 6, 7, 10 y 11. En la pregunta 2, además
+de 0 y 1 aparece el valor 2.
+
+Preguntas nuevas:
+
+12. ¿«Descartado» y «Desistido» son lo mismo?
+13. ¿El «N.º de solicitud» de la Oficina Virtual es el `N Ingreso` de la
+    planilla?
+14. Hay filas con `Estado resumido` «Aprobado» y `Estado` «Recurso
+    reposición» sin resultado. ¿El recurso sigue pendiente o el `Estado`
+    está desactualizado?
+15. ¿El plazo de 90 días empieza el día hábil siguiente al ingreso? ¿Se
+    suspende mientras se responden observaciones?
+16. ¿Un recurso de reposición o jerárquico reinicia los 90 días, o solo un
+    nuevo ingreso?
+17. ¿Cuentan los feriados regionales?

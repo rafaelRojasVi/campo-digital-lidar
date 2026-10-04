@@ -4,7 +4,12 @@
 
 Planning record. PR-0 below is implemented on `feat/transelec-ingreso-2-columns`
 (migration `0011`, parser `@3`; see the contract amendment of 2026-10-02).
-PR-1 to PR-3 are not started. The document orders the
+PR-1 to PR-3 are not started. Their designs, settled with Rafael on
+2026-10-04, are
+[Estado](../../../../docs/superpowers/specs/2026-10-04-transelec-estado-lifecycle-design.md),
+[90 días hábiles](../../../../docs/superpowers/specs/2026-10-04-transelec-plazo-90-habiles-design.md)
+and [web edits and .xlsx download](../../../../docs/superpowers/specs/2026-10-04-transelec-web-edits-xlsx-design.md);
+where they differ from the sketches below, the specs win. The document orders the
 changes requested by Campo Digital after the pilot went live
 (see [Panel Transelec: el piloto está en uso](../es/2026-09-28-piloto-en-uso.md))
 and records what was verified against the code and against the planilla
