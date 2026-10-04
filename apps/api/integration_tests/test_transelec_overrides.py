@@ -10,6 +10,8 @@ from __future__ import annotations
 import csv
 import datetime as dt
 import io
+import tempfile
+import zipfile
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -20,6 +22,7 @@ from app.csrf import CSRF_HEADER_NAME
 from app.deps import get_object_store
 from app.main import app
 from app.object_store import LocalObjectStore
+from app.routers import transelec_edits
 from app.routers.transelec import _RESUMEN_ROW_COLUMNS
 from app.transelec_overrides import (
     FieldNotInSourceError,
@@ -44,6 +47,8 @@ from test_transelec_reads_router import (
 )
 
 from transelec_ingestion.field_overrides import EDITABLE_BY_NAME
+from transelec_ingestion.xlsx_contract import load_transelec_workbook
+from transelec_ingestion.xlsx_web_patch import WorkbookPatchError
 
 ADMIN = (("transelect", Role.ADMIN),)
 OPERATOR = (("transelect", Role.OPERATOR),)
@@ -970,3 +975,123 @@ def test_noop_save_writes_no_audit_event(client: TestClient, tmp_path: Path) -> 
             text("SELECT count(*) FROM platform.audit_event WHERE subject_id = 'None'")
         ).scalar_one()
     assert count == 0 and none_ids == 0
+
+
+# ---------------------------------------------------------------------------
+# Download (Task 7)
+# ---------------------------------------------------------------------------
+
+
+def _download(client: TestClient) -> Any:
+    return client.get("/transelec/export.xlsx")
+
+
+def test_viewer_cannot_download(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-admin", ADMIN)
+    _publish(client, _workbook(tmp_path, "base.xlsx"))
+    client.cookies.clear()
+    _login_with_grants(client, "transelec-viewer", VIEWER)
+    assert _download(client).status_code == 403
+
+
+def test_export_writes_only_applied_edits(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    original = _workbook(tmp_path, "PlanillaSintetica.xlsx")
+    import_id = _publish(client, original, filename="PlanillaSintetica.xlsx")
+    mp001 = _row(client, "MP001", 0)["source_row_number"]
+    mp002 = _row(client, "MP002")["source_row_number"]
+    _put(client, import_id, mp001, "estado_resumido", "Aprobado", expected="En tramite")
+    _put(client, import_id, mp002, "estado", "Reingresado", expected="Rechazado")
+    # v2 drops MP002 (its edit becomes an orphan) but keeps MP001's cell.
+    rows = [dict(item) for item in _BASE_ROWS if item["pmf"] != "MP002"]
+    second = _workbook(tmp_path, "PlanillaSintetica2.xlsx", rows)
+    _publish(client, second, filename="PlanillaSintetica2.xlsx")
+
+    response = _download(client)
+
+    assert response.status_code == 200, response.text
+    disposition = response.headers["content-disposition"]
+    assert "PlanillaSintetica2_web_" in disposition and disposition.endswith('.xlsx"')
+    downloaded = tmp_path / "downloaded.xlsx"
+    downloaded.write_bytes(response.content)
+    # MP001's rows come first in both versions, so its row number did not move.
+    edited = next(
+        r for r in load_transelec_workbook(downloaded).resumen_rows if r.source_row_number == mp001
+    )
+    assert edited.values["estado_resumido"] == "Aprobado"
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        comments = archive.read("xl/comments1.xml").decode("utf-8")
+        assert comments.count("<comment ") == 1  # the orphan is not written
+        assert "web · transelec-operator · " in comments and "antes: En tramite" in comments
+        after = {name: archive.read(name) for name in archive.namelist()}
+    with zipfile.ZipFile(io.BytesIO(second)) as archive:
+        before = {name: archive.read(name) for name in archive.namelist()}
+    changed = {name for name, data in before.items() if after.get(name) != data}
+    assert changed <= {
+        "xl/worksheets/sheet1.xml",
+        "xl/styles.xml",
+        "xl/workbook.xml",
+        "[Content_Types].xml",
+        "xl/worksheets/_rels/sheet1.xml.rels",
+    }
+    with client.engine.connect() as conn:
+        metadata = conn.execute(
+            text(
+                "SELECT metadata FROM platform.audit_event "
+                "WHERE event_type = 'transelec.export.xlsx_downloaded'"
+            )
+        ).scalar_one()
+    assert metadata == {"written": 1, "skipped_formula": 0, "unmapped": 0}
+
+
+def test_export_needs_the_mapping_report(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    with client.engine.begin() as conn:
+        conn.execute(
+            text("UPDATE platform.transelec_import SET mapping_report = NULL WHERE id = :i"),
+            {"i": import_id},
+        )
+    response = _download(client)
+    assert response.status_code == 409
+    assert "vuelva a importar" in response.json()["detail"]
+    assert response.json()["code"] == "mapping_report_missing"
+
+
+def test_export_without_a_stored_workbook_is_a_coded_409(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    _publish(client, _workbook(tmp_path, "base.xlsx"))
+    with client.engine.begin() as conn:
+        conn.execute(text("UPDATE platform.source_snapshot SET object_storage_key = NULL"))
+    response = _download(client)
+    assert response.status_code == 409
+    assert response.json()["code"] == "workbook_unavailable"
+
+
+@pytest.mark.parametrize("failure", [WorkbookPatchError("boom"), RuntimeError("boom")])
+def test_export_failure_cleans_up_and_codes_the_422(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: Exception,
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    _publish(client, _workbook(tmp_path, "base.xlsx"))
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(scratch))
+
+    def refuse(*args: Any, **kwargs: Any) -> None:
+        raise failure
+
+    monkeypatch.setattr(transelec_edits, "patch_workbook", refuse)
+    if isinstance(failure, WorkbookPatchError):
+        response = _download(client)
+        assert response.status_code == 422
+        assert response.json()["code"] == "workbook_unpatchable"
+    else:
+        with pytest.raises(RuntimeError):
+            _download(client)
+    assert list(scratch.iterdir()) == []
