@@ -234,7 +234,12 @@ routing traffic to it.
 
 ### PostGIS image
 
-**FACT (2026-10-04, read-only query and the Railway API):** the production
+**Status (2026-10-04):** production moved to the `PostGIS17` service
+(PostgreSQL 17.5, PostGIS 3.5.2, the CI image). See "RESULT (cutover)" at
+the end of this section. The facts below describe the old `PostGIS` service,
+kept read-only as the rollback.
+
+**FACT (2026-10-04, read-only query and the Railway API):** the old
 PostGIS service runs the image `postgis/postgis:16-master`, a tag built from
 PostGIS's development branch. It holds PostgreSQL 16.15 with PostGIS
 `3.7.0dev` (`3.6.0rc2-620-gb8c7b0142`) and GEOS `3.15.0dev`. The `postgis`
@@ -259,7 +264,7 @@ before the PostGIS deploy of 2026-09-17. **INFERENCE:** production runs
 that digest, and a PostGIS redeploy after the tag moves would pull a newer
 development build under the existing extension catalog.
 
-**PROPOSAL (not decided):** move production to the CI image. It cannot be
+**DECISION (2026-10-04, carried out the same day):** move production to the CI image. It cannot be
 done in place: 16 → 17 is a major upgrade, and 3.7.0dev → 3.5.2 is an
 extension downgrade. At 19 MB, a dump and restore is the simple path.
 
@@ -312,6 +317,53 @@ production's `POSTGRES_INITDB_ARGS`, so TLS came up `on`.
 auth rather than Google sign-in. Steps 2–3 still have to prove the Railway
 side.
 
+**RESULT (cutover, 2026-10-04, about 13:25–13:35 UTC).** Steps 2–3 were run
+from scripts kept outside the repository
+(`~/campo-digital-backups/postgis-cutover/` on Rafael's machine: phases A,
+B and C, plus `unfreeze.sh` and `rollback.sh`).
+
+- **A.** A new service `PostGIS17` was created from
+  `postgis/postgis:17-3.5@sha256:624f5195…`. It has the same
+  `POSTGRES_INITDB_ARGS` (TLS on), a new random `POSTGRES_PASSWORD` that
+  was never printed, and a new 500 MB volume in `sfo` at
+  `/var/lib/postgresql/data` (`PGDATA` in `pgdata/`). It is named without a
+  hyphen because Railway's docs do not confirm that `${{Service-Name.VAR}}`
+  references work with one.
+- **B.** The old database was set to `default_transaction_read_only = on`
+  and the app's connections were dropped. The final dump (161,290 bytes) was
+  taken inside the old container, checksummed locally, uploaded into the new
+  volume with `railway volume files upload` (so the old password never left
+  its service), checksummed again, and restored with the filtered TOC above
+  (`--exit-on-error`, no errors). Every table's row count and the Alembic
+  head (`0011`) were identical between old and new.
+- **C.** The app's five `POSTGRES_*` variables now reference `PostGIS17`
+  (`POSTGRES_HOST = ${{PostGIS17.RAILWAY_PRIVATE_DOMAIN}}`; port, database,
+  user and password are `${{PostGIS17.…}}`). The app was redeployed from
+  `main` (`7077b22`); the pre-deploy migration had nothing to do.
+
+**FACT (after the cutover, read-only):** from inside the app container, the
+database host is `postgis17.railway.internal`, the server reports
+PostgreSQL 17.5 and PostGIS 3.5.2 over TLSv1.3, the Alembic head is `0011`,
+and the row counts match. The deploy log starts with the `campo-entrypoint`
+line, `/ready` answers `200`, the signed-out API routes answer `401`, and
+`railway config plan` still reports no changes (the variables are
+`preserve()`). The old database is read-only with no client connections.
+
+**FACT:** the new database's default `search_path` is `"$user", public,
+topology, tiger` (the old one had no `tiger`), because this image also
+installs `postgis_tiger_geocoder` and `fuzzystrmatch`. **INFERENCE:** this
+has no effect on the app, whose SQL schema-qualifies its tables
+(`platform.…`, `forestry.…`); a scan found no unqualified table names.
+
+**Rollback** (`rollback.sh`): point the five variables back at
+`${{PostGIS.…}}`, run `ALTER DATABASE railway RESET
+default_transaction_read_only` on the old service, and redeploy. Anything
+written to `PostGIS17` after the cutover would not be carried back.
+
+**OPEN QUESTION:** when to delete the old `PostGIS` service and its
+volume. It is a separate decision, made once the new database has run
+without trouble for a while.
+
 ## Manual database backup
 
 The 2026-09-28 decision above stands: nothing backs up production on a
@@ -325,17 +377,18 @@ It dumps the whole database, so it includes the grants
 the decision says cannot be rebuilt. **LIMITATION:** it does not copy the
 uploaded workbook files on the `/data` volume (see "Object storage").
 
-1. On Railway, enable the PostGIS service's TCP proxy. This exposes the
+1. On Railway, enable the database service's TCP proxy (`PostGIS17` since
+   2026-10-04). This exposes the
    database on a public host and port while it is on.
 2. Build the public URL and pass it through the environment only, never as
-   an argument or in a file. **FACT (2026-10-04):** the PostGIS service
-   defines no `DATABASE_PUBLIC_URL`. Its `DATABASE_URL` and
-   `DATABASE_PRIVATE_URL` point at the private network. Compose it from the
+   an argument or in a file. **FACT (2026-10-04):** neither database service
+   defines a `DATABASE_PUBLIC_URL` (the old one's `DATABASE_URL` and
+   `DATABASE_PRIVATE_URL` point at the private network). Compose it from the
    TCP proxy's host and port and the service's `POSTGRES_USER`,
    `POSTGRES_PASSWORD` and `POSTGRES_DB`, as
    `postgresql://USER:PASSWORD@HOST:PORT/DB`. The server accepts the
    script's `PGSSLMODE=require` (see "PostGIS image"), and `pg_dump` must
-   be version 16 or newer:
+   be version 17 or newer:
 
    ```sh
    read -rs DATABASE_PUBLIC_URL && export DATABASE_PUBLIC_URL
@@ -346,7 +399,7 @@ uploaded workbook files on the `/data` volume (see "Object storage").
 3. Disable the TCP proxy again.
 
 **Without the TCP proxy** (used on 2026-10-04, no Railway setting changed):
-run `pg_dump` inside the PostGIS container over `railway ssh`. Use the local
+run `pg_dump` inside the database container (`PostGIS17`) over `railway ssh`. Use the local
 socket (`-h /var/run/postgresql`), because the container's `PGHOST` points
 at the private network. Write the dump to a temp file, print its sha256, and
 stream it back base64-encoded, deleting the temp file in the same command.
