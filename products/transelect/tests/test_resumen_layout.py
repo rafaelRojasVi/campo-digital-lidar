@@ -29,6 +29,7 @@ from transelec_ingestion.resumen_layout import (
     column_letter,
     normalize_header,
     resolve_pmf_field,
+    value_or_unread_text,
 )
 from transelec_ingestion.xlsx_contract import (
     CURRENT_RESUMEN_COLUMNS,
@@ -756,6 +757,22 @@ def test_resolve_pmf_field(
 
     assert (resolved.status, resolved.value, resolved.source_rows) == (status, value, rows)
     assert len(resolved.variants) == (variants if isinstance(variants, int) else 0)
+
+
+@pytest.mark.parametrize(
+    ("value", "text_dates", "expected"),
+    [
+        (dt.date(2026, 8, 1), {}, dt.date(2026, 8, 1)),
+        (None, {}, None),
+        (None, {"f": {"raw": "a b", "parsed": None}}, "a b"),
+        (None, {"f": {"raw": "x", "parsed": "2026-08-01"}}, None),
+        (None, {"f": {"raw": 5, "parsed": None}}, None),
+        (dt.date(2026, 8, 1), {"f": {"raw": "a b", "parsed": None}}, dt.date(2026, 8, 1)),
+        (None, {"other": {"raw": "a b", "parsed": None}}, None),
+    ],
+)
+def test_value_or_unread_text(value: Any, text_dates: Any, expected: Any) -> None:
+    assert value_or_unread_text(value, text_dates, "f") == expected
 
 
 def test_chronology_inconsistencies_are_warnings_and_dates_are_kept(tmp_path: Path) -> None:
