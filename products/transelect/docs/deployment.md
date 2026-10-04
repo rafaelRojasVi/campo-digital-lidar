@@ -237,7 +237,7 @@ routing traffic to it.
 **Status (2026-10-04):** production moved to the `PostGIS17` service
 (PostgreSQL 17.5, PostGIS 3.5.2, the CI image). See "RESULT (cutover)" at
 the end of this section. The facts below describe the old `PostGIS` service,
-kept read-only as the rollback.
+deleted the same day (see "Old service deleted").
 
 **FACT (2026-10-04, read-only query and the Railway API):** the old
 PostGIS service runs the image `postgis/postgis:16-master`, a tag built from
@@ -355,14 +355,31 @@ installs `postgis_tiger_geocoder` and `fuzzystrmatch`. **INFERENCE:** this
 has no effect on the app, whose SQL schema-qualifies its tables
 (`platform.…`, `forestry.…`); a scan found no unqualified table names.
 
-**Rollback** (`rollback.sh`): point the five variables back at
+**Rollback, until the old service was deleted** (`rollback.sh`): point the five variables back at
 `${{PostGIS.…}}`, run `ALTER DATABASE railway RESET
 default_transaction_read_only` on the old service, and redeploy. Anything
 written to `PostGIS17` after the cutover would not be carried back.
 
-**OPEN QUESTION:** when to delete the old `PostGIS` service and its
-volume. It is a separate decision, made once the new database has run
-without trouble for a while.
+**Old service deleted (2026-10-04, about 14:07 UTC).** Rafael decided not
+to wait. First, a row-by-row md5 of all 25 tables matched between old and
+new: imports, publish events, active version, snapshots, rows and audit
+log. The 4 uploaded workbook files are not in the database. They live in
+the app's object store on `/data`, and all 4 were present. They were also
+copied to Rafael's machine, each checked against its sha256 object key. A
+guarded script (`delete-old.sh`) then re-checked that:
+
+- the app referenced only `PostGIS17`;
+- `/ready` answered `200`;
+- the old database was read-only with no clients;
+- the final dump still matched its checksum;
+
+and only then deleted the service and its volume.
+
+**FACT:** Railway soft-deletes volumes. `postgis-volume` was detached, with
+`deletedAt` set to 2026-10-06 14:07 UTC. The old database now survives only
+as the local final dump (`campo-digital-prod-20261004T133040Z-final.dump`,
+sha256 `86348c51…`), which restores into the 17-3.5 image with the filtered
+TOC above. `rollback.sh` no longer applies.
 
 ## Manual database backup
 
@@ -382,8 +399,8 @@ uploaded workbook files on the `/data` volume (see "Object storage").
    database on a public host and port while it is on.
 2. Build the public URL and pass it through the environment only, never as
    an argument or in a file. **FACT (2026-10-04):** neither database service
-   defines a `DATABASE_PUBLIC_URL` (the old one's `DATABASE_URL` and
-   `DATABASE_PRIVATE_URL` point at the private network). Compose it from the
+   defines a `DATABASE_PUBLIC_URL` (the old service had `DATABASE_URL` and
+   `DATABASE_PRIVATE_URL` on the private network only). Compose it from the
    TCP proxy's host and port and the service's `POSTGRES_USER`,
    `POSTGRES_PASSWORD` and `POSTGRES_DB`, as
    `postgresql://USER:PASSWORD@HOST:PORT/DB`. The server accepts the
