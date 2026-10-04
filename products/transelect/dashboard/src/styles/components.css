@@ -1693,8 +1693,12 @@
   text-underline-offset: 2px;
 }
 
-.oficina-virtual a:hover {
-  color: var(--forest);
+.oficina-virtual a:hover,
+.oficina-virtual .btn-link:hover {
+  /* Stays forest-deep (4.5:1 on hovered and selected rows); hover shows as a thicker underline. */
+  color: var(--forest-deep);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 /* An empty live region stays in the accessibility tree but takes no flex slot (or gap). */

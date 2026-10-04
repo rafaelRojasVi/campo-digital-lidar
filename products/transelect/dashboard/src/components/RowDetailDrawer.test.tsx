@@ -395,6 +395,22 @@ describe("RowDetailDrawer — Proceso CONAF (lifecycle_pmf_v1)", () => {
     expect(within(block).queryByText("Paso")).toBeNull();
   });
 
+  it.each([
+    ["aprobado", "Aprobado"],
+    ["descartado", "Descartado"],
+  ] as const)("labels a closed %s PMF «Paso», not «Para revisar»", (group, text) => {
+    const lifecycle = makeLifecycleRow({
+      lifecycle_group: group,
+      lifecycle_step: null,
+      lifecycle_reason: null,
+    });
+    render(<RowDetailDrawer row={lifecycle} lifecycle={lifecycle} onClose={() => {}} />);
+    const block = screen.getByTestId("drawer-lifecycle");
+    expect(block).toHaveTextContent(text);
+    expect(within(block).getByText("Paso")).toBeInTheDocument();
+    expect(within(block).queryByText("Para revisar en la planilla")).toBeNull();
+  });
+
   it("has no Proceso CONAF block from elsewhere, but always links the Oficina Virtual", () => {
     render(
       <RowDetailDrawer

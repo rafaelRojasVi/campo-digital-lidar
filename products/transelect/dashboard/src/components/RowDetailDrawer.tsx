@@ -336,7 +336,7 @@ export function RowDetailDrawer({
             </h3>
             <dl className="facts">
               <Fact label="Grupo">{LIFECYCLE_GROUP_LABELS[lifecycle.lifecycle_group]}</Fact>
-              <Fact label={lifecycle.lifecycle_step ? 'Paso' : 'Para revisar en la planilla'}>
+              <Fact label={lifecycle.lifecycle_reason ? 'Para revisar en la planilla' : 'Paso'}>
                 {lifecycleStepText(lifecycle)}
               </Fact>
             </dl>
