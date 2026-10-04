@@ -1,7 +1,7 @@
 # Transelec: «Estado» tab with the plan lifecycle
 
-Date: 2026-10-04. Status: design approved in conversation with Rafael; this
-file awaits his review before a plan is written. Backlog item PR-1 of
+Date: 2026-10-04. Status: implemented in PR #81
+([plan](../plans/2026-10-04-transelec-estado-lifecycle.md)). Backlog item PR-1 of
 [the post-launch backlog](../../../products/transelect/docs/design/2026-10-02-post-launch-backlog-v1.md).
 Sibling specs, built in parallel:
 [web edits and .xlsx download](2026-10-04-transelec-web-edits-xlsx-design.md)
