@@ -1057,3 +1057,23 @@ a.status-card .status-card-go {
 .owner-compare tbody tr.total th[scope='row'] {
   font-weight: 700;
 }
+
+/* ================================================================ Estado */
+
+/*
+ * The step and reason labels are long Spanish sentences: they wrap inside
+ * their cell (the wrapper still scrolls for the rest) instead of widening the
+ * table past the screen.
+ */
+.estado-table td[data-col='paso'],
+.estado-table td[data-col='tipo_rechazo'] {
+  min-width: 14rem;
+  max-width: 22rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.estado-table .estado-flag {
+  display: block;
+  margin-top: var(--s-2);
+}
