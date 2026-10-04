@@ -523,6 +523,10 @@ input[type='file'] {
  * reach the end (the classic four-layer scroll-shadow, pure CSS, no script).
  */
 .tablewrap {
+  /* Containing block for absolutely positioned children (the .sr-only text in
+     a far-right cell): without it they sit outside the scroller and widen the
+     page. */
+  position: relative;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: var(--r-surface);

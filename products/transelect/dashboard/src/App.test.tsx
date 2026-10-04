@@ -25,6 +25,7 @@ vi.mock('./api', async (importOriginal) => {
     getActiveImport: vi.fn(),
     getSummary: vi.fn(),
     getPending: vi.fn(),
+    getLifecycle: vi.fn(),
     getOwnerStatus: vi.fn(),
     getReport: vi.fn(),
     listRows: vi.fn(),
@@ -49,7 +50,11 @@ const VIEWER: Me = {
   product_grants: [{ product_key: 'transelect', role: 'viewer' }],
 }
 
-const UNAUTHENTICATED = { ok: false as const, status: 401, error: 'Not authenticated.' }
+const UNAUTHENTICATED = {
+  ok: false as const,
+  status: 401,
+  error: 'Not authenticated.',
+}
 const NOTHING_PUBLISHED = {
   ok: false as const,
   status: 404,
@@ -68,7 +73,14 @@ function nav() {
 function stubDashboardReads() {
   // The dashboard's own data is not what these tests are about; every read
   // answers "nothing published yet", which is a real, rendered state.
-  for (const fn of [api.getSummary, api.getPending, api.getOwnerStatus, api.getReport, api.listRows]) {
+  for (const fn of [
+    api.getSummary,
+    api.getPending,
+    api.getLifecycle,
+    api.getOwnerStatus,
+    api.getReport,
+    api.listRows,
+  ]) {
     vi.mocked(fn).mockResolvedValue(NOTHING_PUBLISHED as never)
   }
   vi.mocked(api.getActiveImport).mockResolvedValue(NOTHING_PUBLISHED)
@@ -83,6 +95,7 @@ describe('App session lifecycle', () => {
       api.getActiveImport,
       api.getSummary,
       api.getPending,
+      api.getLifecycle,
       api.getOwnerStatus,
       api.getReport,
       api.listRows,
@@ -108,7 +121,7 @@ describe('App session lifecycle', () => {
     vi.stubGlobal('location', { ...window.location, assign })
     vi.mocked(api.getMe).mockResolvedValue(UNAUTHENTICATED)
     try {
-      render(<App initialPath={ROUTES.pendientes} />)
+      render(<App initialPath={ROUTES.estado} />)
       await waitFor(() => expect(assign).toHaveBeenCalledWith('/'))
       expect(screen.queryByTestId('login-card')).not.toBeInTheDocument()
     } finally {
@@ -192,7 +205,7 @@ describe('App session lifecycle', () => {
     expect(api.devLogin).toHaveBeenCalledWith('dev-viewer')
     expect(nav().getByRole('link', { name: 'Resumen' })).toBeInTheDocument()
     expect(nav().getByRole('link', { name: 'Explorador' })).toBeInTheDocument()
-    expect(nav().getByRole('link', { name: 'Pendientes' })).toBeInTheDocument()
+    expect(nav().getByRole('link', { name: 'Estado' })).toBeInTheDocument()
     expect(nav().getByRole('link', { name: 'Calidad' })).toBeInTheDocument()
     // The whole administration section, not just its two old routes.
     expect(nav().queryByRole('link', { name: 'Datos' })).not.toBeInTheDocument()
@@ -251,5 +264,19 @@ describe('App session lifecycle', () => {
     await screen.findByTestId('login-card')
     expect(screen.queryByRole('button', { name: 'Cambiar usuario' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cerrar sesión' })).not.toBeInTheDocument()
+  })
+
+  it('sends the old Pendientes address to Estado, keeping the filters', async () => {
+    window.history.replaceState({}, '', '/transelec/pendientes?q=legal')
+    vi.mocked(api.getMe).mockResolvedValue({ ok: true, data: ADMIN })
+    try {
+      render(<App initialPath="/transelec/pendientes?q=legal" />)
+
+      await waitFor(() => expect(window.location.pathname).toBe('/transelec/estado'))
+      expect(window.location.search).toBe('?q=legal')
+      expect(nav().getByRole('link', { name: 'Estado' })).toHaveAttribute('aria-current', 'page')
+    } finally {
+      window.history.replaceState({}, '', '/')
+    }
   })
 })

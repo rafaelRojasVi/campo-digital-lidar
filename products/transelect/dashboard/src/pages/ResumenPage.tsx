@@ -180,7 +180,7 @@ export function ResumenPage({
             />
             <div className="attention">
               {buildAttentionItems(data.summary, {
-                pendientes: ROUTES.pendientes,
+                pendientes: ROUTES.estado,
                 calidad: ROUTES.calidad,
               }).map((item) => (
                 <Link
@@ -302,8 +302,8 @@ export function ResumenPage({
               </div>
             )}
             <div className="btns no-print" style={{ marginTop: 'var(--s-4)' }}>
-              <Link to={ROUTES.pendientes} className="btn">
-                Ver todos los pendientes
+              <Link to={ROUTES.estado} className="btn">
+                Ver el estado de los PMF
               </Link>
               <Link to={ROUTES.explorador} className="btn alt">
                 Abrir el explorador

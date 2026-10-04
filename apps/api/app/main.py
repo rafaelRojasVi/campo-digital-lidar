@@ -281,6 +281,8 @@ TRANSELEC_SPA_PAGE_PATHS = frozenset(
     {
         "transelec",
         "transelec/explorador",
+        "transelec/estado",
+        # Redirects to transelec/estado in the browser (one release, 2026-10-04).
         "transelec/pendientes",
         # Not "transelec/aef": that is the read API's own path.
         "transelec/seguimiento-aef",

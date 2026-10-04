@@ -37,7 +37,7 @@ test.describe('sections', () => {
 
     for (const [label, path, marker] of [
       ['Explorador', '/transelec/explorador', 'rows-body'],
-      ['Pendientes', '/transelec/pendientes', 'pending-zone'],
+      ['Estado', '/transelec/estado', 'estado-zone'],
       ['AEF', '/transelec/seguimiento-aef', 'aef-kpis'],
       ['Calidad', '/transelec/calidad', 'quality-panel'],
       ['Datos', '/transelec/datos', 'upload-submit'],
@@ -53,7 +53,9 @@ test.describe('sections', () => {
     }
   })
 
-  test('an AEF PMF row opens its detail by keyboard and returns focus when closed', async ({ page }) => {
+  test('an AEF PMF row opens its detail by keyboard and returns focus when closed', async ({
+    page,
+  }) => {
     await page.goto('/transelec/seguimiento-aef')
     const row = page.getByTestId('aef-pmf-PMF-002')
     await expect(row).toBeVisible()
@@ -306,7 +308,10 @@ test.describe('the row detail drawer', () => {
     const drawer = page.getByTestId('row-drawer')
     await expect(page.getByTestId('drawer-provenance')).toContainText('Fila de origen 1')
     await expect(page.getByTestId('drawer-row-1')).toHaveAttribute('aria-current', 'true')
-    await drawer.getByRole('button', { name: /Ver la fila/ }).first().click()
+    await drawer
+      .getByRole('button', { name: /Ver la fila/ })
+      .first()
+      .click()
     await expect(page.getByTestId('drawer-provenance')).toContainText('Fila de origen 99')
     await expect(page.getByTestId('drawer-row-99')).toHaveAttribute('aria-current', 'true')
     // Row 99 says «Aprobado»; the PMF is counted under its first row's value.
@@ -330,7 +335,7 @@ test.describe('role differences', () => {
 
     await page.goto('/transelec')
     await expect(page.getByTestId('kpi-row')).toBeVisible()
-    for (const label of ['Resumen', 'Explorador', 'Pendientes', 'AEF', 'Calidad']) {
+    for (const label of ['Resumen', 'Explorador', 'Estado', 'AEF', 'Calidad']) {
       await expect(nav(page).getByRole('link', { name: label })).toBeVisible()
     }
     await expect(nav(page).getByRole('link', { name: 'Datos' })).toHaveCount(0)
@@ -365,9 +370,7 @@ test.describe('the signed-out shell', () => {
     await expect(page.getByTestId('login-card')).toBeVisible()
     // Four destinations a visitor cannot open, and a "Sin versión publicada"
     // chip blaming the data for a session problem, are both absent.
-    await expect(
-      page.getByRole('navigation', { name: 'Secciones de Transelec' }),
-    ).toHaveCount(0)
+    await expect(page.getByRole('navigation', { name: 'Secciones de Transelec' })).toHaveCount(0)
     await expect(page.getByText('Sin versión publicada')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Secciones' })).toHaveCount(0)
   })
@@ -442,7 +445,9 @@ test.describe('the shell bar with a long signed-in name', () => {
         // able to trust: it is never clipped, whatever gives way instead.
         const clipped = await chip.evaluate((element) => element.scrollWidth > element.clientWidth)
         expect(clipped, `version chip clipped at ${width}px`).toBe(false)
-        expect(stamp.x + stamp.width, `version chip off screen at ${width}px`).toBeLessThanOrEqual(width)
+        expect(stamp.x + stamp.width, `version chip off screen at ${width}px`).toBeLessThanOrEqual(
+          width,
+        )
       }
 
       // However the name is drawn, the whole of it is still there to read.

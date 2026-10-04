@@ -108,7 +108,7 @@ for (const [label, width, height] of [
   for (const [section, path, marker] of [
     ['resumen', '/transelec', 'kpi-row'],
     ['explorador', '/transelec/explorador', 'rows-body'],
-    ['pendientes', '/transelec/pendientes', 'pending-zone'],
+    ['estado', '/transelec/estado', 'estado-zone'],
     ['calidad', '/transelec/calidad', 'quality-panel'],
     ['datos', '/transelec/datos', 'upload-submit'],
   ] as const) {
@@ -156,8 +156,8 @@ test('TR-FUNC-044: the shell navigation collapses to a disclosure at phone width
   await expect(menu).toBeVisible()
 
   // Choosing a section navigates and closes the menu behind the reader.
-  await menu.getByRole('link', { name: 'Pendientes' }).click()
-  await expect(page.getByTestId('pending-zone')).toBeVisible()
+  await menu.getByRole('link', { name: 'Estado' }).click()
+  await expect(page.getByTestId('estado-zone')).toBeVisible()
   await expect(toggle).toHaveAttribute('aria-expanded', 'false')
 })
 

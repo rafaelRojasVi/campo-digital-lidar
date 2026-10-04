@@ -114,7 +114,7 @@ describe('AppHeader (TR-FUNC-041/046)', () => {
         canPublish={false}
       />,
     )
-    for (const label of ['Resumen', 'Explorador', 'Pendientes', 'Calidad']) {
+    for (const label of ['Resumen', 'Explorador', 'Estado', 'Calidad']) {
       expect(nav().getByRole('link', { name: label })).toBeInTheDocument()
     }
   })

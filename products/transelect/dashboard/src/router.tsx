@@ -20,6 +20,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 export const ROUTES = {
   resumen: '/transelec',
   explorador: '/transelec/explorador',
+  estado: '/transelec/estado',
+  // Retired 2026-10-04 in favour of «Estado»; kept one release so old links
+  // and bookmarks land on it (App.tsx replaces the address).
   pendientes: '/transelec/pendientes',
   aef: '/transelec/seguimiento-aef',
   calidad: '/transelec/calidad',

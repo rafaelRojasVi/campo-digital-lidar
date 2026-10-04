@@ -16,22 +16,29 @@ import { classifyFailure, type ApiFailure } from './lib/apiState'
 import { useFilters } from './lib/useFilters'
 import { CalidadPage } from './pages/CalidadPage'
 import { DatosPage } from './pages/DatosPage'
+import { EstadoPage } from './pages/EstadoPage'
 import { ExploradorPage } from './pages/ExploradorPage'
 import { AefPage } from './pages/AefPage'
-import { PendientesPage } from './pages/PendientesPage'
 import { ResumenPage } from './pages/ResumenPage'
 import { ROUTES, RouterProvider, isAdminRoute, resolveRoute, useRouter } from './router'
 import { PLATFORM_FRONT_DOOR_PATH, platformFrontDoorEnabled } from './runtime/frontDoor'
 import { demoSignInAvailable } from './runtime/environment'
 
 function Shell() {
-  const { pathname } = useRouter()
+  const { pathname, search, navigate } = useRouter()
   const route = resolveRoute(pathname)
 
   // One filter state for the whole application, read from and written to the
   // URL. Held here rather than per page so moving between sections carries
   // the current scope instead of silently resetting it.
   const filterController = useFilters()
+
+  // «Pendientes» became «Estado» on 2026-10-04. Old links and bookmarks keep
+  // working for one release: the address is replaced, filters and all, so
+  // Back never returns to the retired one.
+  useEffect(() => {
+    if (route === ROUTES.pendientes) navigate(`${ROUTES.estado}${search}`, { replace: true })
+  }, [route, search, navigate])
 
   const [me, setMe] = useState<Me | null>(null)
   const [sessionFailure, setSessionFailure] = useState<ApiFailure | null>(null)
@@ -195,9 +202,10 @@ function Shell() {
             sourceFields={activeImport?.source_fields ?? null}
           />
         )
+      case ROUTES.estado:
       case ROUTES.pendientes:
         return (
-          <PendientesPage
+          <EstadoPage
             filterController={filterController}
             sourceFields={activeImport?.source_fields ?? null}
           />
