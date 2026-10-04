@@ -15,7 +15,9 @@ Container packaging: **built and locally verified** (this document).
   service deploys from `main`.
 - **DECISION (2026-09-28):** no backups. The Hobby plan has no scheduled
   backups (Pro only), and Rafael accepted the risk: published workbook data
-  can be rebuilt by re-importing, grants and audit history cannot.
+  can be rebuilt by re-importing, grants and audit history cannot. A manual
+  `pg_dump` can be taken on demand (see "Manual database backup"); it does
+  not change this decision.
 
 Read first, and treat as authoritative over this document if they disagree:
 
@@ -223,6 +225,52 @@ This container does not run migrations on startup, by design (see that same
 document, "no implicit destructive migration on app startup"); apply
 `alembic upgrade head` as a separate release step against this image before
 routing traffic to it.
+
+## Manual database backup
+
+The 2026-09-28 decision above stands: nothing backs up production on a
+schedule. `scripts/backup_prod_db.sh` is the on-demand substitute. It copies
+the production PostgreSQL database to this machine with `pg_dump`, run by
+hand by someone with Railway access, for example before a migration or a
+risky deploy.
+
+It dumps the whole database, so it includes the grants
+(`platform.product_grant`) and audit history (`platform.audit_event`) that
+the decision says cannot be rebuilt. **LIMITATION:** it does not copy the
+uploaded workbook files on the `/data` volume (see "Object storage").
+
+1. On Railway, enable the PostGIS service's TCP proxy. This exposes the
+   database on a public host and port while it is on.
+2. Copy `DATABASE_PUBLIC_URL` from the PostGIS service's variables and pass
+   it through the environment only, never as an argument or in a file:
+
+   ```sh
+   read -rs DATABASE_PUBLIC_URL && export DATABASE_PUBLIC_URL
+   scripts/backup_prod_db.sh
+   unset DATABASE_PUBLIC_URL
+   ```
+
+3. Disable the TCP proxy again.
+
+What the script guarantees, from its own code:
+
+- it refuses to run without `DATABASE_PUBLIC_URL`;
+- it requires TLS (`PGSSLMODE=require` unless already set), because the
+  proxy crosses the public internet;
+- it writes to `$CAMPO_BACKUP_DIR` (default `~/campo-digital-backups`,
+  directory mode `700`, files `600`), outside the repository;
+- it writes `<name>.partial` and renames it only after `pg_restore --list`
+  reads the archive back, so a file without `.partial` is complete.
+
+`pg_dump` and `pg_restore` must be on the `PATH`, at a major version no older
+than the server's: `pg_dump` refuses to dump a newer server.
+
+**LIMITATION:** no restore of one of these dumps has been tested.
+`pg_restore --list` proves the archive is readable, not that it restores
+cleanly; the target database needs PostGIS.
+
+The dumps are client data. Keep them out of the repository and out of the
+OneDrive source root.
 
 ## Object storage
 

@@ -72,6 +72,9 @@ products/lidar/dashboard/public/local-demo/
 .lidar-dev/
 .campo-demo/
 
+# Transelec local launcher state (PIDs, ports, logs) - see scripts/transelec_dev.py
+.transelec-dev/
+
 # Local content-addressed object store (platform ingestion foundation) -
 # never commit stored binaries; see apps/api/app/object_store.py
 .local/
