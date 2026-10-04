@@ -32,6 +32,7 @@ import {
   webTooltip,
 } from '../lib/webEdits'
 import { ConfirmDialog } from './ConfirmDialog'
+import { SourceDate } from './SourceDate'
 import { AlertBanner } from './StateViews'
 import { WebChip } from './WebChip'
 
@@ -54,6 +55,7 @@ export function EditableFieldsSection({
   suggestions,
   onSaved,
   onReload,
+  onRowEdited,
 }: {
   row: ResumenRow
   activeImportId: number | null
@@ -66,9 +68,13 @@ export function EditableFieldsSection({
   suggestions: Partial<Record<EditableFieldName, string[]>>
   onSaved: (row: ResumenRow) => void
   onReload: () => void
+  /** Called after a revert or reload so surfaces showing this row can refresh it. */
+  onRowEdited?: () => void
 }) {
   const [editing, setEditing] = useState<EditableFieldName | null>(null)
   const [draft, setDraft] = useState('')
+  // The value the editor saw when it opened; what a save is checked against.
+  const [seenValue, setSeenValue] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<{ message: string; reload: boolean } | null>(null)
   const [status, setStatus] = useState('')
@@ -94,6 +100,7 @@ export function EditableFieldsSection({
   const start = (spec: EditableFieldSpec) => {
     setEditing(spec.name)
     setDraft(row[spec.name] ?? '')
+    setSeenValue(row[spec.name] ?? null)
     setError(null)
     setStatus('')
   }
@@ -114,7 +121,7 @@ export function EditableFieldsSection({
       sourceRowNumber: row.source_row_number,
       field: spec.name,
       value: draft.trim() === '' ? null : draft,
-      expectedValue: row[spec.name],
+      expectedValue: seenValue,
     })
     setBusy(false)
     if (!result.ok) {
@@ -130,9 +137,11 @@ export function EditableFieldsSection({
     setEditing(null)
     setFocusTarget(`edit-${spec.name}`)
     setStatus(
-      result.data.changed
-        ? `Se guardó el cambio en ${spec.label}.`
-        : `${spec.label} ya tenía ese valor; no hubo cambios.`,
+      !result.data.changed
+        ? `${spec.label} ya tenía ese valor; no hubo cambios.`
+        : draft.trim() === ''
+          ? `${spec.label} se dejó vacío.`
+          : `Se guardó el cambio en ${spec.label}.`,
     )
     onSaved(result.data.row)
   }
@@ -150,6 +159,7 @@ export function EditableFieldsSection({
     }
     setStatus(`${spec.label} volvió al valor de la planilla.`)
     onReload()
+    onRowEdited?.()
   }
 
   /** Escape closes only what is open here; Tab stays between the editor's own controls. */
@@ -202,7 +212,14 @@ export function EditableFieldsSection({
           {' '}
           {error.message}{' '}
           {error.reload && (
-            <button type="button" className="btn-link" onClick={onReload}>
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => {
+                onReload()
+                onRowEdited?.()
+              }}
+            >
               Recargar
             </button>
           )}
@@ -223,6 +240,13 @@ export function EditableFieldsSection({
               <dt>{spec.label}</dt>
               <dd>
                 {isEditing ? (
+                  <>
+                  {spec.kind === 'date' && row[spec.name] == null && row.source_text_dates?.[spec.name] && (
+                    <span className="editable-provenance" data-testid={`text-date-${spec.name}`}>
+                      La planilla tiene texto: «{row.source_text_dates[spec.name].raw}». Al guardar una
+                      fecha se reemplaza.
+                    </span>
+                  )}
                   <form
                     className="field-editor"
                     onKeyDown={(event) => onEditorKeyDown(event, spec)}
@@ -259,10 +283,21 @@ export function EditableFieldsSection({
                       Cancelar
                     </button>
                   </form>
+                  </>
                 ) : (
                   <>
                     <span className="editable-value">
-                      <span>{shown || <span className="hint">Sin dato</span>}</span>
+                      <span>
+                        {spec.kind === 'date' ? (
+                          <SourceDate
+                            row={row}
+                            field={spec.name as 'fecha_ingreso'}
+                            missing="Sin dato"
+                          />
+                        ) : (
+                          shown || <span className="hint">Sin dato</span>
+                        )}
+                      </span>
                       {web && <WebChip />}
                     </span>
                     {web && (

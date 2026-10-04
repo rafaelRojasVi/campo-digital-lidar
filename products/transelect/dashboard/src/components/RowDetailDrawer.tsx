@@ -23,7 +23,7 @@
  * Nothing is borrowed into a blank row. Older versions without AEF columns
  * say so instead of implying a row has missing data.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   EMPTY_FILTERS,
   type AefPmf,
@@ -52,7 +52,7 @@ import {
   LIFECYCLE_GROUP_LABELS,
   lifecycleStepText,
 } from '../lib/lifecycle'
-import { loadSuggestions } from '../lib/webEdits'
+import { isWebField, loadSuggestions } from '../lib/webEdits'
 import { classifyFailure, type FailureView } from '../lib/apiState'
 import type { PlazoDetail } from '../lib/plazo'
 import { Drawer } from '../ui/Drawer'
@@ -245,6 +245,9 @@ export function RowDetailDrawer({
   const [pmfAefLoading, setPmfAefLoading] = useState(sourceHasAef !== false)
   const [pmfAefFailed, setPmfAefFailed] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
+  // Set after a revert or reload: the next fetched copy of the row is also
+  // handed to the page behind (its table row and «web» chip).
+  const [refreshRow, setRefreshRow] = useState(false)
   const [overrides, setOverrides] = useState<TranselecOverride[]>([])
   const [overridesStatus, setOverridesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [suggestions, setSuggestions] = useState<Partial<Record<EditableFieldName, string[]>>>({})
@@ -252,6 +255,13 @@ export function RowDetailDrawer({
   // A different row chosen behind the panel replaces the one shown here.
   // Adjusted during render rather than in an effect, so the panel never
   // paints one frame of the previous row.
+  const currentRowRef = useRef(current.source_row_number)
+  const refreshRowRef = useRef(false)
+  useEffect(() => {
+    currentRowRef.current = current.source_row_number
+    refreshRowRef.current = refreshRow
+  })
+
   if (openedFrom !== row) {
     setOpenedFrom(row)
     setCurrent(row)
@@ -269,12 +279,17 @@ export function RowDetailDrawer({
         setDetail(result.data)
         // After a save or a reload, show the fresh copy of the row being read.
         if (reloadToken > 0) {
-          setCurrent(
-            (previous) =>
-              result.data.rows.find(
-                (entry) => entry.source_row_number === previous.source_row_number,
-              ) ?? previous,
+          const fresh = result.data.rows.find(
+            (entry) => entry.source_row_number === currentRowRef.current,
           )
+          if (fresh) {
+            setCurrent(fresh)
+            if (refreshRowRef.current) {
+              refreshRowRef.current = false
+              setRefreshRow(false)
+              onRowEdited?.(fresh)
+            }
+          }
         }
       } else setFailure(classifyFailure({ status: result.status, error: result.error }))
       setLoading(false)
@@ -409,13 +424,13 @@ export function RowDetailDrawer({
         <section className="drawer-section" aria-labelledby="drawer-tramitacion">
           <h3 id="drawer-tramitacion">Tramitación</h3>
           <dl className="facts">
-            <Fact label="Estado vigente" wide>
+            <Fact label="Estado vigente" wide web={isWebField(current, 'estado')}>
               {cell(current.estado, 'Sin información')}
             </Fact>
-            <Fact label="Motivo" wide>
+            <Fact label="Motivo" wide web={isWebField(current, 'tipo_rechazo')}>
               {cell(current.tipo_rechazo, 'Sin motivo registrado')}
             </Fact>
-            <Fact label="N.º ingreso">
+            <Fact label="N.º ingreso" web={isWebField(current, 'numero_ingreso')}>
               {cell(current.numero_ingreso, 'Sin ingreso')}
               <OficinaVirtualLink
                 key={current.numero_ingreso ?? ''}
@@ -423,7 +438,7 @@ export function RowDetailDrawer({
                 testId="drawer-ov-1"
               />
             </Fact>
-            <Fact label="Fecha ingreso">
+            <Fact label="Fecha ingreso" web={isWebField(current, 'fecha_ingreso')}>
               <SourceDate row={current} field="fecha_ingreso" missing="Sin fecha" />
             </Fact>
             {sourceHasIngreso2 === false ? (
@@ -435,7 +450,7 @@ export function RowDetailDrawer({
               </Fact>
             ) : (
               <>
-                <Fact label="N.º ingreso 2">
+                <Fact label="N.º ingreso 2" web={isWebField(current, 'numero_ingreso_2')}>
                   <span data-testid="drawer-numero-ingreso-2">
                     {cell(current.numero_ingreso_2, 'Sin segundo ingreso')}
                   </span>
@@ -447,14 +462,14 @@ export function RowDetailDrawer({
                     />
                   )}
                 </Fact>
-                <Fact label="Fecha ingreso 2">
+                <Fact label="Fecha ingreso 2" web={isWebField(current, 'fecha_ingreso_2')}>
                   <span data-testid="drawer-fecha-ingreso-2">
                     <SourceDate row={current} field="fecha_ingreso_2" missing="Sin fecha" />
                   </span>
                 </Fact>
               </>
             )}
-            <Fact label="«90 dias» de la planilla">
+            <Fact label="«90 dias» de la planilla" web={isWebField(current, 'fecha_90_dias')}>
               <SourceDate row={current} field="fecha_90_dias" missing="Sin fecha" />
             </Fact>
             <Fact label="PAS">{cell(current.pas, 'Sin información')}</Fact>
@@ -478,6 +493,7 @@ export function RowDetailDrawer({
               onRowEdited?.(updated)
             }}
             onReload={() => setReloadToken((value) => value + 1)}
+            onRowEdited={() => setRefreshRow(true)}
           />
         )}
 

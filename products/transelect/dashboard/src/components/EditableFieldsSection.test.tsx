@@ -189,4 +189,82 @@ describe('EditableFieldsSection', () => {
     expect(discardOverride).toHaveBeenCalledWith(31)
     await waitFor(() => expect(base.onReload).toHaveBeenCalled())
   })
+
+  it('shows unparsed date text and still sends null as the value it saw', async () => {
+    const row = makeRow({
+      source_row_number: 2,
+      fecha_ingreso: null,
+      source_text_dates: {
+        fecha_ingreso: { raw: 'por confirmar', resolution: 'unrecognized', parsed: null },
+      },
+    })
+    vi.mocked(saveOverride).mockResolvedValue({
+      ok: true,
+      data: { override_id: 5, changed: true, row: { ...row, fecha_ingreso: '2026-05-06' } },
+    })
+    render(<EditableFieldsSection {...base} row={row} canEdit onSaved={vi.fn()} />)
+    expect(screen.getByTestId('editable-fecha_ingreso')).toHaveTextContent('por confirmar')
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Fecha ingreso' }))
+    expect(screen.getByTestId('text-date-fecha_ingreso')).toHaveTextContent(
+      'La planilla tiene texto: «por confirmar»',
+    )
+    await userEvent.type(screen.getByLabelText('Nuevo valor de Fecha ingreso'), '2026-05-06')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(saveOverride).toHaveBeenCalledWith(
+      expect.objectContaining({ field: 'fecha_ingreso', value: '2026-05-06', expectedValue: null }),
+    )
+  })
+
+  it('checks the save against the value the editor opened with, even if the row changes', async () => {
+    vi.mocked(saveOverride).mockResolvedValue({ ok: false, status: 409, error: 'x', payload: { detail: 'x', code: 'value_changed' } })
+    const first = makeRow({ source_row_number: 2, estado: 'En tramite' })
+    const { rerender } = render(
+      <EditableFieldsSection {...base} row={first} canEdit onSaved={vi.fn()} />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+    rerender(
+      <EditableFieldsSection
+        {...base}
+        row={{ ...first, estado: 'Aprobado por otra persona' }}
+        canEdit
+        onSaved={vi.fn()}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(saveOverride).toHaveBeenCalledWith(
+      expect.objectContaining({ field: 'estado', expectedValue: 'En tramite' }),
+    )
+  })
+
+  it('says when a field was left empty', async () => {
+    const row = makeRow({ source_row_number: 2, estado: 'En tramite' })
+    vi.mocked(saveOverride).mockResolvedValue({
+      ok: true,
+      data: { override_id: 5, changed: true, row: { ...row, estado: null } },
+    })
+    render(<EditableFieldsSection {...base} row={row} canEdit onSaved={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+    await userEvent.clear(screen.getByLabelText('Nuevo valor de Estado vigente'))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Estado vigente se dejó vacío.')
+  })
+
+  it('tells the page to refresh the row after a revert and after Recargar', async () => {
+    vi.mocked(discardOverride).mockResolvedValue({ ok: true, data: undefined })
+    const onRowEdited = vi.fn()
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow({ source_row_number: 2, web_fields: ['estado'] })}
+        overrides={[applied]}
+        overridesStatus="ready"
+        canEdit
+        onSaved={vi.fn()}
+        onRowEdited={onRowEdited}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Volver al valor de la planilla de Estado vigente' }))
+    await userEvent.click(screen.getByTestId('confirm-accept'))
+    await waitFor(() => expect(onRowEdited).toHaveBeenCalledTimes(1))
+  })
 })
