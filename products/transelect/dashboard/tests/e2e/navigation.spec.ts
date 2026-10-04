@@ -392,3 +392,61 @@ test.describe('the shell bar at laptop widths', () => {
     })
   }
 })
+
+test.describe('the shell bar with a long signed-in name', () => {
+  // The display name is the one thing in the bar whose width the dashboard
+  // does not choose. Found on 2026-10-04: from about 29 characters, "Calidad"
+  // and "Datos" were drawn under the version chip at 1280px, and at 44
+  // characters at every width, because the bar stops growing at --page-max.
+  const NAMES = [
+    'Rafael Rojas',
+    'Javier Andrés Muñoz Contreras',
+    'María José Fernández-Valenzuela de la Fuente',
+  ]
+
+  for (const displayName of NAMES) {
+    test(`a ${displayName.length}-character name never covers the sections or the version stamp`, async ({
+      page,
+    }) => {
+      await stubPlatform(page, {
+        me: {
+          identity_key: 'long-name-admin',
+          display_name: displayName,
+          product_grants: [{ product_key: 'transelect', role: 'admin' }],
+        },
+      })
+      await page.goto('/transelec')
+      await expect(page.getByTestId('kpi-row')).toBeVisible()
+
+      for (const width of [1280, 1366, 1440, 1600, 1920]) {
+        await page.setViewportSize({ width, height: 800 })
+        await expect(nav(page).getByRole('link', { name: 'Calidad' })).toBeVisible()
+
+        const chip = page.locator('.version-chip')
+        const stamp = await chip.boundingBox()
+        if (!stamp) throw new Error(`no version chip at ${width}px`)
+
+        const links = nav(page).getByRole('link')
+        for (let index = 0; index < (await links.count()); index += 1) {
+          const link = await links.nth(index).boundingBox()
+          if (!link) throw new Error(`section link ${index} not measured at ${width}px`)
+          const overlaps =
+            link.x + link.width > stamp.x &&
+            stamp.x + stamp.width > link.x &&
+            link.y + link.height > stamp.y &&
+            stamp.y + stamp.height > link.y
+          expect(overlaps, `section link ${index} under the version chip at ${width}px`).toBe(false)
+        }
+
+        // The version stamp is the one thing in the shell a reader must be
+        // able to trust: it is never clipped, whatever gives way instead.
+        const clipped = await chip.evaluate((element) => element.scrollWidth > element.clientWidth)
+        expect(clipped, `version chip clipped at ${width}px`).toBe(false)
+        expect(stamp.x + stamp.width, `version chip off screen at ${width}px`).toBeLessThanOrEqual(width)
+      }
+
+      // However the name is drawn, the whole of it is still there to read.
+      await expect(page.getByTestId('shell-identity')).toContainText(displayName)
+    })
+  }
+})

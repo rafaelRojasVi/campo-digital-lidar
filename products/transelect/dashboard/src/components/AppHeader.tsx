@@ -221,7 +221,9 @@ export function AppHeader({
 
           {me && (
             <span className="identity" data-testid="shell-identity">
-              <span className="identity-name">{me.display_name}</span>
+              <span className="identity-name" title={me.display_name}>
+                {me.display_name}
+              </span>
               {role && <span className="identity-role">{ROLE_LABELS[role] ?? role}</span>}
             </span>
           )}

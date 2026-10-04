@@ -82,7 +82,13 @@
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  min-width: 0;
+  /*
+   * `max-content`, not `0`. The links are `nowrap`, so a nav allowed to
+   * shrink below them does not compress them: they run on underneath the
+   * version chip. When the bar is short of room, the display name gives way
+   * instead (see `.identity-name`).
+   */
+  min-width: max-content;
   flex: 1;
 }
 
@@ -134,11 +140,13 @@
   align-items: center;
   gap: var(--s-5);
   margin-left: auto;
-  flex-shrink: 0;
+  /* Shrinks only through the display name; everything else in it holds. */
+  min-width: 0;
 }
 
 .version-chip {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--s-3);
   padding: var(--s-2) var(--s-4);
@@ -166,6 +174,7 @@
 
 .identity {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: var(--s-3);
   font-size: var(--t-micro);
@@ -173,17 +182,28 @@
   white-space: nowrap;
 }
 
+/*
+ * The one width in the bar the dashboard does not choose. A long name is cut
+ * with an ellipsis rather than wrapping the bar onto a second row: the bar is
+ * a fixed --shell-h row that scroll offsets and the current-section rule are
+ * measured against. The full name stays in the DOM and in the title.
+ */
 .identity-name {
+  min-width: 0;
+  overflow: hidden;
   color: #fff;
   font-weight: 650;
+  text-overflow: ellipsis;
 }
 
 .identity-role {
+  flex-shrink: 0;
   color: var(--ink-inverse-2);
 }
 
 .session-control {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--s-3);
 }
@@ -1396,8 +1416,9 @@
  * the identity and, on the unified platform, "Proyectos") needs ~1,210px.
  * The chip shows the publish date (the time is in its title). Below 1440px
  * the role label goes; below 1280px the sections fold into the "Secciones"
- * menu. Pinned by
- * tests/e2e/navigation.spec.ts "the shell bar at laptop widths".
+ * menu. A long display name is cut with an ellipsis (see `.identity-name`).
+ * Pinned by tests/e2e/navigation.spec.ts "the shell bar at laptop widths"
+ * and "the shell bar with a long signed-in name".
  */
 @media (max-width: 1439px) {
   .identity-role {
