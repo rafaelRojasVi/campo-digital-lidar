@@ -1107,3 +1107,19 @@ a.status-card .status-card-go {
 .review-list li + li {
   margin-top: var(--s-3);
 }
+
+/* «web» mark: a value that came from a dashboard edit. Carries text, not
+   color alone; --info-* tokens keep it distinct from the status colours. */
+.web-chip {
+  display: inline-block;
+  margin-left: var(--s-3);
+  padding: 1px var(--s-3);
+  border: 1px solid var(--info-line);
+  border-radius: var(--r-pill);
+  background: var(--info-tint);
+  color: var(--ink-2);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  line-height: 1.4;
+  vertical-align: middle;
+}
