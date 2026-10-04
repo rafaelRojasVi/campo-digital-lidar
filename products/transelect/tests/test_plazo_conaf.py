@@ -452,3 +452,42 @@ def test_no_rows_is_an_empty_summary() -> None:
     assert summary.total_pmf_count == 0
     assert summary.pmfs == ()
     assert set(summary.estados.values()) == {0}
+
+
+def test_holidays_inside_the_window_are_not_elapsed_business_days() -> None:
+    thursday = dt.date(2026, 9, 17)
+    monday = dt.date(2026, 9, 21)  # the 18th and 19th are holidays in the test calendar
+    assert business_days_between(thursday, monday, holiday_in_test_calendar) == 1
+
+    entry = _one([_row(fecha_ingreso=thursday)], today=monday, is_holiday=holiday_in_test_calendar)
+
+    assert (entry.estado, entry.elapsed_business_days, entry.remaining_business_days) == (
+        "en_plazo",
+        1,
+        89,
+    )
+
+
+def test_a_deadline_pushed_by_holidays_is_observed_with_zero_remaining() -> None:
+    entry = _one(
+        [_row(fecha_ingreso=dt.date(2026, 6, 1))],
+        today=dt.date(2026, 10, 7),
+        is_holiday=holiday_in_test_calendar,
+    )
+
+    assert entry.deadline == dt.date(2026, 10, 7)
+    assert (entry.estado, entry.elapsed_business_days, entry.remaining_business_days) == (
+        "por_vencer",
+        90,
+        0,
+    )
+
+
+def test_an_ingreso_too_late_for_a_deadline_is_sin_fecha_texto_not_an_error() -> None:
+    entry = _one([_row(fecha_ingreso=dt.date(9999, 12, 30))])
+
+    assert entry.estado == "sin_fecha_texto"
+    assert (entry.base_date, entry.deadline) == (None, None)
+    assert entry.base_field == "fecha_ingreso"
+    assert (entry.elapsed_business_days, entry.remaining_business_days) == (None, None)
+    assert entry.cruce == "sin_calculo"

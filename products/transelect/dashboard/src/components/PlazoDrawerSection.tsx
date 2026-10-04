@@ -46,7 +46,7 @@ export function PlazoDrawerNotice({ status }: { status: PlazoDrawerStatus }) {
       </h3>
       {status === 'loading' && <LoadingBlock label="Calculando el plazo…" lines={2} />}
       {status === 'error' && (
-        <p className="hint" role="status">
+        <p className="hint">
           No se pudo cargar el plazo de este PMF. El resto del detalle no cambia.
         </p>
       )}

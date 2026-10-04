@@ -230,11 +230,15 @@ def build_plazos(
     for pmf, scoped in scope.items():
         facts = every.get(pmf) or scoped
         blocked, base_field, base_date, base_rows = _base(facts)
-        deadline = (
-            add_business_days(base_date, PLAZO_HABILES, is_holiday)
-            if base_date is not None
-            else None
-        )
+        deadline: dt.date | None = None
+        if base_date is not None:
+            try:
+                deadline = add_business_days(base_date, PLAZO_HABILES, is_holiday)
+            except OverflowError:
+                # A date so late that 90 business days after it leave Python's
+                # date range is not a usable ingreso: report it like any other
+                # unreadable ingreso instead of failing the whole read.
+                blocked, base_date = "sin_fecha_texto", None
         cruce, planilla, difference = _cruce(facts, deadline)
 
         elapsed: int | None = None

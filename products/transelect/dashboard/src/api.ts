@@ -661,39 +661,14 @@ interface CsrfToken {
 
 let csrfToken: CsrfToken | null = null
 
-/**
- * The most recent `Date` response header observed from the platform API.
- *
- * TR-FUNC-031's one mechanical bug fix needs a reference "today" that
- * actually advances, and the source-ingestion rule is that observation time
- * is platform infrastructure, never workbook data. The read API exposes no
- * "server now" endpoint, but every response carries the server's own `Date`
- * header — that is the reference this app uses, so "today" is the API
- * process's clock rather than the viewer's. Null until the first response.
- */
-let serverClock: Date | null = null
-
-export function observedServerNow(): Date | null {
-  return serverClock
-}
-
-/** Test seam: reset the module's cached session/clock observations. */
+/** Test seam: reset the module's cached session observations. */
 export function resetApiClientState(): void {
   csrfToken = null
-  serverClock = null
-}
-
-function rememberServerClock(response: Response): void {
-  const header = response.headers.get('date')
-  if (!header) return
-  const parsed = new Date(header)
-  if (!Number.isNaN(parsed.getTime())) serverClock = parsed
 }
 
 async function fetchCsrfToken(): Promise<CsrfToken | null> {
   try {
     const response = await fetch('/api/auth/csrf', { credentials: 'include' })
-    rememberServerClock(response)
     if (!response.ok) return null
     const body = (await response.json()) as { csrf_token?: string; header_name?: string }
     if (!body.csrf_token) return null
@@ -729,7 +704,6 @@ export function onUnauthorized(listener: () => void): () => void {
 }
 
 function observe(response: Response): Response {
-  rememberServerClock(response)
   if (response.status === 401) {
     for (const listener of unauthorizedListeners) listener()
   }

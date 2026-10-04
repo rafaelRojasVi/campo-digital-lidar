@@ -24,7 +24,16 @@ export function PlazoFailureBanner({
   return (
     <AlertBanner title="No se pudo calcular el plazo CONAF">
       <p>{rawFailure && rawFailure.status >= 500 ? scope : failure.message}</p>
-      <button type="button" className="btn-link" onClick={onRetry} disabled={loading}>
+      {/* aria-disabled, not disabled: a disabled button drops keyboard focus. */}
+      <button
+        type="button"
+        className="btn-link"
+        aria-disabled={loading}
+        onClick={() => {
+          if (loading) return
+          onRetry()
+        }}
+      >
         {loading ? 'Reintentando…' : 'Reintentar'}
       </button>
     </AlertBanner>
