@@ -200,6 +200,7 @@ function Shell() {
             filterController={filterController}
             activeImportId={activeImport?.import_id ?? null}
             sourceFields={activeImport?.source_fields ?? null}
+            canEdit={publisher}
           />
         )
       case ROUTES.estado:

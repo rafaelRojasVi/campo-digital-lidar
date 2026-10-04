@@ -1,0 +1,192 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { TranselecOverride } from '../api'
+import { EditableFieldsSection } from './EditableFieldsSection'
+import { makeRow } from '../test/factories'
+
+vi.mock('../api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api')>()
+  return { ...actual, saveOverride: vi.fn(), discardOverride: vi.fn() }
+})
+
+const { saveOverride, discardOverride } = await import('../api')
+
+const base = {
+  activeImportId: 7,
+  sourceFields: null,
+  overrides: [],
+  suggestions: { estado_resumido: ['Aprobado', 'En tramite'] },
+  onReload: vi.fn(),
+}
+
+const applied: TranselecOverride = {
+  id: 31,
+  field: 'estado',
+  field_label: 'Estado vigente',
+  status: 'aplicada',
+  pmf: 'MP001',
+  rol: '101',
+  numero_predio: '1',
+  numero_area_corta: 'A1',
+  source_row_number: 2,
+  web_value: 'Aprobado',
+  planilla_value_at_edit: 'En tramite',
+  created_by_display_name: 'Ana Operadora',
+  created_at: '2026-10-03T15:00:00Z',
+} as unknown as TranselecOverride
+
+describe('EditableFieldsSection', () => {
+  beforeEach(() => {
+    vi.mocked(saveOverride).mockReset()
+    vi.mocked(discardOverride).mockReset()
+    base.onReload.mockReset()
+  })
+
+  it('saves a new value with the value the editor saw', async () => {
+    const onSaved = vi.fn()
+    const row = makeRow({ source_row_number: 2, estado_resumido: 'En tramite' })
+    vi.mocked(saveOverride).mockResolvedValue({
+      ok: true,
+      data: {
+        override_id: 31,
+        changed: true,
+        row: { ...row, estado_resumido: 'Aprobado', web_fields: ['estado_resumido'] },
+      },
+    })
+    render(<EditableFieldsSection {...base} row={row} canEdit onSaved={onSaved} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado resumido' }))
+    const input = screen.getByLabelText('Nuevo valor de Estado resumido')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Aprobado')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    expect(saveOverride).toHaveBeenCalledWith({
+      importId: 7,
+      sourceRowNumber: 2,
+      field: 'estado_resumido',
+      value: 'Aprobado',
+      expectedValue: 'En tramite',
+    })
+    expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ estado_resumido: 'Aprobado' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Se guardó')
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Editar Estado resumido' })).toHaveFocus(),
+    )
+  })
+
+  it('explains a concurrent change and offers a reload', async () => {
+    vi.mocked(saveOverride).mockResolvedValue({
+      ok: false,
+      status: 409,
+      error: 'x',
+      payload: { detail: 'x', code: 'value_changed' },
+    })
+    render(<EditableFieldsSection {...base} row={makeRow()} canEdit onSaved={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Otra persona cambió este valor')
+    expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
+  })
+
+  it('shows chips but no edit controls to a viewer', () => {
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow({ web_fields: ['estado'] })}
+        canEdit={false}
+        onSaved={vi.fn()}
+      />,
+    )
+    expect(screen.getAllByTestId('web-chip')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: /Editar/ })).not.toBeInTheDocument()
+  })
+
+  it('hides Editar for a field the published planilla has no column for', () => {
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow()}
+        canEdit
+        sourceFields={['estado', 'estado_resumido']}
+        onSaved={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Editar Estado vigente' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Editar N.º ingreso 2' })).not.toBeInTheDocument()
+  })
+
+  it('uses a date input for date fields and a datalist for suggestible ones', async () => {
+    render(<EditableFieldsSection {...base} row={makeRow()} canEdit onSaved={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Fecha ingreso' }))
+    expect(screen.getByLabelText('Nuevo valor de Fecha ingreso')).toHaveAttribute('type', 'date')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado resumido' }))
+    const input = screen.getByLabelText('Nuevo valor de Estado resumido')
+    expect(input).toHaveAttribute('list', 'suggest-estado_resumido')
+    expect(document.querySelectorAll('#suggest-estado_resumido option')).toHaveLength(2)
+  })
+
+  it('shows who edited a value as visible text, not only a tooltip', () => {
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow({ source_row_number: 2, web_fields: ['estado'] })}
+        overrides={[applied]}
+        overridesStatus="ready"
+        canEdit={false}
+        onSaved={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('editable-estado')).toHaveTextContent(
+      'Editado en la web por Ana Operadora · 03-10-2026 · en la planilla: En tramite',
+    )
+  })
+
+  it('says when the provenance is loading or failed', () => {
+    const row = makeRow({ web_fields: ['estado'] })
+    const { rerender } = render(
+      <EditableFieldsSection {...base} row={row} overridesStatus="loading" canEdit={false} onSaved={vi.fn()} />,
+    )
+    expect(screen.getByText(/Cargando quién editó/)).toBeInTheDocument()
+    rerender(
+      <EditableFieldsSection {...base} row={row} overridesStatus="error" canEdit={false} onSaved={vi.fn()} />,
+    )
+    expect(screen.getByText(/No se pudo cargar quién editó/)).toBeInTheDocument()
+  })
+
+  it('Escape cancels the editor without reaching the drawer', async () => {
+    const outside = vi.fn()
+    document.addEventListener('keydown', outside)
+    render(<EditableFieldsSection {...base} row={makeRow()} canEdit onSaved={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByLabelText('Nuevo valor de Estado vigente')).not.toBeInTheDocument()
+    expect(outside).not.toHaveBeenCalled()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Editar Estado vigente' })).toHaveFocus(),
+    )
+    document.removeEventListener('keydown', outside)
+  })
+
+  it('asks before going back to the planilla value', async () => {
+    vi.mocked(discardOverride).mockResolvedValue({ ok: true, data: undefined })
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow({ source_row_number: 2, web_fields: ['estado'] })}
+        overrides={[applied]}
+        overridesStatus="ready"
+        canEdit
+        onSaved={vi.fn()}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Volver al valor de la planilla de Estado vigente' }))
+    expect(discardOverride).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toHaveTextContent('En tramite')
+    await userEvent.click(screen.getByTestId('confirm-accept'))
+    expect(discardOverride).toHaveBeenCalledWith(31)
+    await waitFor(() => expect(base.onReload).toHaveBeenCalled())
+  })
+})

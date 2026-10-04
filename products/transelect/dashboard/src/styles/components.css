@@ -1736,3 +1736,73 @@
   align-items: flex-start;
   gap: var(--s-1);
 }
+
+/* The «web» mark: a value that came from a dashboard edit (web edits spec §6).
+   Same yellow as the fill written into the downloaded planilla; the word
+   «web» carries the meaning, the colour only echoes the planilla. */
+.web-chip {
+  display: inline-block;
+  padding: 1px var(--s-3);
+  border: 1px solid #e6c35c;
+  border-radius: var(--r-pill);
+  background: #fff2cc;
+  color: #6b5200;
+  font-size: var(--t-micro);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.editable-value {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.editable-provenance {
+  display: block;
+  margin-top: var(--s-1);
+  color: var(--ink-3);
+  font-size: var(--t-small);
+  line-height: 1.5;
+}
+
+.editable-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-5);
+  margin-top: var(--s-1);
+  font-size: var(--t-small);
+}
+
+.editable-fact .btn-link {
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.field-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  align-items: center;
+}
+
+.field-editor input {
+  flex: 1 1 14ch;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 var(--s-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--t-body);
+}
+
+.field-editor input:focus {
+  border-color: var(--forest);
+  box-shadow: 0 0 0 3px var(--forest-tint);
+}

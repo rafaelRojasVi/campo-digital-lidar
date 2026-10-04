@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RowDetailDrawer } from "./RowDetailDrawer";
 import { makeLifecycleRow, makePlazoPmf, makePlazos, makeRow } from "../test/factories";
@@ -7,10 +8,10 @@ import type { AefPmf, AefPmfField, TranselecAef } from "../api";
 
 vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
-  return { ...actual, getPmfDetail: vi.fn(), getAef: vi.fn() };
+  return { ...actual, getPmfDetail: vi.fn(), getAef: vi.fn(), listOverrides: vi.fn().mockResolvedValue({ ok: true, data: [] }) };
 });
 
-const { getPmfDetail, getAef } = await import("../api");
+const { getPmfDetail, getAef, listOverrides } = await import("../api");
 
 const tracked = makeRow({
   source_row_number: 2,
@@ -558,5 +559,53 @@ describe("RowDetailDrawer — Plazo CONAF (plazo_conaf_90_habiles_v1)", () => {
       />,
     );
     expect(screen.getByTestId("drawer-plazo")).toHaveTextContent("Este PMF no tiene plazo calculado");
+  });
+});
+
+describe("RowDetailDrawer — web edits", () => {
+  beforeEach(() => {
+    vi.mocked(getPmfDetail).mockReset();
+    vi.mocked(getAef).mockReset();
+    vi.mocked(listOverrides).mockReset();
+    vi.mocked(listOverrides).mockResolvedValue({ ok: true, data: [] });
+    vi.mocked(getAef).mockResolvedValue({
+      ok: true,
+      data: { pmfs: [] } as unknown as TranselecAef,
+    });
+    vi.mocked(getPmfDetail).mockResolvedValue({
+      ok: true,
+      data: {
+        pmf: "BN001",
+        row_count: 1,
+        basis_estado_resumido: "estado_resumido_first_row",
+        estado_resumido: "En tramite",
+        rows: [untracked],
+      },
+    });
+  });
+
+  it("offers Editar to an editor and Escape closes the editor, not the drawer", async () => {
+    const onClose = vi.fn();
+    render(
+      <RowDetailDrawer row={untracked} onClose={onClose} canEdit activeImportId={7} />,
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Editar Estado vigente" }),
+    );
+    expect(screen.getByLabelText("Nuevo valor de Estado vigente")).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
+    expect(
+      screen.queryByLabelText("Nuevo valor de Estado vigente"),
+    ).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows a viewer the chip but no Editar", async () => {
+    const edited = makeRow({ source_row_number: 3, pmf: "BN001", web_fields: ["estado"] });
+    render(<RowDetailDrawer row={edited} onClose={() => {}} />);
+    expect(await screen.findAllByTestId("web-chip")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /Editar/ })).not.toBeInTheDocument();
   });
 });

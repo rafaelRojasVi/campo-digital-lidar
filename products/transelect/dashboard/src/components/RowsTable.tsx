@@ -26,7 +26,9 @@
 import type { ResumenRow } from '../api'
 import { cell, formatNumber } from '../format'
 import { chronologyFlagsOf, chronologyLabel } from '../lib/aef'
+import { isWebField } from '../lib/webEdits'
 import { StatusPill } from './StatusPill'
+import { WebChip } from './WebChip'
 
 export function RowsTable({
   rows,
@@ -89,6 +91,12 @@ export function RowsTable({
               <td className="numeric">{formatNumber(row.superficie_corta)}</td>
               <td>
                 <StatusPill value={row.estado_resumido} />
+                {isWebField(row, 'estado_resumido') && (
+                  <>
+                    {' '}
+                    <WebChip description="Estado resumido editado en la web" />
+                  </>
+                )}
               </td>
               <td>
                 {cell(row.aef) || <span className="aef-empty">—</span>}
@@ -104,7 +112,15 @@ export function RowsTable({
                   </>
                 )}
               </td>
-              <td>{cell(row.numero_ingreso)}</td>
+              <td>
+                {cell(row.numero_ingreso)}
+                {isWebField(row, 'numero_ingreso') && (
+                  <>
+                    {' '}
+                    <WebChip description="N.º ingreso editado en la web" />
+                  </>
+                )}
+              </td>
               <td>{cell(row.empresa)}</td>
               <td>{cell(row.tipo_propietario)}</td>
               <td>{cell(row.sector)}</td>

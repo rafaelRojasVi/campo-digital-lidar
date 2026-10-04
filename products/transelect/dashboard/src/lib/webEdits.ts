@@ -25,8 +25,8 @@ export interface EditableFieldSpec {
 
 export const EDITABLE_FIELDS: readonly EditableFieldSpec[] = [
   { name: 'estado_resumido', label: 'Estado resumido', kind: 'text', suggest: true },
-  { name: 'estado', label: 'Estado', kind: 'text', suggest: true },
-  { name: 'tipo_rechazo', label: 'Tipo de rechazo', kind: 'text', suggest: true },
+  { name: 'estado', label: 'Estado vigente', kind: 'text', suggest: true },
+  { name: 'tipo_rechazo', label: 'Motivo', kind: 'text', suggest: true },
   { name: 'reingreso_tec', label: 'Reingreso técnico', kind: 'text', suggest: false },
   { name: 'reingreso_legal', label: 'Reingreso legal', kind: 'text', suggest: false },
   { name: 'reingreso_recrep', label: 'Reingreso rec. reposición', kind: 'text', suggest: false },
@@ -54,8 +54,8 @@ export function isWebField(row: Pick<ResumenRow, 'web_fields'>, field: EditableF
   return (row.web_fields ?? []).includes(field)
 }
 
-export function displayValue(spec: EditableFieldSpec, value: string | null): string {
-  if (value === null || value.trim() === '') return ''
+export function displayValue(spec: EditableFieldSpec, value: string | null | undefined): string {
+  if (value == null || value.trim() === '') return ''
   return spec.kind === 'date' ? formatDate(value) : value
 }
 

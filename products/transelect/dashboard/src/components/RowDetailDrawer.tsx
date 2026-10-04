@@ -30,9 +30,12 @@ import {
   type AefPmfField,
   type LifecycleRow,
   type ResumenRow,
+  type EditableFieldName,
+  type TranselecOverride,
   type TranselecPmfDetail,
   getAef,
   getPmfDetail,
+  listOverrides,
 } from '../api'
 import { cell, formatDate, formatInteger, formatNumber } from '../format'
 import {
@@ -49,9 +52,11 @@ import {
   LIFECYCLE_GROUP_LABELS,
   lifecycleStepText,
 } from '../lib/lifecycle'
+import { loadSuggestions } from '../lib/webEdits'
 import { classifyFailure, type FailureView } from '../lib/apiState'
 import type { PlazoDetail } from '../lib/plazo'
 import { Drawer } from '../ui/Drawer'
+import { EditableFieldsSection } from './EditableFieldsSection'
 import { AlertBanner, LoadingBlock } from './StateViews'
 import { Fact } from './Fact'
 import { OficinaVirtualLink } from './OficinaVirtualLink'
@@ -210,6 +215,9 @@ export function RowDetailDrawer({
   lifecycle = null,
   plazo = null,
   plazoStatus,
+  canEdit = false,
+  activeImportId = null,
+  onRowEdited,
 }: {
   row: ResumenRow
   onClose: () => void
@@ -221,6 +229,10 @@ export function RowDetailDrawer({
   plazo?: PlazoDetail | null
   /** Shown instead of the term while it is pending, failed or absent. */
   plazoStatus?: PlazoDrawerStatus
+  /** Operator/admin: offer web edits (the server re-enforces Action.EDIT). */
+  canEdit?: boolean
+  activeImportId?: number | null
+  onRowEdited?: (row: ResumenRow) => void
 }) {
   const sourceHasAef = aefInSource(sourceFields)
   const sourceHasIngreso2 = ingreso2InSource(sourceFields)
@@ -232,6 +244,10 @@ export function RowDetailDrawer({
   const [pmfAef, setPmfAef] = useState<AefPmf | null>(null)
   const [pmfAefLoading, setPmfAefLoading] = useState(sourceHasAef !== false)
   const [pmfAefFailed, setPmfAefFailed] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
+  const [overrides, setOverrides] = useState<TranselecOverride[]>([])
+  const [overridesStatus, setOverridesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [suggestions, setSuggestions] = useState<Partial<Record<EditableFieldName, string[]>>>({})
 
   // A different row chosen behind the panel replaces the one shown here.
   // Adjusted during render rather than in an effect, so the panel never
@@ -249,15 +265,48 @@ export function RowDetailDrawer({
 
     void getPmfDetail(row.pmf).then((result) => {
       if (cancelled) return
-      if (result.ok) setDetail(result.data)
-      else setFailure(classifyFailure({ status: result.status, error: result.error }))
+      if (result.ok) {
+        setDetail(result.data)
+        // After a save or a reload, show the fresh copy of the row being read.
+        if (reloadToken > 0) {
+          setCurrent(
+            (previous) =>
+              result.data.rows.find(
+                (entry) => entry.source_row_number === previous.source_row_number,
+              ) ?? previous,
+          )
+        }
+      } else setFailure(classifyFailure({ status: result.status, error: result.error }))
       setLoading(false)
     })
 
     return () => {
       cancelled = true
     }
-  }, [row.pmf])
+  }, [row.pmf, reloadToken])
+
+  useEffect(() => {
+    let cancelled = false
+    void listOverrides({ pmf: row.pmf }).then((result) => {
+      if (cancelled) return
+      setOverrides(result.ok ? result.data : [])
+      setOverridesStatus(result.ok ? 'ready' : 'error')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [row.pmf, reloadToken])
+
+  useEffect(() => {
+    if (!canEdit || activeImportId === null) return
+    let cancelled = false
+    void loadSuggestions(activeImportId).then((values) => {
+      if (!cancelled) setSuggestions(values)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [canEdit, activeImportId])
 
   useEffect(() => {
     if (sourceHasAef === false) {
@@ -413,6 +462,24 @@ export function RowDetailDrawer({
             <Fact label="Propietario">{cell(current.tipo_propietario, 'Sin información')}</Fact>
           </dl>
         </section>
+
+        {(canEdit || (current.web_fields ?? []).length > 0) && (
+          <EditableFieldsSection
+            row={current}
+            activeImportId={activeImportId}
+            canEdit={canEdit}
+            sourceFields={sourceFields ?? null}
+            overrides={overrides}
+            overridesStatus={overridesStatus}
+            suggestions={suggestions}
+            onSaved={(updated) => {
+              setCurrent(updated)
+              setReloadToken((value) => value + 1)
+              onRowEdited?.(updated)
+            }}
+            onReload={() => setReloadToken((value) => value + 1)}
+          />
+        )}
 
         {sourceHasAef !== false && (
           <PmfAefSection pmf={pmfAef} loading={pmfAefLoading} failed={pmfAefFailed} />
