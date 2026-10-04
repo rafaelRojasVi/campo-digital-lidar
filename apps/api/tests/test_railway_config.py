@@ -51,3 +51,56 @@ def test_railway_start_command_is_exactly_the_images_own_start() -> None:
 def test_railway_health_check_is_readiness_not_liveness() -> None:
     # /ready fails without a mounted, writable object store; /health does not.
     assert _railway()["deploy"]["healthcheckPath"] == "/ready"
+
+
+# .railway/railway.ts replaces railway.json, which Railway stops reading on
+# 2026-12-01. Both must describe the same service until railway.json is gone.
+
+
+def _railway_ts() -> str:
+    return (REPO_ROOT / ".railway" / "railway.ts").read_text(encoding="utf-8")
+
+
+def _ts_string_option(name: str) -> str:
+    match = re.search(rf'\b{name}:\s*("(?:[^"\\]|\\.)*")', _railway_ts())
+    assert match, f".railway/railway.ts declares no string {name}"
+    return str(json.loads(match.group(1)))
+
+
+def _ts_env() -> dict[str, str]:
+    match = re.search(r"\benv:\s*\{(.*?)\n\s*\}", _railway_ts(), flags=re.DOTALL)
+    assert match, ".railway/railway.ts declares no env block"
+    return dict(re.findall(r"^\s*(\w+):\s*(.+?),\s*$", match.group(1), flags=re.MULTILINE))
+
+
+def test_iac_start_command_is_exactly_the_images_own_start() -> None:
+    argv = shlex.split(_ts_string_option("start"))
+
+    assert argv == _dockerfile_json_instruction("ENTRYPOINT") + _dockerfile_json_instruction("CMD")
+
+
+def test_iac_and_config_as_code_agree_while_both_exist() -> None:
+    assert _ts_string_option("start") == _railway()["deploy"]["startCommand"]
+    assert _ts_string_option("healthcheck") == _railway()["deploy"]["healthcheckPath"]
+
+
+def test_iac_health_check_is_readiness_not_liveness() -> None:
+    assert _ts_string_option("healthcheck") == "/ready"
+
+
+def test_iac_runs_migrations_as_a_pre_deploy_step() -> None:
+    assert _ts_string_option("preDeploy") == ".venv/bin/alembic upgrade head"
+
+
+def test_iac_keeps_the_object_store_volume_and_its_variable() -> None:
+    assert re.search(r'volumeMounts:\s*\{\s*"/data":', _railway_ts())
+    assert "CAMPO_OBJECT_STORE_ROOT" in _ts_env()
+
+
+def test_iac_never_writes_a_variable_value_into_the_repository() -> None:
+    # An apply deletes any variable the file leaves out, so every production
+    # variable is declared; preserve() keeps its value in Railway only.
+    env = _ts_env()
+
+    assert env
+    assert {name: value for name, value in env.items() if value != "preserve()"} == {}
