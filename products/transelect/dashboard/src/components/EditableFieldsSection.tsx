@@ -17,6 +17,7 @@ import type { KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   type EditableFieldName,
+  type OverrideConflictCode,
   type ResumenRow,
   type TranselecOverride,
   discardOverride,
@@ -76,7 +77,12 @@ export function EditableFieldsSection({
   // The value the editor saw when it opened; what a save is checked against.
   const [seenValue, setSeenValue] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<{ message: string; reload: boolean } | null>(null)
+  const [error, setError] = useState<{
+    field: EditableFieldName
+    code: OverrideConflictCode | null
+    message: string
+    reload: boolean
+  } | null>(null)
   const [status, setStatus] = useState('')
   const [reverting, setReverting] = useState<{
     override: TranselecOverride
@@ -128,9 +134,9 @@ export function EditableFieldsSection({
       setStatus('')
       const code = overrideConflictCode(result.payload)
       if (code === 'version_changed' || code === 'value_changed') {
-        setError({ message: RELOAD_COPY[code], reload: true })
+        setError({ field: spec.name, code, message: RELOAD_COPY[code], reload: true })
       } else {
-        setError({ message: result.error, reload: false })
+        setError({ field: spec.name, code: null, message: result.error, reload: false })
       }
       return
     }
@@ -154,10 +160,27 @@ export function EditableFieldsSection({
     setReverting(null)
     setFocusTarget(`edit-${spec.name}`)
     if (!result.ok) {
-      setError({ message: result.error, reload: false })
+      setError({ field: spec.name, code: null, message: result.error, reload: false })
       return
     }
     setStatus(`${spec.label} volvió al valor de la planilla.`)
+    onReload()
+    onRowEdited?.()
+  }
+
+  /** «Recargar»: close the stale editor and refetch, so the next edit starts from the fresh value. */
+  const reloadAfterConflict = (spec: EditableFieldSpec) => {
+    if (error?.code === 'version_changed') {
+      // The active version changed: every save would be refused until the page knows the new one.
+      window.location.reload()
+      return
+    }
+    setError(null)
+    setEditing(null)
+    setSeenValue(null)
+    setDraft('')
+    setFocusTarget(`edit-${spec.name}`)
+    setStatus(`Se recargó ${spec.label}. Revise el valor actual y vuelva a editar si corresponde.`)
     onReload()
     onRowEdited?.()
   }
@@ -207,24 +230,6 @@ export function EditableFieldsSection({
       <p className="hint" role="status" aria-live="polite" data-testid="editables-status">
         {status}
       </p>
-      {error && (
-        <AlertBanner title="No se guardó el cambio">
-          {' '}
-          {error.message}{' '}
-          {error.reload && (
-            <button
-              type="button"
-              className="btn-link"
-              onClick={() => {
-                onReload()
-                onRowEdited?.()
-              }}
-            >
-              Recargar
-            </button>
-          )}
-        </AlertBanner>
-      )}
       <dl className="facts">
         {EDITABLE_FIELDS.map((spec) => {
           const web = isWebField(row, spec.name)
@@ -339,6 +344,21 @@ export function EditableFieldsSection({
                       </span>
                     )}
                   </>
+                )}
+                {error?.field === spec.name && (
+                  <AlertBanner title="No se guardó el cambio">
+                    {' '}
+                    {error.message}{' '}
+                    {error.reload && (
+                      <button
+                        type="button"
+                        className="btn-link"
+                        onClick={() => reloadAfterConflict(spec)}
+                      >
+                        {error.code === 'version_changed' ? 'Recargar la página' : 'Recargar'}
+                      </button>
+                    )}
+                  </AlertBanner>
                 )}
               </dd>
             </div>

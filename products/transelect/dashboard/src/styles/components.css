@@ -1741,13 +1741,11 @@
    Same yellow as the fill written into the downloaded planilla; the word
    «web» carries the meaning, the colour only echoes the planilla. */
 .web-chip {
-  --web-chip-bg: #fff2cc;
-  --web-chip-line: #e6c35c;
-  --web-chip-ink: #6b5200; /* 6.6:1 on --web-chip-bg */
+  position: relative; /* contains its sr-only text inside the table scroller */
   display: inline-block;
   padding: 1px var(--s-3);
   border: 1px solid var(--web-chip-line);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   background: var(--web-chip-bg);
   color: var(--web-chip-ink);
   font-size: var(--t-micro);
@@ -1831,7 +1829,7 @@ td .web-chip,
 .edit-status[data-status='en_conflicto'] {
   border-color: var(--st-late);
   background: var(--st-late-tint);
-  color: #8a3217; /* 7:1 on --st-late-tint */;
+  color: var(--st-late-ink);
 }
 .edit-status[data-status='huerfana'] {
   border-color: var(--st-progress);
@@ -1859,6 +1857,8 @@ td .web-chip,
 .edits-table td[data-col='pmf'],
 .edits-table td[data-col='planilla'],
 .edits-table td[data-col='web'] {
+  min-width: 12ch;
+  white-space: normal; /* beats the global td nowrap so long values wrap */
   overflow-wrap: anywhere;
 }
 .edit-actions {

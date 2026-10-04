@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TranselecOverride } from "../api";
@@ -13,6 +13,7 @@ vi.mock("../api", async (importOriginal) => {
     listOverrides: vi.fn(),
     keepOverride: vi.fn(),
     discardOverride: vi.fn(),
+    downloadOverridesXlsx: vi.fn(),
   };
 });
 
@@ -22,8 +23,13 @@ vi.mock("../components/RowDetailDrawer", () => ({
   ),
 }));
 
-const { listOverrides, keepOverride, discardOverride, listRows } =
-  await import("../api");
+const {
+  listOverrides,
+  keepOverride,
+  discardOverride,
+  listRows,
+  downloadOverridesXlsx,
+} = await import("../api");
 
 const make = (
   id: number,
@@ -51,6 +57,7 @@ describe("EdicionesPage", () => {
     vi.mocked(keepOverride).mockReset();
     vi.mocked(listRows).mockReset();
     vi.mocked(discardOverride).mockReset();
+    vi.mocked(downloadOverridesXlsx).mockReset();
   });
 
   it("lists edits, says what the download writes, and keeps a conflict", async () => {
@@ -68,10 +75,7 @@ describe("EdicionesPage", () => {
       </RouterProvider>,
     );
 
-    expect(await screen.findByTestId("download-xlsx")).toHaveAttribute(
-      "href",
-      "/api/transelec/export.xlsx",
-    );
+    expect(await screen.findByTestId("download-xlsx")).toHaveRole("button");
     expect(screen.getByTestId("download-note")).toHaveTextContent(
       "1 celda editada marcada",
     );
@@ -257,5 +261,130 @@ describe("EdicionesPage", () => {
       "No se encontró la fila",
     );
     expect(screen.queryByTestId("drawer")).toBeNull();
+  });
+
+  it("titles a failed load as about the edits, not the import", async () => {
+    vi.mocked(listOverrides).mockResolvedValue({
+      ok: false,
+      status: 500,
+      error: "boom",
+    });
+    render(
+      <RouterProvider initialPath="/transelec/ediciones">
+        <EdicionesPage />
+      </RouterProvider>,
+    );
+    expect(
+      await screen.findByText("No se pudieron cargar las ediciones web"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/importación no se completó/i)).toBeNull();
+  });
+
+  it("explains the decision only when something needs one", async () => {
+    vi.mocked(listOverrides).mockResolvedValue({
+      ok: true,
+      data: [make(1, "aplicada")],
+    });
+    const { unmount } = render(
+      <RouterProvider initialPath="/transelec/ediciones">
+        <EdicionesPage />
+      </RouterProvider>,
+    );
+    await screen.findByTestId("overrides-table");
+    expect(screen.queryByTestId("conflict-help")).toBeNull();
+    unmount();
+
+    vi.mocked(listOverrides).mockResolvedValue({
+      ok: true,
+      data: [make(1, "en_conflicto")],
+    });
+    render(
+      <RouterProvider initialPath="/transelec/ediciones">
+        <EdicionesPage />
+      </RouterProvider>,
+    );
+    expect(await screen.findByTestId("conflict-help")).toHaveTextContent(
+      "«Mantener valor web» vuelve a mostrar el valor web",
+    );
+  });
+
+  describe("download", () => {
+    const renderPane = async () => {
+      vi.mocked(listOverrides).mockResolvedValue({
+        ok: true,
+        data: [make(1, "aplicada")],
+      });
+      render(
+        <RouterProvider initialPath="/transelec/ediciones">
+          <EdicionesPage />
+        </RouterProvider>,
+      );
+      return screen.findByTestId("download-xlsx");
+    };
+
+    it("saves the blob under the server's file name while showing a busy state", async () => {
+      const createUrl = vi.fn(() => "blob:planilla");
+      const revokeUrl = vi.fn();
+      vi.stubGlobal(
+        "URL",
+        Object.assign(URL, {
+          createObjectURL: createUrl,
+          revokeObjectURL: revokeUrl,
+        }),
+      );
+      const clicks: string[] = [];
+      const click = vi
+        .spyOn(HTMLAnchorElement.prototype, "click")
+        .mockImplementation(function (this: HTMLAnchorElement) {
+          clicks.push(this.download);
+        });
+      let finish!: (
+        value: Awaited<ReturnType<typeof downloadOverridesXlsx>>,
+      ) => void;
+      vi.mocked(downloadOverridesXlsx).mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      const button = await renderPane();
+      await userEvent.click(button);
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent("Preparando la planilla…");
+
+      finish({
+        ok: true,
+        data: { blob: new Blob(["x"]), filename: "planilla ediciones.xlsx" },
+      });
+      await waitFor(() => expect(button).toBeEnabled());
+      expect(clicks).toEqual(["planilla ediciones.xlsx"]);
+      expect(createUrl).toHaveBeenCalledTimes(1);
+      expect(revokeUrl).toHaveBeenCalledWith("blob:planilla");
+      expect(screen.queryByText("No se pudo descargar la planilla")).toBeNull();
+      click.mockRestore();
+      vi.unstubAllGlobals();
+    });
+
+    it.each([
+      [
+        409,
+        "Esta versión se importó sin el mapa de columnas; vuelva a importar.",
+      ],
+      [
+        422,
+        "No se pudo preparar la planilla con ediciones. Contacte a soporte.",
+      ],
+    ])("shows the server's message for a %s", async (status, error) => {
+      vi.mocked(downloadOverridesXlsx).mockResolvedValue({
+        ok: false,
+        status,
+        error,
+      });
+      const button = await renderPane();
+      await userEvent.click(button);
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("No se pudo descargar la planilla");
+      expect(alert).toHaveTextContent(error);
+      expect(button).toBeEnabled();
+    });
   });
 });

@@ -13,7 +13,7 @@ import {
   type ResumenRow,
   type TranselecOverride,
   discardOverride,
-  exportXlsxUrl,
+  downloadOverridesXlsx,
   keepOverride,
   listOverrides,
   listRows,
@@ -69,6 +69,8 @@ export function EdicionesPage({
   const [confirming, setConfirming] = useState<TranselecOverride | null>(null);
   const [openRow, setOpenRow] = useState<ResumenRow | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +79,16 @@ export function EdicionesPage({
       if (result.ok) {
         setOverrides(result.data);
         setFailure(null);
-      } else setFailure(classifyFailure(result));
+      } else {
+        const view = classifyFailure(result);
+        // This pane loads edits; «la importación no se completó» would send
+        // the operator to re-import a planilla, which is the wrong action.
+        setFailure(
+          view.kind === "import_failed" || view.kind === "error"
+            ? { ...view, title: "No se pudieron cargar las ediciones web" }
+            : view,
+        );
+      }
     });
     return () => {
       cancelled = true;
@@ -112,6 +123,26 @@ export function EdicionesPage({
     },
     [reload],
   );
+
+  const download = useCallback(async () => {
+    setDownloading(true);
+    setDownloadError(null);
+    const result = await downloadOverridesXlsx();
+    setDownloading(false);
+    if (!result.ok) {
+      setDownloadError(result.error);
+      return;
+    }
+    const url = URL.createObjectURL(result.data.blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = result.data.filename;
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }, []);
 
   const viewRow = useCallback(async (override: TranselecOverride) => {
     setBusyId(override.id);
@@ -173,15 +204,23 @@ export function EdicionesPage({
           meta="Valores cambiados en el panel sobre la versión publicada. La planilla publicada no se modifica."
         />
         <div className="btns no-print edits-download">
-          <a
+          <button
+            type="button"
             className="btn"
-            href={exportXlsxUrl()}
-            download
+            disabled={downloading}
+            onClick={() => void download()}
             data-testid="download-xlsx"
           >
-            Descargar planilla con ediciones (.xlsx)
-          </a>
+            {downloading
+              ? "Preparando la planilla…"
+              : "Descargar planilla con ediciones (.xlsx)"}
+          </button>
         </div>
+        {downloadError && (
+          <AlertBanner title="No se pudo descargar la planilla">
+            {downloadError}
+          </AlertBanner>
+        )}
         <p className="hint" data-testid="download-note">
           La descarga es la planilla publicada con{" "}
           {plural(applied, "celda editada marcada", "celdas editadas marcadas")}{" "}
@@ -191,6 +230,18 @@ export function EdicionesPage({
           {incorporated > 0 &&
             ` ${plural(incorporated, "edición ya está", "ediciones ya están")} en la planilla y no necesita marca.`}
         </p>
+
+        {notWritten + incorporated > 0 && (
+          <p className="hint" data-testid="conflict-help">
+            «En conflicto con la planilla»: la planilla publicada cambió ese
+            valor después de la edición y el panel muestra el de la planilla.
+            «Mantener valor web» vuelve a mostrar el valor web y lo escribe en
+            la descarga; «Descartar» lo borra y queda el de la planilla. «Sin
+            fila en la versión publicada»: la edición no se muestra ni se
+            descarga. «Ya está en la planilla»: la planilla ya tiene el valor
+            web.
+          </p>
+        )}
 
         <div
           className="sr-only"

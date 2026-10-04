@@ -1165,7 +1165,47 @@ export function keepOverride(id: number): Promise<ApiResult<{ override_id: numbe
   })
 }
 
-/** The planilla with the applied edits marked «web»; the browser downloads it. */
+/** The planilla with the applied edits marked «web». */
 export function exportXlsxUrl(): string {
   return '/api/transelec/export.xlsx'
+}
+
+/** The file name from a Content-Disposition header (`filename*` UTF-8 first, then `filename`). */
+export function filenameFromDisposition(header: string | null, fallback: string): string {
+  if (!header) return fallback
+  const star = /filename\*\s*=\s*([^']*)'[^']*'([^;]+)/i.exec(header)
+  if (star) {
+    try {
+      const name = decodeURIComponent(star[2].trim().replace(/^"|"$/g, ''))
+      if (name) return name
+    } catch {
+      // malformed percent-encoding: try the plain filename instead
+    }
+  }
+  const plain = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(header)
+  const name = (plain?.[1] ?? plain?.[2] ?? '').trim()
+  return name || fallback
+}
+
+/** Fetches the planilla with the edits so a failure can be shown instead of a dead download. */
+export async function downloadOverridesXlsx(): Promise<
+  ApiResult<{ blob: Blob; filename: string }>
+> {
+  try {
+    const response = await send(exportXlsxUrl(), undefined)
+    if (!response.ok) {
+      const failure = await readFailure(response)
+      return failure.payload === undefined
+        ? { ok: false, status: response.status, error: failure.error }
+        : { ok: false, status: response.status, error: failure.error, payload: failure.payload }
+    }
+    const blob = await response.blob()
+    const filename = filenameFromDisposition(
+      response.headers.get('Content-Disposition'),
+      'planilla_con_ediciones.xlsx',
+    )
+    return { ok: true, data: { blob, filename } }
+  } catch {
+    return { ok: false, status: 0, error: NETWORK_ERROR }
+  }
 }

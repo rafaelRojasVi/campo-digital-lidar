@@ -267,4 +267,72 @@ describe('EditableFieldsSection', () => {
     await userEvent.click(screen.getByTestId('confirm-accept'))
     await waitFor(() => expect(onRowEdited).toHaveBeenCalledTimes(1))
   })
+
+  describe('Recargar after a conflict', () => {
+    const conflict = (code: string) =>
+      vi.mocked(saveOverride).mockResolvedValue({
+        ok: false,
+        status: 409,
+        error: 'x',
+        payload: { detail: 'x', code },
+      })
+
+    it('shows the alert beside the edited field, then closes the editor and re-captures the value', async () => {
+      conflict('value_changed')
+      const onRowEdited = vi.fn()
+      const props = { ...base, canEdit: true, onSaved: vi.fn(), onRowEdited }
+      const { rerender } = render(
+        <EditableFieldsSection {...props} row={makeRow({ source_row_number: 2, estado: 'En tramite' })} />,
+      )
+      await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+      const alert = await screen.findByRole('alert')
+      expect(screen.getByTestId('editable-estado')).toContainElement(alert)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Recargar' }))
+      expect(base.onReload).toHaveBeenCalledTimes(1)
+      expect(onRowEdited).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Nuevo valor de Estado vigente')).not.toBeInTheDocument()
+
+      // The drawer refetched: the row now carries the other person's value.
+      rerender(
+        <EditableFieldsSection {...props} row={makeRow({ source_row_number: 2, estado: 'Aprobado' })} />,
+      )
+      vi.mocked(saveOverride).mockResolvedValue({
+        ok: true,
+        data: { override_id: 5, changed: true, row: makeRow({ estado: 'Desistido' }) },
+      })
+      await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+      await userEvent.clear(screen.getByLabelText('Nuevo valor de Estado vigente'))
+      await userEvent.type(screen.getByLabelText('Nuevo valor de Estado vigente'), 'Desistido')
+      await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+      expect(saveOverride).toHaveBeenLastCalledWith(
+        expect.objectContaining({ field: 'estado', expectedValue: 'Aprobado' }),
+      )
+    })
+
+    it('offers a full page reload when the active version changed', async () => {
+      conflict('version_changed')
+      const reload = vi.fn()
+      const original = window.location
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...original, reload },
+      })
+      try {
+        render(
+          <EditableFieldsSection {...base} row={makeRow({ source_row_number: 2 })} canEdit onSaved={vi.fn()} />,
+        )
+        await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+        await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+        await userEvent.click(await screen.findByRole('button', { name: 'Recargar la página' }))
+        expect(reload).toHaveBeenCalledTimes(1)
+        expect(base.onReload).not.toHaveBeenCalled()
+      } finally {
+        Object.defineProperty(window, 'location', { configurable: true, value: original })
+      }
+    })
+  })
 })

@@ -280,6 +280,18 @@ test("Datos → Ediciones web lists conflicts first, keeps only on conflicts, an
   let kept = false;
   await stubPlatform(page, {
     extra: async (p) => {
+      await p.route("**/api/transelec/export.xlsx", (route) =>
+        route.fulfill({
+          status: 200,
+          contentType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          headers: {
+            "Content-Disposition":
+              "attachment; filename=\"planilla_con_ediciones.xlsx\"",
+          },
+          body: "xlsx",
+        }),
+      );
       await p.route("**/api/transelec/overrides*", (route) =>
         fulfill(route, edits),
       );
@@ -298,9 +310,10 @@ test("Datos → Ediciones web lists conflicts first, keeps only on conflicts, an
   });
 
   await page.goto("/transelec/ediciones");
-  await expect(page.getByTestId("download-xlsx")).toHaveAttribute(
-    "href",
-    "/api/transelec/export.xlsx",
+  const download = page.waitForEvent("download");
+  await page.getByTestId("download-xlsx").click();
+  expect((await download).suggestedFilename()).toBe(
+    "planilla_con_ediciones.xlsx",
   );
   const rows = page.getByTestId("overrides-table").locator("tbody tr");
   await expect(rows).toHaveCount(2);
@@ -352,6 +365,28 @@ test("Datos → Ediciones web has no horizontal page scroll at 390 px", async ({
   }));
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
 });
+
+for (const width of [390, 1280]) {
+  test(`Explorador with «web» chips has no horizontal page scroll at ${width} px`, async ({
+    page,
+  }) => {
+    await stubPlatform(page, {
+      rowOverrides: () => ({
+        numero_ingreso: "2026-0042",
+        web_fields: ["numero_ingreso"],
+      }),
+    });
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/transelec/explorador");
+    await expect(page.getByTestId("row-1")).toBeVisible();
+    await expect(page.getByTestId("web-chip").first()).toBeAttached();
+    const overflow = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+  });
+}
 
 test("Calidad shows the web-edit conflicts block with a link to the pane", async ({
   page,

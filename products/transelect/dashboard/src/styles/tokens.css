@@ -65,6 +65,12 @@
   --st-late-tint: #f8e9e3;
   --st-rejected-tint: #f6e5e5;
   --st-struck-tint: #eceeeb;
+  /* Conflict label text: 6.97:1 on --st-late-tint. */
+  --st-late-ink: #8a3217;
+  /* The «web» mark: echoes the yellow written into the downloaded planilla. */
+  --web-chip-bg: #fff2cc;
+  --web-chip-line: #e6c35c;
+  --web-chip-ink: #6b5200; /* 6.65:1 on --web-chip-bg */
 
   /* --------------------------------------------------------------- feed */
   --focus: #0b6ea8;
