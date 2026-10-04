@@ -440,7 +440,7 @@ PostgreSQL that accepts TLS (`sslmode=require`), started as root, and
   with a start command: the entrypoint log line appeared, PID 1 ran at
   uid 999, and `/ready` returned `200`.
 
-### Railway build and start: `railway.json`
+### Railway build and start
 
 Railway replaces the image's `ENTRYPOINT` with a service's custom start
 command ("the start command overrides the image's `ENTRYPOINT` in exec
@@ -449,8 +449,10 @@ runs as root (`RAILWAY_RUN_UID=0`) so the entrypoint can take ownership of
 the volume. A start command that skipped the entrypoint would therefore run
 the API **as root**, and would never chown the volume.
 
-**DECISION (2026-09-25):** `railway.json` (config as code, which Railway
-applies over dashboard values) pins:
+**DECISION (2026-09-25), superseded 2026-10-04:** `railway.json` (config as
+code, which Railway applies over dashboard values) pinned the values below.
+They are now declared in `.railway/railway.ts` (see "Railway Infrastructure
+as Code" below) and stored on the service, and `railway.json` is removed:
 
 - `build.builder = DOCKERFILE`, `build.dockerfilePath = Dockerfile`;
 - `deploy.startCommand` = the entrypoint followed by the image's own `CMD`,
@@ -480,9 +482,11 @@ On the Railway service that runs this image:
 | Volume mount path | `/data` |
 | `CAMPO_OBJECT_STORE_ROOT` | `/data/object-store` |
 | `RAILWAY_RUN_UID` | `0` (Railway's documented setting for a non-root image with a volume; the entrypoint drops back to `campo`) |
-| Healthcheck path | `/ready` (also pinned in `railway.json` and `.railway/railway.ts`) |
-| Custom start command | empty (`railway.json` supplies it; `.railway/railway.ts` after the migration below) |
-| Pre-deploy command | `.venv/bin/alembic upgrade head` (dashboard; also declared in `.railway/railway.ts`) |
+| Healthcheck path | `/ready` (stored on the service; declared in `.railway/railway.ts`) |
+| Custom start command | the entrypoint + the image's `CMD` (stored on the service; declared in `.railway/railway.ts`) |
+| Pre-deploy command | `.venv/bin/alembic upgrade head` (stored on the service; declared in `.railway/railway.ts`) |
+| Builder | `RAILPACK` stored, with `dockerfilePath = /Dockerfile`, which makes Railway build the Dockerfile (see below) |
+| Config file path | none (`railwayConfigFile` is `null`) |
 
 **LIMITATION:** a Railway volume is a single-instance disk. The service must
 stay at one replica, and the volume is not a backup. A managed object-store
@@ -517,22 +521,30 @@ keeps the start command equal to the Dockerfile's and fails if a variable
 value is ever written into the file. It cannot see Railway, so the plan is
 the only check that the variable list is complete.
 
-Before 2026-12-01, by someone with Railway access:
+**Rollout (2026-10-04):**
 
-1. `npm ci --prefix .railway`, then `railway link` to `sweet-truth` /
-   `production` / `campo-digital-platform`.
-2. `railway config plan --detailed-exit-code` must exit `0` ("already up to
-   date"). If it lists any change, stop and reconcile the file first.
-3. `railway config apply`. The repository's partial (`campo-digital-platform`)
-   takes ownership of the service and its volume.
-4. Remove `railway.json` and its tests in a follow-up PR, clear the
-   service's Config File setting, deploy, and check that the deploy log
-   still starts with the `campo-entrypoint` line and the healthcheck is
-   `/ready`.
+1. `railway config plan --detailed-exit-code` against production exited
+   `0` ("already up to date").
+2. `railway config apply --yes` reported the same and **wrote nothing**.
+   **FACT:** `railway config partials list` still shows "No named partial
+   ownership". A zero-change apply records no ownership; the first apply
+   that changes something will.
+3. `railway.json` and its tests were removed. The tests now check the same
+   guarantees against `.railway/railway.ts`.
 
-**OPEN QUESTION:** whether the start command and healthcheck the plan saw
-are stored on the service or only overlaid from `railway.json` at deploy.
-Step 2 cannot tell them apart. Step 4's deploy log answers it.
+**FACT (Railway API `serviceInstance`, 2026-10-04):** the start command, the
+`/ready` healthcheck and the pre-deploy command are stored on the service,
+so they do not depend on `railway.json`. The stored builder is `RAILPACK`,
+with `dockerfilePath = /Dockerfile`, and Railway's `Builder` enum has no
+Dockerfile value (only `HEROKU`, `NIXPACKS`, `PAKETO`, `RAILPACK`).
+**INFERENCE:** the Dockerfile is chosen by `dockerfilePath`, not by the
+builder enum, so builds stay Dockerfile builds without `railway.json`.
+
+**To verify on the first deploy without `railway.json`:** the build log
+shows the Dockerfile's stages (`[runtime n/16] COPY …`), the deploy log
+starts with the `campo-entrypoint` line, `/ready` answers `200`, and
+`railway config plan` still reports no changes. If the build is not a
+Dockerfile build, revert this change before 2026-12-01.
 
 ### Before the first redeploy: files already in the container
 

@@ -209,9 +209,9 @@ nothing.
 ## Deployment (Rafael, manual; do not merge or deploy without deciding to)
 
 1. Review and merge the PR into `main`. Railway deploys `main` manually.
-2. The Railway **pre-deploy command** (`alembic upgrade head`, configured
-   in the Railway UI, not in `railway.json`; since 2026-10-04 also declared
-   in `.railway/railway.ts`, see the Transelec `deployment.md`) runs `0010`.
+2. The Railway **pre-deploy command** (`alembic upgrade head`, stored on
+   the Railway service and declared in `.railway/railway.ts`; see the
+   Transelec `deployment.md`) runs `0010`.
    Confirm it is still set before deploying.
 3. Confirm `CAMPO_OBJECT_STORE_ROOT=/data/object-store` on the app service
    (it is already required for Transelec uploads; `/ready` fails without a
