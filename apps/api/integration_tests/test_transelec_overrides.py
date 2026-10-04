@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 from app.access import Role
+from app.csrf import CSRF_HEADER_NAME
 from app.deps import get_object_store
 from app.main import app
 from app.object_store import LocalObjectStore
@@ -32,6 +33,7 @@ from app.transelec_overrides import (
 )
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
+from sqlalchemy.exc import IntegrityError
 from test_transelec_reads_router import (
     _SAME_ORIGIN,
     _ingestion_run_id,
@@ -694,3 +696,277 @@ def test_a_save_racing_a_discard_is_refused_not_silently_applied(
             text("SELECT count(*) FROM platform.transelec_field_override WHERE ended_at IS NULL")
         ).scalar_one()
     assert active == 0
+
+
+# ---------------------------------------------------------------------------
+# Routes (Task 5)
+# ---------------------------------------------------------------------------
+
+
+def _put(
+    client: TestClient,
+    import_id: int,
+    row: int,
+    field: str,
+    value: str | None,
+    *,
+    expected: str | None,
+    csrf: bool = True,
+) -> Any:
+    headers = {"Origin": _SAME_ORIGIN}
+    if not csrf:
+        headers[CSRF_HEADER_NAME] = ""
+    return client.put(
+        "/transelec/overrides",
+        json={
+            "import_id": import_id,
+            "source_row_number": row,
+            "field": field,
+            "value": value,
+            "expected_value": expected,
+        },
+        headers=headers,
+    )
+
+
+def test_unauthenticated_and_viewer_cannot_edit(client: TestClient, tmp_path: Path) -> None:
+    assert client.put("/transelec/overrides", json={}).status_code in (401, 403)
+    _login_with_grants(client, "transelec-admin", ADMIN)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+    client.cookies.clear()
+
+    _login_with_grants(client, "transelec-viewer", VIEWER)
+    response = _put(client, import_id, row, "estado", "x", expected="En evaluacion")
+    assert response.status_code == 403
+    assert client.get("/transelec/overrides").status_code == 200  # viewers read the list
+
+
+def test_edit_requires_csrf(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+    response = _put(client, import_id, row, "estado", "x", expected="En evaluacion", csrf=False)
+    assert response.status_code == 403
+
+
+def test_operator_saves_and_gets_the_effective_row(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+
+    response = _put(client, import_id, row, "estado_resumido", "Aprobado", expected="En tramite")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["changed"] is True and body["override_id"] is not None
+    assert body["row"]["estado_resumido"] == "Aprobado"
+    assert body["row"]["web_fields"] == ["estado_resumido"]
+    listed = client.get("/transelec/overrides", params={"pmf": "MP001"}).json()
+    assert listed[0]["status"] == "aplicada"
+    assert listed[0]["field_label"] == "Estado resumido"
+    assert listed[0]["web_value"] == "Aprobado"
+    assert listed[0]["planilla_value_at_edit"] == "En tramite"
+    assert listed[0]["created_by_display_name"] == "transelec-operator"
+    assert client.get("/api/transelec/overrides").status_code == 200  # /api alias mounted
+
+
+def test_conflicts_return_codes_and_spanish_messages(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+
+    stale = _put(client, import_id + 1000, row, "estado", "x", expected="En evaluacion")
+    changed = _put(client, import_id, row, "estado", "x", expected="Otro")
+
+    assert stale.status_code == 409 and stale.json()["code"] == "version_changed"
+    assert changed.status_code == 409 and changed.json()["code"] == "value_changed"
+    assert "Recargue" in changed.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "status"),
+    [
+        ("empresa", "x", 422),
+        ("fecha_ingreso", "12-03-2026", 422),
+        ("estado", "x" * 501, 422),
+    ],
+)
+def test_invalid_edits_are_422(
+    client: TestClient, tmp_path: Path, field: str, value: str, status: int
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+    assert _put(client, import_id, row, field, value, expected=None).status_code == status
+
+
+def test_field_without_a_source_column_is_not_editable(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+    response = _put(client, import_id, row, "fecha_ingreso_2", "2026-01-02", expected=None)
+    assert response.status_code == 422
+    assert "columna" in response.json()["detail"]
+
+
+def test_edit_hits_only_the_chosen_row_of_a_shared_key(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    second = _row(client, "MP003", 1)["source_row_number"]
+
+    assert (
+        _put(client, import_id, second, "estado", "Desistido", expected="Aprobado").status_code
+        == 200
+    )
+
+    rows = _rows(client, "MP003")
+    assert [r["estado"] for r in rows] == ["Aprobado", "Desistido"]
+
+
+def test_date_edit_over_raw_text_survives_an_unchanged_republish(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "v1.xlsx"))
+    row = _row(client, "MP002")
+    assert row["fecha_ingreso"] is None and "fecha_ingreso" in row["source_text_dates"]
+
+    saved = _put(
+        client, import_id, row["source_row_number"], "fecha_ingreso", "2026-03-12", expected=None
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["row"]["fecha_ingreso"] == "2026-03-12"
+    assert "fecha_ingreso" not in saved.json()["row"]["source_text_dates"]
+
+    # A new upload whose MP002 cell still holds the same text: the edit applies.
+    rows = [dict(item) for item in _BASE_ROWS]
+    rows[0]["empresa"] = "Forestal Este"  # a different file, same MP002 cell
+    _publish(client, _workbook(tmp_path, "v2.xlsx", rows), filename="v2.xlsx")
+    assert _row(client, "MP002")["fecha_ingreso"] == "2026-03-12"
+    assert client.get("/transelec/overrides").json()[0]["status"] == "aplicada"
+
+
+def test_orphans_are_listed_and_discard_returns_to_the_planilla(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "v1.xlsx"))
+    mp002 = _row(client, "MP002")["source_row_number"]
+    mp001 = _row(client, "MP001", 0)["source_row_number"]
+    _put(client, import_id, mp002, "estado", "Reingresado", expected="Rechazado")
+    saved = _put(client, import_id, mp001, "estado", "Aprobado", expected="En evaluacion")
+
+    rows = [dict(item) for item in _BASE_ROWS if item["pmf"] != "MP002"]
+    _publish(client, _workbook(tmp_path, "v2.xlsx", rows), filename="v2.xlsx")
+    listed = client.get("/transelec/overrides").json()
+    assert [item["status"] for item in listed] == ["huerfana", "aplicada"]
+    assert listed[0]["source_row_number"] is None
+
+    gone = client.delete(
+        f"/transelec/overrides/{saved.json()['override_id']}", headers={"Origin": _SAME_ORIGIN}
+    )
+    assert gone.status_code == 204
+    assert _row(client, "MP001", 0)["estado"] == "En evaluacion"
+    again = client.delete(
+        f"/transelec/overrides/{saved.json()['override_id']}", headers={"Origin": _SAME_ORIGIN}
+    )
+    assert again.status_code == 404
+
+
+def test_keep_route_requires_a_conflict(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+    saved = _put(client, import_id, row, "estado", "Aprobado", expected="En evaluacion").json()
+    response = client.post(
+        f"/transelec/overrides/{saved['override_id']}/keep", headers={"Origin": _SAME_ORIGIN}
+    )
+    assert response.status_code == 409 and response.json()["code"] == "not_in_conflict"
+
+
+def test_audit_rows_carry_no_cell_values(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+    _put(client, import_id, row, "estado_resumido", "Valor-Unico-Web", expected="En tramite")
+
+    with client.engine.connect() as conn:
+        audit = conn.execute(
+            text(
+                "SELECT subject_kind, metadata::text FROM platform.audit_event "
+                "WHERE event_type = 'transelec.override.saved'"
+            )
+        ).one()
+    assert audit.subject_kind == "transelec_override"
+    assert "Valor-Unico-Web" not in audit.metadata and "En tramite" not in audit.metadata
+
+
+def _insert_cell_edit(conn: Any, *, key_ordinal: int = 1) -> None:
+    conn.execute(
+        text(
+            """
+            INSERT INTO platform.transelec_field_override (
+                pmf, rol, numero_predio, numero_area_corta, key_ordinal, field,
+                value_text, planilla_value_text, base_import_id, created_by_app_user_id
+            )
+            SELECT pmf, rol, numero_predio, numero_area_corta, :ordinal, 'estado',
+                   'dup', 'x', import_id, (SELECT min(id) FROM platform.app_user)
+            FROM platform.transelec_keyed_row
+            ORDER BY source_row_number
+            LIMIT 1
+            """
+        ),
+        {"ordinal": key_ordinal},
+    )
+
+
+def test_duplicate_active_edit_maps_to_value_changed(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+
+    def racing_save(conn: Any, **_: Any) -> Any:
+        # Two active edits of one cell: the partial unique index refuses the second.
+        _insert_cell_edit(conn)
+        _insert_cell_edit(conn)
+
+    monkeypatch.setattr("app.routers.transelec_edits.save_override", racing_save)
+    response = _put(client, import_id, row, "estado", "x", expected="En evaluacion")
+    assert response.status_code == 409 and response.json()["code"] == "value_changed"
+
+
+def test_other_integrity_errors_are_not_value_changed(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+
+    def broken_save(conn: Any, **_: Any) -> Any:
+        _insert_cell_edit(conn, key_ordinal=0)  # violates ck_..._key_ordinal
+
+    monkeypatch.setattr("app.routers.transelec_edits.save_override", broken_save)
+    with pytest.raises(IntegrityError):
+        _put(client, import_id, row, "estado", "x", expected="En evaluacion")
+
+
+def test_noop_save_writes_no_audit_event(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+    response = _put(client, import_id, row, "estado", "En evaluacion", expected="En evaluacion")
+    assert response.status_code == 200 and response.json()["changed"] is False
+    with client.engine.connect() as conn:
+        count = conn.execute(
+            text(
+                "SELECT count(*) FROM platform.audit_event "
+                "WHERE event_type LIKE 'transelec.override.%'"
+            )
+        ).scalar_one()
+        none_ids = conn.execute(
+            text("SELECT count(*) FROM platform.audit_event WHERE subject_id = 'None'")
+        ).scalar_one()
+    assert count == 0 and none_ids == 0

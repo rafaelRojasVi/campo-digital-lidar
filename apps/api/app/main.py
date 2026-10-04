@@ -48,6 +48,7 @@ from app.routers.lidar import router as lidar_router
 from app.routers.session import router as session_router
 from app.routers.transelec import TRANSELEC_MAX_UPLOAD_BYTES
 from app.routers.transelec import router as transelec_router
+from app.routers.transelec_edits import router as transelec_edits_router
 
 _execution_backend: ExecutionBackend | None = None
 
@@ -207,6 +208,7 @@ def _check_object_store_writable() -> None:
 app.include_router(lidar_router)
 app.include_router(ingestion_router)
 app.include_router(transelec_router)
+app.include_router(transelec_edits_router)
 
 # Always mounted, in every APP_ENV: any environment that can authenticate a
 # session must also be able to obtain the CSRF token app.csrf.require_csrf
@@ -271,6 +273,7 @@ app.include_router(entra_auth_router, prefix="/api")
 app.include_router(google_auth_router, prefix="/api")
 app.include_router(session_router, prefix="/api")
 app.include_router(transelec_router, prefix="/api")
+app.include_router(transelec_edits_router, prefix="/api")
 
 # Serves the built frontends from this same process when production builds
 # are present (see app.dashboard_static): the Campo Digital front door at "/",
