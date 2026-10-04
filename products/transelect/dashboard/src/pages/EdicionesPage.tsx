@@ -262,15 +262,17 @@ export function EdicionesPage({
                           {STATUS_LABELS[entry.status]}
                         </span>
                       </td>
-                      <td id={`override-pmf-${entry.id}`}>
+                      <td id={`override-pmf-${entry.id}`} data-col="pmf">
                         <b>{entry.pmf}</b>
                       </td>
                       <td className="numeric">
                         {entry.source_row_number ?? "—"}
                       </td>
                       <td>{spec.label}</td>
-                      <td>{displayValue(spec, planilla) || "(vacía)"}</td>
-                      <td>
+                      <td data-col="planilla">
+                        {displayValue(spec, planilla) || "(vacía)"}
+                      </td>
+                      <td data-col="web">
                         {displayValue(spec, entry.web_value) || "(vacía)"}
                       </td>
                       <td>

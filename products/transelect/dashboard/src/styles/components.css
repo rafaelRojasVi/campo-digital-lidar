@@ -1856,9 +1856,9 @@ td .web-chip,
 .edits-table th.numeric {
   text-align: right;
 }
-.edits-table td:nth-child(3),
-.edits-table td:nth-child(6),
-.edits-table td:nth-child(7) {
+.edits-table td[data-col='pmf'],
+.edits-table td[data-col='planilla'],
+.edits-table td[data-col='web'] {
   overflow-wrap: anywhere;
 }
 .edit-actions {

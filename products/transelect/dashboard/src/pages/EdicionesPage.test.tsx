@@ -9,13 +9,21 @@ vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
   return {
     ...actual,
+    listRows: vi.fn(),
     listOverrides: vi.fn(),
     keepOverride: vi.fn(),
     discardOverride: vi.fn(),
   };
 });
 
-const { listOverrides, keepOverride, discardOverride } = await import("../api");
+vi.mock("../components/RowDetailDrawer", () => ({
+  RowDetailDrawer: ({ row }: { row: { source_row_number: number } }) => (
+    <div data-testid="drawer">fila {row.source_row_number}</div>
+  ),
+}));
+
+const { listOverrides, keepOverride, discardOverride, listRows } =
+  await import("../api");
 
 const make = (
   id: number,
@@ -41,6 +49,7 @@ describe("EdicionesPage", () => {
   beforeEach(() => {
     vi.mocked(listOverrides).mockReset();
     vi.mocked(keepOverride).mockReset();
+    vi.mocked(listRows).mockReset();
     vi.mocked(discardOverride).mockReset();
   });
 
@@ -90,7 +99,7 @@ describe("EdicionesPage", () => {
   it("puts conflicts and orphans first, and announces what keeping did", async () => {
     vi.mocked(listOverrides).mockResolvedValue({
       ok: true,
-      data: [make(3, "aplicada"), make(2, "huerfana"), make(1, "en_conflicto")],
+      data: [make(1, "aplicada"), make(2, "huerfana"), make(3, "en_conflicto")],
     });
     vi.mocked(keepOverride).mockResolvedValue({
       ok: true,
@@ -106,14 +115,14 @@ describe("EdicionesPage", () => {
       .getAllByRole("row")
       .slice(1)
       .map((row) => row.getAttribute("data-testid"));
-    expect(ids).toEqual(["override-1", "override-2", "override-3"]);
+    expect(ids).toEqual(["override-3", "override-2", "override-1"]);
     expect(
-      within(screen.getByTestId("override-1")).getByText(
+      within(screen.getByTestId("override-3")).getByText(
         "En conflicto con la planilla",
       ),
     ).toBeInTheDocument();
     await userEvent.click(
-      within(screen.getByTestId("override-1")).getByRole("button", {
+      within(screen.getByTestId("override-3")).getByRole("button", {
         name: "Mantener valor web",
       }),
     );
@@ -169,5 +178,84 @@ describe("EdicionesPage", () => {
     expect(
       await screen.findByRole("button", { name: "Reintentar" }),
     ).toBeInTheDocument();
+  });
+
+  it("offers actions only where they apply", async () => {
+    vi.mocked(listOverrides).mockResolvedValue({
+      ok: true,
+      data: [make(1, "aplicada"), make(2, "huerfana"), make(3, "en_conflicto")],
+    });
+    render(
+      <RouterProvider initialPath="/transelec/ediciones">
+        <EdicionesPage />
+      </RouterProvider>,
+    );
+    const applied = await screen.findByTestId("override-1");
+    const orphan = screen.getByTestId("override-2");
+    const conflict = screen.getByTestId("override-3");
+    const keep = { name: "Mantener valor web" };
+    expect(within(applied).queryByRole("button", keep)).toBeNull();
+    expect(within(orphan).queryByRole("button", keep)).toBeNull();
+    expect(within(conflict).getByRole("button", keep)).toBeInTheDocument();
+    expect(
+      within(orphan).queryByRole("button", { name: "Ver fila" }),
+    ).toBeNull();
+    expect(
+      within(applied).getByRole("button", { name: "Ver fila" }),
+    ).toBeInTheDocument();
+    expect(
+      within(orphan).getByRole("button", { name: "Descartar" }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the matching row from Ver fila", async () => {
+    vi.mocked(listOverrides).mockResolvedValue({
+      ok: true,
+      data: [make(1, "aplicada")],
+    });
+    vi.mocked(listRows).mockResolvedValue({
+      ok: true,
+      data: {
+        items: [{ source_row_number: 99 }, { source_row_number: 2 }] as never,
+        next_cursor: null,
+        has_more: false,
+        total_count: 2,
+      },
+    });
+    render(
+      <RouterProvider initialPath="/transelec/ediciones">
+        <EdicionesPage />
+      </RouterProvider>,
+    );
+    const row = await screen.findByTestId("override-1");
+    await userEvent.click(
+      within(row).getByRole("button", { name: "Ver fila" }),
+    );
+    expect(await screen.findByTestId("drawer")).toHaveTextContent("fila 2");
+    expect(vi.mocked(listRows).mock.calls[0][0]).toMatchObject({ q: "MP001" });
+  });
+
+  it("says so when Ver fila finds no such row", async () => {
+    vi.mocked(listOverrides).mockResolvedValue({
+      ok: true,
+      data: [make(1, "aplicada")],
+    });
+    vi.mocked(listRows).mockResolvedValue({
+      ok: true,
+      data: { items: [], next_cursor: null, has_more: false, total_count: 0 },
+    });
+    render(
+      <RouterProvider initialPath="/transelec/ediciones">
+        <EdicionesPage />
+      </RouterProvider>,
+    );
+    const row = await screen.findByTestId("override-1");
+    await userEvent.click(
+      within(row).getByRole("button", { name: "Ver fila" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "No se encontró la fila",
+    );
+    expect(screen.queryByTestId("drawer")).toBeNull();
   });
 });
