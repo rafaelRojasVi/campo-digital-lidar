@@ -8,9 +8,11 @@
  * unlike the reviewed snapshot's counts.
  */
 import type {
+  LifecycleRow,
   ResumenRow,
   TranselecActiveImport,
   TranselecImportHistoryRow,
+  TranselecLifecycle,
   TranselecOwnerStatus,
   TranselecPending,
   TranselecReport,
@@ -229,6 +231,62 @@ export function makeHistoryRow(
     distinct_provisional_predio_ids: 1,
     surface_total: 32.5,
     is_active: true,
+    ...overrides,
+  }
+}
+
+export function makeLifecycleRow(overrides: Partial<LifecycleRow> = {}): LifecycleRow {
+  return {
+    ...makeRow(),
+    lifecycle_group: 'en_tramite',
+    lifecycle_step: 'en_evaluacion',
+    lifecycle_reason: null,
+    lifecycle_flags: [],
+    ...overrides,
+  }
+}
+
+export function makeLifecycle(overrides: Partial<TranselecLifecycle> = {}): TranselecLifecycle {
+  return {
+    basis: 'lifecycle_pmf_v1',
+    total_pmf_count: 4,
+    groups: { aprobado: 1, en_tramite: 2, descartado: 0, desistido: 0, sin_clasificar: 1 },
+    steps: {
+      sin_ingreso: 0,
+      en_evaluacion: 1,
+      rechazado_esperando_recurso: 1,
+      en_recurso_reposicion: 0,
+      en_recurso_jerarquico: 0,
+    },
+    rows: [
+      makeLifecycleRow({
+        source_row_number: 2,
+        pmf: 'MP001',
+        estado: 'Aprobado',
+        estado_resumido: 'Aprobado',
+        lifecycle_group: 'aprobado',
+        lifecycle_step: null,
+      }),
+      makeLifecycleRow({
+        source_row_number: 3,
+        pmf: 'MP002',
+        estado: 'Rechazado',
+        tipo_rechazo: 'Legal',
+        reingreso_legal: '1',
+        lifecycle_step: 'rechazado_esperando_recurso',
+      }),
+      makeLifecycleRow({ source_row_number: 5, pmf: 'MP003' }),
+      makeLifecycleRow({
+        source_row_number: 7,
+        pmf: 'MP004',
+        estado: 'Recurso reposicion',
+        estado_resumido: 'Aprobado',
+        lifecycle_group: 'sin_clasificar',
+        lifecycle_step: null,
+        lifecycle_reason: 'estado_y_resumido_no_coinciden',
+        lifecycle_flags: ['filas_no_coinciden'],
+      }),
+    ],
     ...overrides,
   }
 }

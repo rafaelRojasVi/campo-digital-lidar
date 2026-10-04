@@ -61,6 +61,19 @@ export const RULES: Record<string, RuleExplanation> = {
     ],
     sourceColumns: ['Estado'],
   },
+  lifecycle_pmf_v1: {
+    name: 'Dónde está cada PMF en la tramitación CONAF',
+    steps: [
+      'Cada PMF se evalúa una sola vez, con su primera fila (la de número de fila más bajo).',
+      'El grupo sale de «Estado resumido»: «Aprobado» → Aprobado; «En trámite» o «Rechazado» → En trámite; «Descartado» → Descartado; «Desistido» → Desistido.',
+      'Dentro de «En trámite», el paso sale de «Estado»: sin «N Ingreso» ni «N Ingreso2» → Sin ingreso a CONAF; «En evaluación» → En evaluación; «Rechazado» o un recurso rechazado → Rechazado, esperando recurso; «Recurso reposición» → En recurso de reposición; «Recurso jerárquico» → En recurso jerárquico.',
+      'Un rechazo no es un final: todo rechazo termina en Aprobado, Descartado o Desistido.',
+      'No cuentan mayúsculas, tildes ni espacios; ninguna otra variación se adivina. Un valor que la regla no conoce, o un «Estado» que contradice al «Estado resumido», deja el PMF «Sin clasificar» con el motivo, y se lista en Calidad.',
+      'Si las filas del PMF no tienen el mismo estado, se usa la primera y el PMF se marca para revisar.',
+      'Categorías provisionales hasta que Campo Digital confirme el vocabulario.',
+    ],
+    sourceColumns: ['PMF', 'Estado resumido', 'Estado', 'N Ingreso', 'N Ingreso2', 'Tipo de rechazo'],
+  },
   owner_stage_legacy: {
     name: 'Estado de cada predio en la tabla por propietario',
     steps: [

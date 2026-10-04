@@ -199,6 +199,60 @@ export function makeApiRow(index: number, overrides: Record<string, unknown> = {
   }
 }
 
+/**
+ * `GET /transelec/lifecycle`: six synthetic PMFs, one per case the Estado
+ * section draws. Counts agree with the rows.
+ */
+export function lifecycleBody() {
+  const row = (
+    index: number,
+    lifecycle: Record<string, unknown>,
+    overrides: Record<string, unknown> = {},
+  ) => ({
+    ...makeApiRow(index, overrides),
+    lifecycle_step: null,
+    lifecycle_reason: null,
+    lifecycle_flags: [],
+    ...lifecycle,
+  })
+  return {
+    basis: 'lifecycle_pmf_v1',
+    total_pmf_count: 6,
+    groups: { aprobado: 1, en_tramite: 4, descartado: 0, desistido: 0, sin_clasificar: 1 },
+    steps: {
+      sin_ingreso: 1,
+      en_evaluacion: 1,
+      rechazado_esperando_recurso: 1,
+      en_recurso_reposicion: 1,
+      en_recurso_jerarquico: 0,
+    },
+    rows: [
+      row(
+        1,
+        { lifecycle_group: 'en_tramite', lifecycle_step: 'rechazado_esperando_recurso' },
+        { estado: 'Rechazado', tipo_rechazo: 'Legal', reingreso_legal: '1' },
+      ),
+      row(2, { lifecycle_group: 'en_tramite', lifecycle_step: 'en_evaluacion' }),
+      row(
+        3,
+        { lifecycle_group: 'en_tramite', lifecycle_step: 'en_recurso_reposicion' },
+        { estado: 'Recurso reposicion', numero_ingreso_2: 'ING-3-R' },
+      ),
+      row(4, { lifecycle_group: 'en_tramite', lifecycle_step: 'sin_ingreso' }, { numero_ingreso: null }),
+      row(5, { lifecycle_group: 'aprobado' }, { estado: 'Aprobado', estado_resumido: 'Aprobado' }),
+      row(
+        6,
+        {
+          lifecycle_group: 'sin_clasificar',
+          lifecycle_reason: 'estado_y_resumido_no_coinciden',
+          lifecycle_flags: ['filas_no_coinciden'],
+        },
+        { estado: 'Recurso reposicion', estado_resumido: 'Aprobado' },
+      ),
+    ],
+  }
+}
+
 export interface StubOptions {
   /** Force a status on every Transelec read (401/403/404 state tests). */
   readStatus?: number
@@ -321,6 +375,12 @@ export async function stubPlatform(page: Page, options: StubOptions = {}): Promi
       })),
     })
   })
+
+  await page.route('**/api/transelec/lifecycle*', (route) => {
+    if (fail) return json(route, failBody, fail)
+    return json(route, lifecycleBody())
+  })
+
 
   await page.route('**/api/transelec/owner-status*', (route) => {
     if (fail) return json(route, failBody, fail)
