@@ -209,6 +209,8 @@ function Shell() {
           <EstadoPage
             filterController={filterController}
             sourceFields={activeImport?.source_fields ?? null}
+            activeImportId={activeImport?.import_id ?? null}
+            canEdit={publisher}
           />
         )
       case ROUTES.aef:

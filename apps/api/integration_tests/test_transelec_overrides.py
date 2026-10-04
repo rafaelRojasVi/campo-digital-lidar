@@ -1185,3 +1185,39 @@ def test_export_failure_cleans_up_and_codes_the_422(
         with pytest.raises(RuntimeError):
             _download(client)
     assert list(scratch.iterdir()) == []
+
+
+# ---------------------------------------------------------------------------
+# Sibling bases read web edits (Estado and the 90 días hábiles term)
+# ---------------------------------------------------------------------------
+
+
+def _pmf_entry(client: TestClient, path: str, list_key: str, pmf: str) -> dict[str, Any]:
+    response = client.get(path)
+    assert response.status_code == 200, response.text
+    return next(entry for entry in response.json()[list_key] if entry["pmf"] == pmf)
+
+
+def test_estado_and_plazos_read_web_edits(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    rows = [dict(item) for item in _BASE_ROWS]
+    rows[0]["estado"] = "Aprobado"  # contradicts its Estado resumido «En tramite»
+    import_id = _publish(client, _workbook(tmp_path, "siblings.xlsx", rows))
+
+    assert (
+        _pmf_entry(client, "/transelec/lifecycle", "rows", "MP001")["lifecycle_group"] != "aprobado"
+    )
+    first = _row(client, "MP001", 0)["source_row_number"]
+    saved = _put(client, import_id, first, "estado_resumido", "Aprobado", expected="En tramite")
+    assert saved.status_code == 200, saved.text
+    assert (
+        _pmf_entry(client, "/transelec/lifecycle", "rows", "MP001")["lifecycle_group"] == "aprobado"
+    )
+
+    assert _pmf_entry(client, "/transelec/plazos", "pmfs", "MP002")["estado"] == "sin_fecha_texto"
+    mp002 = _row(client, "MP002")["source_row_number"]
+    saved = _put(client, import_id, mp002, "fecha_ingreso", "2026-06-01", expected=None)
+    assert saved.status_code == 200, saved.text
+    plazo = _pmf_entry(client, "/transelec/plazos", "pmfs", "MP002")
+    assert plazo["base_field"] == "fecha_ingreso"
+    assert plazo["estado"] != "sin_fecha_texto"

@@ -265,6 +265,31 @@ test("a viewer sees the chip and who edited, but no edit controls", async ({
   ).toHaveCount(0);
 });
 
+test("the Estado drawer edits too, and Estado re-reads the PMF after a save", async ({
+  page,
+}) => {
+  await stubPlatform(page, statefulEdits([]));
+  let lifecycleReads = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.endsWith("/transelec/lifecycle"))
+      lifecycleReads += 1;
+  });
+
+  await page.goto("/transelec/estado");
+  await page.getByTestId("estado-row-1").locator("td").first().click();
+  const drawer = page.getByTestId("row-drawer");
+  await drawer.getByRole("button", { name: "Editar Estado resumido" }).click();
+  await drawer.getByLabel("Nuevo valor de Estado resumido").fill("Aprobado");
+  const readsBeforeSave = lifecycleReads;
+  await drawer.getByRole("button", { name: "Guardar" }).click();
+
+  await expect(drawer.getByTestId("editables-status")).toContainText(
+    "Se guardó el cambio en Estado resumido.",
+  );
+  await expect.poll(() => lifecycleReads).toBeGreaterThan(readsBeforeSave);
+  await expect(drawer).toBeVisible();
+});
+
 test("Datos → Ediciones web lists conflicts first, keeps only on conflicts, and offers the download", async ({
   page,
 }) => {
