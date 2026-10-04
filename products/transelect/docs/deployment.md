@@ -378,12 +378,59 @@ On the Railway service that runs this image:
 | Volume mount path | `/data` |
 | `CAMPO_OBJECT_STORE_ROOT` | `/data/object-store` |
 | `RAILWAY_RUN_UID` | `0` (Railway's documented setting for a non-root image with a volume; the entrypoint drops back to `campo`) |
-| Healthcheck path | `/ready` (also pinned in `railway.json`) |
-| Custom start command | empty (`railway.json` supplies it) |
+| Healthcheck path | `/ready` (also pinned in `railway.json` and `.railway/railway.ts`) |
+| Custom start command | empty (`railway.json` supplies it; `.railway/railway.ts` after the migration below) |
+| Pre-deploy command | `.venv/bin/alembic upgrade head` (dashboard; also declared in `.railway/railway.ts`) |
 
 **LIMITATION:** a Railway volume is a single-instance disk. The service must
 stay at one replica, and the volume is not a backup. A managed object-store
 backend remains future work.
+
+### Railway Infrastructure as Code: `.railway/railway.ts`
+
+**FACT (Railway CLI 5.63.1, 2026-10-04):** Config as Code (`railway.json`)
+is deprecated, and Railway stops reading it on **2026-12-01**.
+`.railway/railway.ts` is its replacement. It declares the app service: its
+GitHub source, the Dockerfile builder, the start command, `/ready`, the
+pre-deploy migration (until now set only in the dashboard), the `/data`
+volume, and every variable through `preserve()`, which keeps the value in
+Railway and out of the repository. PostGIS is not declared and is left
+alone.
+
+Railway does not read `.railway/` when it deploys. The file changes nothing
+until someone runs `railway config apply`.
+
+**RESULT (2026-10-04, `railway config plan` against production):** with
+the file as committed, the plan reports no changes. An earlier draft that
+declared only the start command, healthcheck and pre-deploy planned to
+**delete all 15 production variables** (database credentials, the Google
+client secret, `PLATFORM_TOKEN_ENCRYPTION_KEY`), detach the `/data` volume
+and clear the source and builder. Once the service is declared, an apply
+treats the file as the whole truth for it. Anything left out is removed,
+not left alone.
+
+So a variable added in the dashboard must also be added to the file as
+`preserve()`, or the next apply deletes it. `apps/api/tests/test_railway_config.py`
+keeps the start command equal to the Dockerfile's and fails if a variable
+value is ever written into the file. It cannot see Railway, so the plan is
+the only check that the variable list is complete.
+
+Before 2026-12-01, by someone with Railway access:
+
+1. `npm ci --prefix .railway`, then `railway link` to `sweet-truth` /
+   `production` / `campo-digital-platform`.
+2. `railway config plan --detailed-exit-code` must exit `0` ("already up to
+   date"). If it lists any change, stop and reconcile the file first.
+3. `railway config apply`. The repository's partial (`campo-digital-platform`)
+   takes ownership of the service and its volume.
+4. Remove `railway.json` and its tests in a follow-up PR, clear the
+   service's Config File setting, deploy, and check that the deploy log
+   still starts with the `campo-entrypoint` line and the healthcheck is
+   `/ready`.
+
+**OPEN QUESTION:** whether the start command and healthcheck the plan saw
+are stored on the service or only overlaid from `railway.json` at deploy.
+Step 2 cannot tell them apart. Step 4's deploy log answers it.
 
 ### Before the first redeploy: files already in the container
 
