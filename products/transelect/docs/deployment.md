@@ -281,6 +281,37 @@ extension downgrade. At 19 MB, a dump and restore is the simple path.
    variables back. Anything written after the cutover is lost on rollback.
 5. Delete the old service only as a separate, later decision.
 
+**RESULT (rehearsal of step 1, 2026-10-04).** The production dump was taken
+inside the PostGIS container (see "Without the TCP proxy" below). It was
+161,224 bytes, with its sha256 verified on both ends. It was restored into
+a throwaway container from the pinned 17-3.5 image, started with
+production's `POSTGRES_INITDB_ARGS`, so TLS came up `on`.
+
+- A plain `pg_restore` reports two errors, both from PostGIS topology. The
+  image's init script already created the `topology` schema, and 3.7.0dev's
+  `topology.topology` has a `useslargeids` column that 3.5.2 lacks. Both
+  topology tables are empty in production, and no migration or app code
+  uses topology. **DECISION:** restore with those entries filtered out:
+
+  ```sh
+  pg_restore --list prod.dump | grep -v -E " topology | SCHEMA - topology" > toc.list
+  pg_restore --no-owner --no-privileges -L toc.list -d <db> prod.dump   # exit 0, no errors
+  ```
+
+  The target database must come from `template_postgis`, or have
+  `CREATE EXTENSION postgis` run first.
+- All 27 tables matched production's row counts exactly, including
+  `platform.transelec_resumen_row` (2,187), `platform.audit_event` and
+  `platform.product_grant`.
+- Against the restored database, `alembic current` reports `0011 (head)`
+  and `upgrade head` has nothing to do. The API's `/health` and `/ready`
+  answer `200`, and with a dev session `/api/transelec/summary` answers
+  `200` with its full structure.
+
+**LIMITATION:** the rehearsal ran locally, not on Railway, and with dev
+auth rather than Google sign-in. Steps 2–3 still have to prove the Railway
+side.
+
 ## Manual database backup
 
 The 2026-09-28 decision above stands: nothing backs up production on a
@@ -313,6 +344,15 @@ uploaded workbook files on the `/data` volume (see "Object storage").
    ```
 
 3. Disable the TCP proxy again.
+
+**Without the TCP proxy** (used on 2026-10-04, no Railway setting changed):
+run `pg_dump` inside the PostGIS container over `railway ssh`. Use the local
+socket (`-h /var/run/postgresql`), because the container's `PGHOST` points
+at the private network. Write the dump to a temp file, print its sha256, and
+stream it back base64-encoded, deleting the temp file in the same command.
+Decode it locally into `~/campo-digital-backups` (mode `600`) and compare
+the checksum. No password leaves the container, and the database is never
+exposed publicly. Its `pg_dump` is the server's own version.
 
 What the script guarantees, from its own code:
 
