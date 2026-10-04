@@ -1667,10 +1667,18 @@
   display: inline-flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--s-3);
+  gap: var(--s-2) var(--s-4);
   margin-left: var(--s-3);
-  font-size: var(--t-micro);
+  font-size: var(--t-small);
   max-width: 100%;
+}
+
+/* Touch targets: at least 24x24 px, the primary action of the feature. */
+.oficina-virtual a,
+.oficina-virtual .btn-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
 }
 
 .oficina-virtual .hint {
