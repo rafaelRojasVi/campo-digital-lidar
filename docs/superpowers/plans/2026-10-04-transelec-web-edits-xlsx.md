@@ -261,7 +261,10 @@ def test_comparable_and_shown_value_meet_in_the_middle() -> None:
 
 def test_cell_signature_uses_raw_text_when_a_date_cell_held_text() -> None:
     evidence = {"fecha_ingreso": {"raw": " 12 de marzo y 4 de mayo ", "parsed": None}}
-    assert cell_signature(DATE, value=None, text_dates=evidence) == ("12 de marzo y 4 de mayo", None)
+    assert cell_signature(DATE, value=None, text_dates=evidence) == (
+        "12 de marzo y 4 de mayo",
+        None,
+    )
     assert cell_signature(DATE, value=dt.date(2026, 3, 12), text_dates=evidence) == (
         None,
         dt.date(2026, 3, 12),
@@ -271,7 +274,9 @@ def test_cell_signature_uses_raw_text_when_a_date_cell_held_text() -> None:
 
 
 def test_value_signature_matches_cell_signature_of_the_same_value() -> None:
-    assert value_signature(TEXT, "Aprobado") == cell_signature(TEXT, value="Aprobado", text_dates={})
+    assert value_signature(TEXT, "Aprobado") == cell_signature(
+        TEXT, value="Aprobado", text_dates={}
+    )
     assert value_signature(DATE, dt.date(2026, 1, 2)) == (None, dt.date(2026, 1, 2))
     assert value_signature(DATE, None) == (None, None)
 
@@ -1165,13 +1170,17 @@ def test_effective_view_equals_the_source_rows_without_edits(
             ),
             {"i": import_id},
         ).scalar_one()
-        ordinals = conn.execute(
-            text(
-                "SELECT key_ordinal FROM platform.transelec_effective_row "
-                "WHERE import_id = :i AND pmf = 'MP003' ORDER BY source_row_number"
-            ),
-            {"i": import_id},
-        ).scalars().all()
+        ordinals = (
+            conn.execute(
+                text(
+                    "SELECT key_ordinal FROM platform.transelec_effective_row "
+                    "WHERE import_id = :i AND pmf = 'MP003' ORDER BY source_row_number"
+                ),
+                {"i": import_id},
+            )
+            .scalars()
+            .all()
+        )
     assert difference == 0
     assert ordinals == [1, 2]
     assert all(row["web_fields"] == [] for row in _rows(client, "MP001"))
@@ -1200,7 +1209,9 @@ def test_every_read_sees_an_applied_edit(client: TestClient, tmp_path: Path) -> 
     searched = client.get("/transelec/pmfs", params={"q": "MP001", "estado_resumido": "Aprobado"})
     assert searched.json()["total_count"] == 1
 
-    csv_text = client.get("/transelec/export.csv", params={"q": "MP001"}).content.decode("utf-8-sig")
+    csv_text = client.get("/transelec/export.csv", params={"q": "MP001"}).content.decode(
+        "utf-8-sig"
+    )
     assert "Aprobado" in csv_text
 
 
@@ -1272,7 +1283,7 @@ Add to `ResumenRowView`, after `source_text_dates`:
 Add to `_resumen_row_view`, after `source_text_dates=...`:
 
 ```python
-        web_fields=list(row.web_fields or []),
+web_fields = (list(row.web_fields or []),)
 ```
 
 Check that no other read still selects the base table. Expected: only `import_projection.py` (the write path) and docstrings mention it.
@@ -1446,10 +1457,22 @@ def test_resave_supersedes_and_returning_to_the_planilla_discards(
     import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
     row = _row(client, "MP001", 0)["source_row_number"]
 
-    _save(client.engine, import_id=import_id, row=row, field="estado", value="A", expected="En evaluacion")
+    _save(
+        client.engine,
+        import_id=import_id,
+        row=row,
+        field="estado",
+        value="A",
+        expected="En evaluacion",
+    )
     _save(client.engine, import_id=import_id, row=row, field="estado", value="B", expected="A")
     back = _save(
-        client.engine, import_id=import_id, row=row, field="estado", value="En evaluacion", expected="B"
+        client.engine,
+        import_id=import_id,
+        row=row,
+        field="estado",
+        value="En evaluacion",
+        expected="B",
     )
     same = _save(
         client.engine,
@@ -1498,8 +1521,22 @@ def test_activation_retires_incorporated_edits_and_flags_conflicts(
     first = _publish(client, _workbook(tmp_path, "v1.xlsx"))
     row_a = _row(client, "MP001", 0)["source_row_number"]
     row_b = _row(client, "MP001", 1)["source_row_number"]
-    _save(client.engine, import_id=first, row=row_a, field="estado_resumido", value="Aprobado", expected="En tramite")
-    _save(client.engine, import_id=first, row=row_b, field="estado_resumido", value="Aprobado", expected="En tramite")
+    _save(
+        client.engine,
+        import_id=first,
+        row=row_a,
+        field="estado_resumido",
+        value="Aprobado",
+        expected="En tramite",
+    )
+    _save(
+        client.engine,
+        import_id=first,
+        row=row_b,
+        field="estado_resumido",
+        value="Aprobado",
+        expected="En tramite",
+    )
 
     # v2: row A now says what the web said (incorporated); row B changed to
     # something else (conflict); MP002 is gone (orphan is covered in Task 5).
@@ -1510,12 +1547,16 @@ def test_activation_retires_incorporated_edits_and_flags_conflicts(
 
     with client.engine.connect() as conn:
         records = list_overrides(conn, import_id=second)
-        ended = conn.execute(
-            text(
-                "SELECT end_reason FROM platform.transelec_field_override "
-                "WHERE ended_at IS NOT NULL"
+        ended = (
+            conn.execute(
+                text(
+                    "SELECT end_reason FROM platform.transelec_field_override "
+                    "WHERE ended_at IS NOT NULL"
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         audit = conn.execute(
             text(
                 "SELECT metadata FROM platform.audit_event "
@@ -1686,8 +1727,7 @@ def _locked_active_import(connection: Connection) -> int:
 
     active = connection.execute(
         text(
-            "SELECT active_import_id FROM platform.transelec_dashboard_state "
-            "WHERE id = 1 FOR SHARE"
+            "SELECT active_import_id FROM platform.transelec_dashboard_state WHERE id = 1 FOR SHARE"
         )
     ).scalar_one()
     if active is None:
@@ -2150,7 +2190,10 @@ def test_edit_hits_only_the_chosen_row_of_a_shared_key(client: TestClient, tmp_p
     import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
     second = _row(client, "MP003", 1)["source_row_number"]
 
-    assert _put(client, import_id, second, "estado", "Desistido", expected="Aprobado").status_code == 200
+    assert (
+        _put(client, import_id, second, "estado", "Desistido", expected="Aprobado").status_code
+        == 200
+    )
 
     rows = _rows(client, "MP003")
     assert [r["estado"] for r in rows] == ["Aprobado", "Desistido"]
@@ -2164,7 +2207,9 @@ def test_date_edit_over_raw_text_survives_an_unchanged_republish(
     row = _row(client, "MP002")
     assert row["fecha_ingreso"] is None and "fecha_ingreso" in row["source_text_dates"]
 
-    saved = _put(client, import_id, row["source_row_number"], "fecha_ingreso", "2026-03-12", expected=None)
+    saved = _put(
+        client, import_id, row["source_row_number"], "fecha_ingreso", "2026-03-12", expected=None
+    )
     assert saved.status_code == 200, saved.text
     assert saved.json()["row"]["fecha_ingreso"] == "2026-03-12"
     assert "fecha_ingreso" not in saved.json()["row"]["source_text_dates"]
@@ -2707,9 +2752,13 @@ def test_cells_are_written_with_the_right_types(source: Path, tmp_path: Path) ->
     patch_workbook(source, out, sheet_name="Resumen", edits=EDITS)
     sheet = _parts(out)["xl/worksheets/sheet1.xml"].decode("utf-8")
 
-    assert re.search(r'<c r="A2" s="\d+" t="inlineStr"><is><t xml:space="preserve">Aprobado</t>', sheet)
+    assert re.search(
+        r'<c r="A2" s="\d+" t="inlineStr"><is><t xml:space="preserve">Aprobado</t>', sheet
+    )
     assert re.search(r'<c r="B2" s="\d+"><v>2</v></c>', sheet)  # stays numeric
-    assert re.search(rf'<c r="C2" s="\d+"><v>{excel_serial(dt.date(2026, 2, 1), date1904=False)}</v>', sheet)
+    assert re.search(
+        rf'<c r="C2" s="\d+"><v>{excel_serial(dt.date(2026, 2, 1), date1904=False)}</v>', sheet
+    )
     assert "ING &lt;1&gt; &amp; 2" in sheet  # escaped
     assert re.search(r'<c r="C3" s="\d+"/>', sheet)  # cleared, styled
     assert sheet.index('r="C3"') < sheet.index('r="E3"')  # inserted in column order
@@ -2786,12 +2835,16 @@ def test_the_importer_reads_the_web_values_back(tmp_path: Path) -> None:
     assert row.values["fecha_ingreso"] == dt.date(2026, 3, 12)
 
 
-def test_refuses_unknown_sheet_missing_row_and_duplicate_cells(source: Path, tmp_path: Path) -> None:
+def test_refuses_unknown_sheet_missing_row_and_duplicate_cells(
+    source: Path, tmp_path: Path
+) -> None:
     out = tmp_path / "out.xlsx"
     with pytest.raises(WorkbookPatchError):
         patch_workbook(source, out, sheet_name="Nope", edits=EDITS)
     with pytest.raises(WorkbookPatchError):
-        patch_workbook(source, out, sheet_name="Resumen", edits=[CellEdit(99, "A", "text", "x", "n")])
+        patch_workbook(
+            source, out, sheet_name="Resumen", edits=[CellEdit(99, "A", "text", "x", "n")]
+        )
     with pytest.raises(WorkbookPatchError):
         patch_workbook(source, out, sheet_name="Resumen", edits=[EDITS[0], EDITS[0]])
 
@@ -3300,8 +3353,9 @@ _EMPTY_RELS = (
 )
 
 
-def _add_notes(parts: dict[str, bytes], names: set[str], sheet_part: str,
-               edits: Sequence[CellEdit]) -> list[str]:
+def _add_notes(
+    parts: dict[str, bytes], names: set[str], sheet_part: str, edits: Sequence[CellEdit]
+) -> list[str]:
     """Add one note per edit; return the part names touched or created."""
 
     touched: list[str] = []
@@ -3391,11 +3445,12 @@ def _add_notes(parts: dict[str, bytes], names: set[str], sheet_part: str,
         if existing is not None:
             # Excel holds one note per cell: keep the existing note, add ours below.
             addition = (
-                '<r><t xml:space="preserve">'
-                f"{escape(chr(10) + _clean_text(edit.note))}</t></r>"
+                f'<r><t xml:space="preserve">{escape(chr(10) + _clean_text(edit.note))}</t></r>'
             )
             merged = existing.group(0).replace("</text>", addition + "</text>", 1)
-            comments_xml = comments_xml[: existing.start()] + merged + comments_xml[existing.end() :]
+            comments_xml = (
+                comments_xml[: existing.start()] + merged + comments_xml[existing.end() :]
+            )
             continue
         comment = _comment_xml(edit.ref, author_id, edit.note)
         if "<commentList/>" in comments_xml:
@@ -5538,11 +5593,15 @@ def test_estado_and_plazos_read_web_edits(client: TestClient, tmp_path: Path) ->
     rows[0]["estado"] = "Aprobado"  # contradicts its Estado resumido «En tramite»
     import_id = _publish(client, _workbook(tmp_path, "siblings.xlsx", rows))
 
-    assert _pmf_entry(client, "/transelec/lifecycle", "rows", "MP001")["lifecycle_group"] != "aprobado"
+    assert (
+        _pmf_entry(client, "/transelec/lifecycle", "rows", "MP001")["lifecycle_group"] != "aprobado"
+    )
     first = _row(client, "MP001", 0)["source_row_number"]
     saved = _put(client, import_id, first, "estado_resumido", "Aprobado", expected="En tramite")
     assert saved.status_code == 200, saved.text
-    assert _pmf_entry(client, "/transelec/lifecycle", "rows", "MP001")["lifecycle_group"] == "aprobado"
+    assert (
+        _pmf_entry(client, "/transelec/lifecycle", "rows", "MP001")["lifecycle_group"] == "aprobado"
+    )
 
     assert _pmf_entry(client, "/transelec/plazos", "pmfs", "MP002")["estado"] == "sin_fecha_texto"
     mp002 = _row(client, "MP002")["source_row_number"]

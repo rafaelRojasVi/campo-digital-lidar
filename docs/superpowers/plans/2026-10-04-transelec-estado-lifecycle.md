@@ -329,12 +329,16 @@ def test_a_rejection_is_never_terminal() -> None:
 
 
 def test_case_accents_and_spaces_do_not_matter() -> None:
-    assert classify_first_row(
-        _row(estado_resumido="EN TRÁMITE", estado="  En   Evaluación ")
-    ) == ("en_tramite", "en_evaluacion", None)
-    assert classify_first_row(
-        _row(estado_resumido="en trámite", estado="Recurso Jerárquico")
-    ) == ("en_tramite", "en_recurso_jerarquico", None)
+    assert classify_first_row(_row(estado_resumido="EN TRÁMITE", estado="  En   Evaluación ")) == (
+        "en_tramite",
+        "en_evaluacion",
+        None,
+    )
+    assert classify_first_row(_row(estado_resumido="en trámite", estado="Recurso Jerárquico")) == (
+        "en_tramite",
+        "en_recurso_jerarquico",
+        None,
+    )
 
 
 @pytest.mark.parametrize("blank", [None, "", "   "])
@@ -419,7 +423,11 @@ def test_rows_that_disagree_keep_the_first_row_and_are_flagged() -> None:
     summary = build_lifecycle(
         [
             _row(source_row_number=2, estado="Aprobado", estado_resumido="Aprobado"),
-            _row(source_row_number=3, estado="Recurso reposicion aprobado", estado_resumido="Aprobado"),
+            _row(
+                source_row_number=3,
+                estado="Recurso reposicion aprobado",
+                estado_resumido="Aprobado",
+            ),
             _row(source_row_number=5, pmf="MP002"),
         ]
     )
@@ -444,7 +452,9 @@ def test_rows_that_differ_only_in_spelling_are_not_flagged() -> None:
 def test_counts_cover_every_group_and_step_and_pmfs_follow_source_order() -> None:
     summary = build_lifecycle(
         [
-            _row(source_row_number=7, pmf="MP003", estado="Descartado", estado_resumido="Descartado"),
+            _row(
+                source_row_number=7, pmf="MP003", estado="Descartado", estado_resumido="Descartado"
+            ),
             _row(source_row_number=2, pmf="MP001", estado="Rechazado"),
             _row(source_row_number=4, pmf="MP002", estado="Aprobado", estado_resumido="Aprobado"),
         ]
@@ -1046,9 +1056,7 @@ def test_lifecycle_follows_the_shared_filter_contract(
     _login(client, "dev-admin")
     _publish_fixture(client, integration_engine, _lifecycle_fixture_workbook(tmp_path))
 
-    narrowed = client.get(
-        "/transelec/lifecycle", params={"estado_resumido": "En tramite"}
-    ).json()
+    narrowed = client.get("/transelec/lifecycle", params={"estado_resumido": "En tramite"}).json()
     assert narrowed["total_pmf_count"] == 3
     assert {row["pmf"] for row in narrowed["rows"]} == {"LC002", "LC003", "LC007"}
     assert narrowed["groups"]["en_tramite"] == 3
@@ -2784,9 +2792,9 @@ In `apps/api/app/main.py`, in `TRANSELEC_SPA_PAGE_PATHS`, add
 `"transelec/pendientes",` line to:
 
 ```python
-        "transelec/estado",
-        # Redirects to transelec/estado in the browser (one release, 2026-10-04).
-        "transelec/pendientes",
+("transelec/estado",)
+# Redirects to transelec/estado in the browser (one release, 2026-10-04).
+("transelec/pendientes",)
 ```
 
 - [ ] **Step 8: Run unit tests (dashboard and server)**
