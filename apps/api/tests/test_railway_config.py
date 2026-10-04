@@ -1,11 +1,12 @@
-"""railway.json must build the Dockerfile and start through its entrypoint.
+""".railway/railway.ts must build the Dockerfile and start through its entrypoint.
 
 Railway replaces the image's ENTRYPOINT with any custom start command, and
 the production service runs as root (RAILWAY_RUN_UID=0) so the entrypoint
 can hand the volume to ``campo``. A start command that skipped the
-entrypoint would therefore run the API as root. Pinning both in
-config-as-code, which overrides the dashboard, keeps that from depending on
-a dashboard field nobody can see from the repository.
+entrypoint would therefore run the API as root. Declaring it as
+Infrastructure as Code keeps that from depending on a dashboard field nobody
+can see from the repository. (It replaced railway.json, Config as Code,
+which Railway stops reading on 2026-12-01.)
 """
 
 from __future__ import annotations
@@ -18,43 +19,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-def _railway() -> dict[str, dict[str, str]]:
-    return json.loads((REPO_ROOT / "railway.json").read_text(encoding="utf-8"))
-
-
 def _dockerfile_json_instruction(name: str) -> list[str]:
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
     match = re.search(rf"^{name} (\[.*\])$", dockerfile, flags=re.MULTILINE)
     assert match, f"Dockerfile has no exec-form {name}"
     return list(json.loads(match.group(1)))
-
-
-def test_railway_builds_the_repository_dockerfile() -> None:
-    build = _railway()["build"]
-
-    assert build["builder"] == "DOCKERFILE"
-    assert build["dockerfilePath"] == "Dockerfile"
-
-
-def test_railway_start_command_runs_through_the_image_entrypoint() -> None:
-    argv = shlex.split(_railway()["deploy"]["startCommand"])
-
-    assert argv[:1] == _dockerfile_json_instruction("ENTRYPOINT")
-
-
-def test_railway_start_command_is_exactly_the_images_own_start() -> None:
-    argv = shlex.split(_railway()["deploy"]["startCommand"])
-
-    assert argv == _dockerfile_json_instruction("ENTRYPOINT") + _dockerfile_json_instruction("CMD")
-
-
-def test_railway_health_check_is_readiness_not_liveness() -> None:
-    # /ready fails without a mounted, writable object store; /health does not.
-    assert _railway()["deploy"]["healthcheckPath"] == "/ready"
-
-
-# .railway/railway.ts replaces railway.json, which Railway stops reading on
-# 2026-12-01. Both must describe the same service until railway.json is gone.
 
 
 def _railway_ts() -> str:
@@ -73,18 +42,34 @@ def _ts_env() -> dict[str, str]:
     return dict(re.findall(r"^\s*(\w+):\s*(.+?),\s*$", match.group(1), flags=re.MULTILINE))
 
 
+def test_config_as_code_is_gone() -> None:
+    # Two sources of truth for the same service is how they drift apart.
+    assert not (REPO_ROOT / "railway.json").exists()
+    assert not (REPO_ROOT / "railway.toml").exists()
+
+
+def test_iac_builds_the_repository_dockerfile() -> None:
+    assert re.search(
+        r'build:\s*\{\s*builder:\s*"DOCKERFILE",\s*dockerfilePath:\s*"/Dockerfile"\s*\}',
+        _railway_ts(),
+    )
+    assert (REPO_ROOT / "Dockerfile").is_file()
+
+
+def test_iac_start_command_runs_through_the_image_entrypoint() -> None:
+    argv = shlex.split(_ts_string_option("start"))
+
+    assert argv[:1] == _dockerfile_json_instruction("ENTRYPOINT")
+
+
 def test_iac_start_command_is_exactly_the_images_own_start() -> None:
     argv = shlex.split(_ts_string_option("start"))
 
     assert argv == _dockerfile_json_instruction("ENTRYPOINT") + _dockerfile_json_instruction("CMD")
 
 
-def test_iac_and_config_as_code_agree_while_both_exist() -> None:
-    assert _ts_string_option("start") == _railway()["deploy"]["startCommand"]
-    assert _ts_string_option("healthcheck") == _railway()["deploy"]["healthcheckPath"]
-
-
 def test_iac_health_check_is_readiness_not_liveness() -> None:
+    # /ready fails without a mounted, writable object store; /health does not.
     assert _ts_string_option("healthcheck") == "/ready"
 
 

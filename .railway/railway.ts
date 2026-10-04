@@ -1,7 +1,8 @@
 import { defineRailway, github, preserve, project, service, volume } from "railway/iac";
 
-// Infrastructure as Code for the production app service. It replaces
-// railway.json (Config as Code), which Railway stops reading on 2026-12-01.
+// Infrastructure as Code for the production app service. It replaced
+// railway.json (Config as Code, removed 2026-10-04), which Railway stops
+// reading on 2026-12-01.
 //
 // Railway does not read this file when it deploys: it changes the service only
 // when someone runs `railway config apply` (see
