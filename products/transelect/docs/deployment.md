@@ -540,11 +540,14 @@ Dockerfile value (only `HEROKU`, `NIXPACKS`, `PAKETO`, `RAILPACK`).
 **INFERENCE:** the Dockerfile is chosen by `dockerfilePath`, not by the
 builder enum, so builds stay Dockerfile builds without `railway.json`.
 
-**To verify on the first deploy without `railway.json`:** the build log
-shows the Dockerfile's stages (`[runtime n/16] COPY …`), the deploy log
-starts with the `campo-entrypoint` line, `/ready` answers `200`, and
-`railway config plan` still reports no changes. If the build is not a
-Dockerfile build, revert this change before 2026-12-01.
+**RESULT (deploy `2193f7d5` of `58e8e68`, the first without `railway.json`,
+2026-10-04):** the build log shows the Dockerfile's stages (`[runtime 15/16]
+COPY scripts/container/entrypoint.sh`, …) and no Railpack, which confirms the
+inference above. The deploy log starts with the `campo-entrypoint … dropping
+to campo` line, `/ready` answers `200`, and the service still stores the
+`/ready` healthcheck, the pre-deploy migration and the entrypoint start
+command. `railway config plan` still reports no changes. The 2026-12-01
+cutoff no longer affects this service.
 
 ### Before the first redeploy: files already in the container
 
