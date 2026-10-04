@@ -341,3 +341,24 @@ Fills and notes are ignored by the importer. Every edit then becomes
 - Bulk edit.
 - Writing edits into the other worksheets.
 - Viewer downloads of the .xlsx.
+
+## Plan refinements (2026-10-04)
+
+Found while writing
+[the implementation plan](../plans/2026-10-04-transelec-web-edits-xlsx.md),
+which records the evidence (the migration SQL and the patcher were exercised
+locally; the patcher handled the real 30-Sept planilla in 1.9 s with every
+untouched part byte-identical):
+
+- **Blank cells.** A cell absent from the sheet XML also accepts a number. The
+  real planilla omits blank cells.
+- **Fields without a column.** Editing a field the active version has no
+  column for answers 422, since such an edit could never be downloaded.
+- **Retiring incorporated edits.** This happens in the router's `_activate`,
+  inside the activation transaction.
+- **Note dates.** The date in each note comes from PostgreSQL in
+  `America/Santiago`; no `tzdata` dependency is needed for this feature.
+- **Page paths.** The «Ediciones web» pane adds `transelec/ediciones` to
+  `TRANSELEC_SPA_PAGE_PATHS`.
+- **View columns.** The view's column list is fixed in migration 0012. A test
+  fails if a future contract column is missing from it.

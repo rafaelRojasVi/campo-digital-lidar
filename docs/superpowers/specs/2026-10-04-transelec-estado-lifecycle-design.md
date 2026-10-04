@@ -209,3 +209,20 @@ Added to the Spanish meeting note.
 3. Is CONAF's N.º de solicitud the planilla's `N Ingreso`?
 4. *Estado resumido* «Aprobado» with *Estado* «Recurso reposición» and no
    outcome: is the recurso pending, or is *Estado* out of date?
+
+## Plan refinements (2026-10-04)
+
+Found while writing
+[the implementation plan](../plans/2026-10-04-transelec-estado-lifecycle.md),
+which records the evidence:
+
+- **API path.** The read is `GET /transelec/lifecycle`, not `/estado`. The
+  router is also mounted without the `/api` prefix, and `transelec/estado` is
+  a dashboard page path, so a shared path would answer a page reload with
+  JSON. A guard test pins this.
+- **Page paths.** `TRANSELEC_SPA_PAGE_PATHS` lists `transelec/estado`.
+- **Display fields.** Tipo de rechazo, `Reingreso_*` and both ingreso pairs
+  come from the PMF's first row hydrated as `ResumenRowView`, as `/pending`
+  does. The classifier's input carries only what it classifies.
+- **Old pending rule.** It stays on the Estado page as a closed «Pendientes
+  prioritarios (regla anterior)» block.

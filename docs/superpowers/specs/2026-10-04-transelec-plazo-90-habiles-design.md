@@ -197,3 +197,18 @@ Added to the Spanish meeting note.
 2. Does a recurso de reposición or jerárquico restart the 90 days, or only a
    new ingreso (*Fecha de ingreso2*)?
 3. Should regional holidays count?
+
+## Plan refinements (2026-10-04)
+
+Found while writing
+[the implementation plan](../plans/2026-10-04-transelec-plazo-90-habiles.md):
+
+- **Cross-check.** It gains `sin_calculo` for PMFs without a computed
+  deadline.
+- **Legacy basis.** It uses «90 dias» strictly before the server's date in
+  Chile, as specified. The browser check it replaces could flip up to a day
+  early.
+- **Test location.** Integration tests with dated cells go in
+  `test_transelec_router.py`; the reads-router fixtures cannot write dates.
+- **Holiday list.** The government page with the official 2026 list is
+  located at execution time; `gob.cl/feriados` answered 404 on 2026-10-04.
