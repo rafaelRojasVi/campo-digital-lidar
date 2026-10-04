@@ -20,7 +20,7 @@ import { AlertBanner, LoadingBlock } from './StateViews'
 import { StatusPill } from './StatusPill'
 
 function stageSegments(pending: TranselecPending): CompositionSegment[] {
-  const tones = ['late', 'progress', 'struck'] as const
+  const tones = ['none', 'progress', 'struck'] as const
   return PENDING_STAGE_ORDER.map((stage, index) => ({
     key: stage,
     label: PENDING_STAGE_LABELS[stage],
@@ -50,7 +50,7 @@ export function LegacyPendingSection({
   )
 
   return (
-    <details className="how" data-testid="legacy-pending">
+    <details className="how legacy-pending" data-testid="legacy-pending">
       <summary>Pendientes prioritarios (regla anterior)</summary>
       <div className="how-body">
         {failure && <AlertBanner title={failure.title}>{failure.message}</AlertBanner>}

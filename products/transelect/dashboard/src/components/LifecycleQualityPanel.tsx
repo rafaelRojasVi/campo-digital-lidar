@@ -32,11 +32,11 @@ export function LifecycleQualityPanel({
           </p>
           {review.length === 0 ? (
             <p className="quality-what">
-              Todos los PMF del alcance tienen un grupo y un paso reconocidos.
+              Ningún PMF por revisar: la regla reconoce el estado de todos y sus filas coinciden.
             </p>
           ) : (
             <>
-              <ul className="variant-list" data-testid="lifecycle-review-list">
+              <ul className="variant-list review-list" data-testid="lifecycle-review-list">
                 {review.map((row) => (
                   <li
                     key={row.source_row_number}
@@ -48,7 +48,7 @@ export function LifecycleQualityPanel({
                       ...row.lifecycle_flags.map((flag) => LIFECYCLE_FLAG_LABELS[flag]),
                     ]
                       .filter(Boolean)
-                      .join('; ')}{' '}
+                      .join('. ')}{' '}
                     ·{' '}
                     <Link
                       to={`${ROUTES.estado}${
@@ -56,7 +56,7 @@ export function LifecycleQualityPanel({
                       }`}
                       className="quality-go"
                     >
-                      Abrir {row.pmf} en Estado
+                      Buscar {row.pmf} en Estado
                     </Link>
                   </li>
                 ))}

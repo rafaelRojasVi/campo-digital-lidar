@@ -72,7 +72,7 @@ export function OficinaVirtualLink({
           type="button"
           className="btn-link"
           onClick={() => void copy()}
-          aria-label={`Copiar el N.º ${value}`}
+          aria-label={`Copiar N.º ${value}`}
           data-testid={`${testId}-copy`}
         >
           Copiar N.º

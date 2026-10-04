@@ -1083,3 +1083,26 @@ a.status-card .status-card-go {
   display: block;
   margin-top: var(--s-2);
 }
+
+/* The one step that is the reader's work: the bar's attention red, plus weight. */
+.estado-table .estado-attention {
+  color: var(--st-late);
+  font-weight: 650;
+}
+
+/* «Abrir» and «Copiar N.º» on one line: no indent, and room for both. */
+.estado-table .oficina-virtual {
+  margin-left: 0;
+}
+
+.estado-table td[data-col='oficina'] {
+  min-width: 9.5rem;
+}
+
+.how.legacy-pending {
+  max-width: none;
+}
+
+.review-list li + li {
+  margin-top: var(--s-3);
+}

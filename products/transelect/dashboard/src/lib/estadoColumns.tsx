@@ -40,7 +40,11 @@ export const ESTADO_COLUMNS: readonly EstadoColumn[] = [
     // The step or the reason, plus any flag: both are long, so the cell wraps.
     render: (row) => (
       <>
-        {lifecycleStepText(row)}
+        {row.lifecycle_step === 'rechazado_esperando_recurso' ? (
+          <span className="estado-attention">{lifecycleStepText(row)}</span>
+        ) : (
+          lifecycleStepText(row)
+        )}
         {row.lifecycle_flags.map((flag) => (
           <span className="hint estado-flag" key={flag}>
             {LIFECYCLE_FLAG_LABELS[flag]}

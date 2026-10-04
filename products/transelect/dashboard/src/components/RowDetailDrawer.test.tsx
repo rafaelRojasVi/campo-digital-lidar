@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RowDetailDrawer } from "./RowDetailDrawer";
 import { makeLifecycleRow, makeRow } from "../test/factories";
@@ -389,6 +389,10 @@ describe("RowDetailDrawer — Proceso CONAF (lifecycle_pmf_v1)", () => {
     expect(block).toHaveTextContent("Sin clasificar");
     expect(block).toHaveTextContent("«Estado» y «Estado resumido» no coinciden");
     expect(block).toHaveTextContent("Sus filas no tienen el mismo");
+    // The reason is the «Para revisar» fact; it is not stated a second time as a hint.
+    expect(block.textContent?.match(/«Estado» y «Estado resumido» no coinciden/g) ?? []).toHaveLength(1);
+    expect(within(block).getByText("Para revisar en la planilla")).toBeInTheDocument();
+    expect(within(block).queryByText("Paso")).toBeNull();
   });
 
   it("has no Proceso CONAF block from elsewhere, but always links the Oficina Virtual", () => {
@@ -405,7 +409,7 @@ describe("RowDetailDrawer — Proceso CONAF (lifecycle_pmf_v1)", () => {
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(link).toHaveAccessibleName(/pestaña nueva/);
-    expect(screen.getByTestId("drawer-ov-1-copy")).toHaveAccessibleName("Copiar el N.º ING-7");
+    expect(screen.getByTestId("drawer-ov-1-copy")).toHaveAccessibleName("Copiar N.º ING-7");
   });
 
   it("copies the N.º and says so", async () => {

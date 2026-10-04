@@ -632,6 +632,13 @@ td.empty,
   text-align: center;
 }
 
+/* On a phone the table is wider than the screen: a centred message lands off-screen. */
+@media (max-width: 767px) {
+  td.empty {
+    text-align: left;
+  }
+}
+
 /* ---------------------------------------------------------- status pill */
 
 .pill {

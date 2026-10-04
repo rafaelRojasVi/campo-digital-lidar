@@ -19,6 +19,15 @@ describe('EstadoTable', () => {
     expect(row).toHaveTextContent('— / 1 / —')
   })
 
+  it('marks only the rejected-awaiting-recurso step as the one needing action', () => {
+    render(<EstadoTable rows={rows} selectedRow={null} onOpen={() => {}} />)
+    const marked = within(screen.getByTestId('estado-row-3')).getByText(
+      'Rechazado, esperando recurso',
+    )
+    expect(marked).toHaveClass('estado-attention')
+    expect(screen.getByTestId('estado-row-2').querySelector('.estado-attention')).toBeNull()
+  })
+
   it('appends extra columns after its own, so a later basis adds one column', () => {
     const plazo: EstadoColumn = {
       key: 'plazo',
@@ -47,7 +56,7 @@ describe('EstadoTable', () => {
     try {
       render(<EstadoTable rows={rows} selectedRow={null} onOpen={onOpen} />)
       const row = screen.getByTestId('estado-row-3')
-      await userEvent.click(within(row).getByRole('button', { name: 'Copiar el N.º ING-900' }))
+      await userEvent.click(within(row).getByRole('button', { name: 'Copiar N.º ING-900' }))
       fireEvent.keyDown(within(row).getByRole('link', { name: /^Abrir Oficina Virtual CONAF/ }), {
         key: 'Enter',
       })

@@ -48,7 +48,6 @@ import { ingreso2InSource } from '../lib/ingreso'
 import {
   LIFECYCLE_FLAG_LABELS,
   LIFECYCLE_GROUP_LABELS,
-  LIFECYCLE_REASON_LABELS,
   lifecycleStepText,
 } from '../lib/lifecycle'
 import { classifyFailure, type FailureView } from '../lib/apiState'
@@ -337,18 +336,15 @@ export function RowDetailDrawer({
             </h3>
             <dl className="facts">
               <Fact label="Grupo">{LIFECYCLE_GROUP_LABELS[lifecycle.lifecycle_group]}</Fact>
-              <Fact label="Paso">{lifecycleStepText(lifecycle)}</Fact>
+              <Fact label={lifecycle.lifecycle_step ? 'Paso' : 'Para revisar en la planilla'}>
+                {lifecycleStepText(lifecycle)}
+              </Fact>
             </dl>
             {lifecycle.lifecycle_flags.map((flag) => (
               <p className="hint" key={flag}>
                 {LIFECYCLE_FLAG_LABELS[flag]}.
               </p>
             ))}
-            {lifecycle.lifecycle_reason && lifecycle.lifecycle_step === null && (
-              <p className="hint">
-                Para revisar en la planilla: {LIFECYCLE_REASON_LABELS[lifecycle.lifecycle_reason]}.
-              </p>
-            )}
             <p className="hint">
               Según la primera fila del PMF (fila {formatInteger(lifecycle.source_row_number)}).
               Categorías provisionales hasta que Campo Digital las confirme.

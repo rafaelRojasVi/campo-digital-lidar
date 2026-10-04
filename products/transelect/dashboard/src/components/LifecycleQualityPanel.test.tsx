@@ -28,7 +28,7 @@ describe('LifecycleQualityPanel', () => {
   it('lets each listed PMF be reached through a link to Estado filtered to it', () => {
     render(<LifecycleQualityPanel lifecycle={makeLifecycle()} />)
 
-    expect(screen.getByRole('link', { name: 'Abrir MP004 en Estado' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Buscar MP004 en Estado' })).toHaveAttribute(
       'href',
       '/transelec/estado?q=MP004',
     )

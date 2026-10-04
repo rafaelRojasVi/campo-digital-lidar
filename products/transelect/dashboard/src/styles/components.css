@@ -439,7 +439,7 @@
 
 .composition-seg[data-tone='none'] {
   background: var(--st-none);
-  color: var(--ink-2);
+  color: var(--ink);
 }
 
 .composition-legend {
@@ -1683,6 +1683,23 @@
 
 .oficina-virtual .hint {
   overflow-wrap: anywhere;
+}
+
+/* The panel's link colour, like «Copiar N.º» beside it (author rule also beats UA :visited). */
+.oficina-virtual a {
+  color: var(--forest-deep);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.oficina-virtual a:hover {
+  color: var(--forest);
+}
+
+/* An empty live region stays in the accessibility tree but takes no flex slot (or gap). */
+.oficina-virtual [role='status']:empty {
+  position: absolute;
 }
 
 /* Long reason and flag labels wrap inside the drawer instead of widening it. */
