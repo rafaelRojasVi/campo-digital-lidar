@@ -36,8 +36,14 @@ function daysText(detail: PlazoDetail): string {
 /** The block while the read is pending, failed, or has nothing for the PMF. */
 export function PlazoDrawerNotice({ status }: { status: PlazoDrawerStatus }) {
   return (
-    <section className="drawer-section" aria-labelledby="drawer-plazo-title" data-testid="drawer-plazo">
-      <h3 id="drawer-plazo-title">{TITLE}</h3>
+    <section
+      className="drawer-section"
+      aria-labelledby="drawer-plazo-title"
+      data-testid="drawer-plazo"
+    >
+      <h3 id="drawer-plazo-title">
+        {TITLE} <span className="hint">(provisional)</span>
+      </h3>
       {status === 'loading' && <LoadingBlock label="Calculando el plazo…" lines={2} />}
       {status === 'error' && (
         <p className="hint" role="status">
@@ -52,10 +58,16 @@ export function PlazoDrawerNotice({ status }: { status: PlazoDrawerStatus }) {
 export function PlazoDrawerSection({ detail }: { detail: PlazoDetail }) {
   const { entry } = detail
   return (
-    <section className="drawer-section" aria-labelledby="drawer-plazo-title" data-testid="drawer-plazo">
-      <h3 id="drawer-plazo-title">{TITLE}</h3>
-      <dl className="facts">
-        <Fact label="Estado del plazo">
+    <section
+      className="drawer-section"
+      aria-labelledby="drawer-plazo-title"
+      data-testid="drawer-plazo"
+    >
+      <h3 id="drawer-plazo-title">
+        {TITLE} <span className="hint">(provisional)</span>
+      </h3>
+      <dl className="facts plazo-facts">
+        <Fact label="Estado del plazo" wide>
           <span className={`pill ${PLAZO_ESTADO_PILL[entry.estado]}`}>
             {PLAZO_ESTADO_LABELS[entry.estado]}
           </span>{' '}
@@ -65,7 +77,9 @@ export function PlazoDrawerSection({ detail }: { detail: PlazoDetail }) {
         <Fact label="Vence">{entry.deadline ? formatDate(entry.deadline) : '—'}</Fact>
         <Fact label="Días hábiles">{daysText(detail)}</Fact>
         <Fact label="«90 dias» de la planilla" wide>
-          {entry.planilla_90_dias ? formatDate(entry.planilla_90_dias) : 'Sin fecha'} ·{' '}
+          {entry.cruce !== 'difiere' && (
+            <>{entry.planilla_90_dias ? formatDate(entry.planilla_90_dias) : 'Sin fecha'} · </>
+          )}
           {cruceText(entry)}
         </Fact>
       </dl>

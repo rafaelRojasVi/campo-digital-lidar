@@ -28,6 +28,7 @@ import {
   getPlazos,
 } from '../api'
 import { EstadoTable } from '../components/EstadoTable'
+import { PlazoFailureBanner } from '../components/PlazoFailureBanner'
 import { LegacyPendingSection } from '../components/LegacyPendingSection'
 import { RowDetailDrawer } from '../components/RowDetailDrawer'
 import { AlertBanner, LoadingBlock, StateBlock } from '../components/StateViews'
@@ -89,8 +90,15 @@ export function EstadoPage({
     data && soloVencidos && plazos.data
       ? data.rows.filter((row) => plazoIndex.get(row.pmf)?.estado === 'vencido')
       : (data?.rows ?? [])
+  const sinContar = plazos.data
+    ? plazos.data.estados.sin_fecha_texto + plazos.data.estados.conflicto
+    : 0
   const openPlazo = openRow ? plazoDetail(plazos.data, openRow.pmf) : null
-  const plazoStatus = plazos.failure ? 'error' : plazos.loading && !plazos.data ? 'loading' : 'empty'
+  const plazoStatus = plazos.failure
+    ? 'error'
+    : plazos.loading && !plazos.data
+      ? 'loading'
+      : 'empty'
 
   if (failure && !data) {
     return (
@@ -128,7 +136,15 @@ export function EstadoPage({
 
       {failure && data && <AlertBanner title={failure.title}>{failure.message}</AlertBanner>}
       {plazos.failure && (
-        <AlertBanner title="No se pudo calcular el plazo CONAF">{plazos.failure.message}</AlertBanner>
+        <div style={{ marginBottom: 'var(--s-5)' }}>
+          <PlazoFailureBanner
+            failure={plazos.failure}
+            rawFailure={plazos.rawFailure}
+            loading={plazos.loading}
+            onRetry={plazos.reload}
+            scope="El servidor no pudo contar los días hábiles. La columna «Plazo CONAF» y la pregunta de vencidos no están disponibles; el resto de la página sí."
+          />
+        </div>
       )}
 
       {!data && loading && <LoadingBlock label="Cargando el estado de los PMF…" shape="bar" />}
@@ -155,8 +171,9 @@ export function EstadoPage({
             El grupo sale del «Estado resumido» de la primera fila de cada PMF; el paso, de su
             «Estado». «Rechazado» es un paso dentro de «En trámite»: todo rechazo termina en
             «Aprobado», «Descartado» o «Desistido». Lo que esta regla no reconoce queda «Sin
-            clasificar» y se lista en Calidad. El plazo CONAF cuenta 90 días hábiles desde el ingreso
-            más reciente. Categorías y plazo provisionales hasta que Campo Digital los confirme.
+            clasificar» y se lista en Calidad. El plazo CONAF cuenta 90 días hábiles desde el
+            ingreso más reciente. Categorías y plazo provisionales hasta que Campo Digital los
+            confirme.
           </p>
           <HowCalculated
             bases={[
@@ -180,7 +197,6 @@ export function EstadoPage({
             <button
               type="button"
               className={soloVencidos ? 'btn' : 'btn alt'}
-              aria-pressed={soloVencidos}
               disabled={!plazos.data}
               onClick={() => setSoloVencidos((value) => !value)}
               data-quick="overdue"
@@ -189,30 +205,50 @@ export function EstadoPage({
             </button>
           </div>
 
-          {soloVencidos && plazos.data && (
-            <p className="notice" role="status" data-testid="plazo-vencidos-note">
-              <b data-testid="plazo-vencidos-count">{formatInteger(plazos.data.estados.vencido)}</b>{' '}
-              PMF con el plazo CONAF vencido al <b>{formatDate(plazos.data.observed_on)}</b>, la fecha
-              del servidor en Chile, no una fecha fija. Con la regla anterior (fecha «90 dias» de la
-              planilla anterior a hoy, sin «Aprobado») serían{' '}
-              <b data-testid="plazo-legacy-count">
-                {formatInteger(plazos.data.legacy_vencido_row_count)}
-              </b>{' '}
-              áreas de corta.
-            </p>
-          )}
+          <div role="status">
+            {soloVencidos && plazos.data && (
+              <p
+                className="hint"
+                data-testid="plazo-vencidos-note"
+                style={{ marginBottom: 'var(--s-5)' }}
+              >
+                <b data-testid="plazo-vencidos-count">
+                  {formatInteger(plazos.data.estados.vencido)}
+                </b>{' '}
+                PMF con el plazo CONAF vencido al <b>{formatDate(plazos.data.observed_on)}</b>, la
+                fecha del servidor en Chile, no una fecha fija. Con la regla anterior (fecha «90
+                dias» de la planilla anterior a hoy, sin «Aprobado») serían{' '}
+                <b data-testid="plazo-legacy-count">
+                  {formatInteger(plazos.data.legacy_vencido_row_count)}
+                </b>{' '}
+                áreas de corta.
+                {sinContar > 0 && (
+                  <>
+                    {' '}
+                    Sin contar <b>{formatInteger(sinContar)}</b> PMF cuya fecha de ingreso no se
+                    pudo leer o difiere entre filas.
+                  </>
+                )}
+              </p>
+            )}
+          </div>
 
           <section className="ruled" aria-labelledby="estado-rows-title">
             <SectionHeader
               id="estado-rows-title"
-              title="PMF del alcance"
-              meta={`${formatInteger(rows.length)} PMF · seleccione uno para ver su detalle`}
+              title={soloVencidos ? 'PMF con el plazo CONAF vencido' : 'PMF del alcance'}
+              meta={
+                soloVencidos && plazos.data
+                  ? `${formatInteger(rows.length)} de ${formatInteger(data.rows.length)} PMF · vencidos al ${formatDate(plazos.data.observed_on)}`
+                  : `${formatInteger(rows.length)} PMF · seleccione uno para ver su detalle`
+              }
             />
             <EstadoTable
               rows={rows}
               selectedRow={openRow?.source_row_number ?? null}
               onOpen={setOpenRow}
               extraColumns={[plazoColumn(plazoIndex, plazos.loading)]}
+              emptyText={soloVencidos ? 'Ningún PMF del alcance superó el plazo.' : undefined}
             />
           </section>
 

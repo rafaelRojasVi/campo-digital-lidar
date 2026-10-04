@@ -80,7 +80,7 @@ export const RULES: Record<string, RuleExplanation> = {
       'Para cada PMF, la fecha de inicio es «Fecha de ingreso2» si la tiene; si no, «Fecha de ingreso1». Un reingreso vuelve a contar el plazo.',
       'Si la fecha más reciente no se puede leer, no se usa la anterior: el PMF queda «Sin fecha legible».',
       'Las fechas se leen en todas las filas del PMF; si las filas traen fechas distintas, no se elige ninguna («Fechas distintas»).',
-      'El día 1 es el primer día hábil después del ingreso; el plazo vence el día hábil 90. Son hábiles los días de lunes a viernes que no son feriados nacionales de Chile.',
+      'El día 1 es el primer día hábil después del ingreso; el plazo vence el día hábil 90. Son hábiles los días de lunes a viernes que no son feriados nacionales de Chile. Los feriados regionales no se descuentan.',
       '«Hoy» es la fecha del servidor en Chile, no la del navegador ni la columna «Hoy» de la planilla.',
       'Vencido si hoy es posterior al vencimiento; por vencer si quedan 10 días hábiles o menos; los PMF Aprobados, Descartados o Desistidos no aplican.',
       'La columna «90 dias» de la planilla se compara con este cálculo; nunca se reemplaza.',

@@ -534,6 +534,20 @@
   background: var(--info-tint);
 }
 
+/* A retry inside a banner: beside its message, a 24px target, a hover that keeps 4.5:1. */
+.alert .btn-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.alert .btn-link:hover {
+  color: var(--forest-deep);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
  /*
   * A hint, not an alert. It explains how the search field behaves and never
   * changes, so it wears the page's quietest text treatment rather than its
@@ -1480,6 +1494,10 @@
 }
 
 @media (max-width: 767px) {
+  .plazo-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .page {
     padding: var(--s-5) var(--s-4) var(--s-8);
   }
@@ -1714,7 +1732,7 @@
 /* «Plazo CONAF» cell: the status pill, then its date line. */
 .plazo-cell {
   display: inline-flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--s-3);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
 }

@@ -21,6 +21,7 @@
  * reproduced rather than reconciled; the section now explains the difference
  * in plain words and shows both predio counts side by side.
  */
+import { PlazoFailureBanner } from '../components/PlazoFailureBanner'
 import { useCallback } from 'react'
 import {
   type TranselecLifecycle,
@@ -69,7 +70,11 @@ export function CalidadPage({ filterController }: { filterController: FilterCont
       if (!report.ok) return report
       return {
         ok: true,
-        data: { summary: summary.data, ownerStatus: ownerStatus.data, report: report.data },
+        data: {
+          summary: summary.data,
+          ownerStatus: ownerStatus.data,
+          report: report.data,
+        },
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [key]),
@@ -182,12 +187,13 @@ export function CalidadPage({ filterController }: { filterController: FilterCont
             {plazosRead.data ? (
               <PlazoQualityPanel plazos={plazosRead.data} filters={filters} />
             ) : plazosRead.failure ? (
-              <AlertBanner title="No se pudo calcular el plazo CONAF">
-                {plazosRead.failure.message}
-                <button type="button" className="btn-link" onClick={plazosRead.reload}>
-                  Reintentar
-                </button>
-              </AlertBanner>
+              <PlazoFailureBanner
+                failure={plazosRead.failure}
+                rawFailure={plazosRead.rawFailure}
+                loading={plazosRead.loading}
+                onRetry={plazosRead.reload}
+                scope="El servidor no pudo contar los días hábiles, así que no se puede comparar la columna «90 dias» con el cálculo."
+              />
             ) : (
               <LoadingBlock label="Cargando los plazos por revisar…" lines={2} />
             )}

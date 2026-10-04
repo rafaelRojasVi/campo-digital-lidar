@@ -426,6 +426,41 @@ test('TR-FUNC-031: the overdue question is answered with the server date in Chil
   await expect(page.getByTestId('estado-table').locator('tbody tr')).toHaveCount(6)
 })
 
+test('TR-FUNC-031: a printed vencidos view says it is the vencidos view and the server date', async ({
+  page,
+}) => {
+  await openEstado(page)
+  await page.getByRole('button', { name: '¿Qué PMF superaron los 90 días hábiles?' }).click()
+  await page.emulateMedia({ media: 'print' })
+  await expect(page.getByTestId('plazo-vencidos-note')).toBeVisible()
+  await expect(page.getByTestId('plazo-vencidos-note')).toContainText('02-09-2026')
+  await expect(page.getByRole('heading', { name: 'PMF con el plazo CONAF vencido' })).toBeVisible()
+})
+
+test('Estado: a failing /plazos shows Spanish text and «Reintentar» recovers the column', async ({
+  page,
+}) => {
+  let failing = true
+  await page.route('**/api/transelec/plazos*', (route) =>
+    failing
+      ? route.fulfill({
+          status: 500,
+          contentType: 'text/plain',
+          body: 'Internal Server Error',
+        })
+      : route.fallback(),
+  )
+  await openEstado(page)
+  const banner = page.getByRole('alert').filter({ hasText: 'No se pudo calcular el plazo CONAF' })
+  await expect(banner).toBeVisible()
+  await expect(banner).not.toContainText('Internal Server Error')
+  await expect(banner).toContainText('El servidor no pudo contar los días hábiles')
+  failing = false
+  await banner.getByRole('button', { name: 'Reintentar' }).click()
+  await expect(banner).toBeHidden()
+  await expect(page.getByTestId('plazo-1')).toContainText('Vencido')
+})
+
 test('TR-FUNC-017/031: the vencidos view follows a filter change instead of going stale', async ({
   page,
 }) => {
@@ -443,9 +478,11 @@ test('TR-FUNC-017/031: the vencidos view follows a filter change instead of goin
 test('Estado: the «Plazo CONAF» column and the drawer explain each term', async ({ page }) => {
   await openEstado(page)
   const headers = page.getByTestId('estado-table').locator('thead th')
-  await expect(headers.last()).toHaveText('Plazo CONAF')
+  await expect(headers.nth(1)).toHaveText('Plazo CONAF')
   await expect(page.getByTestId('plazo-1')).toContainText('Vencido')
-  await expect(page.getByTestId('plazo-1')).toContainText('venció el 19-06-2026 · hace 51 días hábiles')
+  await expect(page.getByTestId('plazo-1')).toContainText(
+    'venció el 19-06-2026 · hace 51 días hábiles',
+  )
   await expect(page.getByTestId('plazo-2')).toContainText('Por vencer')
   await expect(page.getByTestId('plazo-3')).toContainText('quedan 68 días hábiles')
   await expect(page.getByTestId('plazo-5')).toContainText('No aplica')
@@ -453,7 +490,9 @@ test('Estado: the «Plazo CONAF» column and the drawer explain each term', asyn
   await page.getByTestId('estado-row-1').locator('td').first().click()
   const block = page.getByTestId('drawer-plazo')
   await expect(block).toContainText('Fecha de ingreso1 · 10-02-2026')
-  await expect(block).toContainText('Difiere: la planilla dice 10-05-2026, 40 días antes del cálculo')
+  await expect(block).toContainText(
+    'Difiere: la planilla dice 10-05-2026, 40 días antes del cálculo',
+  )
   await expect(block).toContainText('holidays 0.105')
 })
 

@@ -5,12 +5,15 @@
  * The count is the server's PMF-level `cruce_difiere_count`; it is never
  * derived from the legacy row-level count.
  */
-import type { TranselecFilterState, TranselecPlazos } from '../api'
-import { formatInteger } from '../format'
+import { EMPTY_FILTERS, type TranselecFilterState, type TranselecPlazos } from '../api'
+import { formatDate, formatInteger } from '../format'
 import { searchFromFilters } from '../lib/filterUrl'
 import { cruceText } from '../lib/plazo'
 import { Link, ROUTES } from '../router'
 import { HowCalculated } from '../ui/HowCalculated'
+
+/** Longer lists stay short on the page; Estado has the rest. */
+const LIST_CAP = 10
 
 export function PlazoQualityPanel({
   plazos,
@@ -40,15 +43,27 @@ export function PlazoQualityPanel({
           ) : (
             <>
               <ul className="variant-list review-list" data-testid="plazo-difiere-list">
-                {differ.map((entry) => (
+                {differ.slice(0, LIST_CAP).map((entry) => (
                   <li
                     key={entry.source_row_number}
                     data-testid={`plazo-difiere-${entry.source_row_number}`}
                   >
                     <b>{entry.pmf}</b> · fila {formatInteger(entry.source_row_number)} ·{' '}
                     {cruceText(entry)}
+                    {entry.deadline && <> (cálculo: {formatDate(entry.deadline)})</>} ·{' '}
+                    <Link
+                      to={`${ROUTES.estado}${searchFromFilters({ ...(filters ?? EMPTY_FILTERS), q: entry.pmf })}`}
+                      className="quality-go"
+                    >
+                      Buscar {entry.pmf} en Estado
+                    </Link>
                   </li>
                 ))}
+                {differ.length > LIST_CAP && (
+                  <li className="hint">
+                    y {formatInteger(differ.length - LIST_CAP)} más; véalos en Estado.
+                  </li>
+                )}
               </ul>
               <p className="quality-todo">
                 <b>Qué revisar:</b> la columna «90 dias» y la fecha de ingreso de esas filas en la

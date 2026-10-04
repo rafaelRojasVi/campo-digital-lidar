@@ -405,7 +405,7 @@ export function RowDetailDrawer({
                 </Fact>
               </>
             )}
-            <Fact label="90 días">
+            <Fact label="«90 dias» de la planilla">
               <SourceDate row={current} field="fecha_90_dias" missing="Sin fecha" />
             </Fact>
             <Fact label="PAS">{cell(current.pas, 'Sin información')}</Fact>
