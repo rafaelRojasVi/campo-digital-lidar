@@ -7,6 +7,8 @@ no planilla value appears here.
 
 from __future__ import annotations
 
+import csv
+import io
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -173,9 +175,20 @@ def _row(client: TestClient, pmf: str, index: int = 0) -> dict[str, Any]:
 
 
 def _insert_override(
-    engine: Engine, *, import_id: int, source_row_number: int, field: str, value: str
+    engine: Engine,
+    *,
+    import_id: int,
+    source_row_number: int,
+    field: str,
+    value: str,
+    planilla_value_text: str | None = None,
 ) -> None:
-    """An applied text edit written straight to the table (view tests only)."""
+    """A text edit written straight to the table (view tests only).
+
+    By default the planilla value seen at edit time is the row's current cell,
+    so the edit is ``aplicada``. Passing ``planilla_value_text`` that differs
+    from the current cell (and from ``value``) makes it ``en_conflicto``.
+    """
 
     with engine.begin() as conn:
         conn.execute(
@@ -186,12 +199,19 @@ def _insert_override(
                     value_text, planilla_value_text, base_import_id, created_by_app_user_id
                 )
                 SELECT pmf, rol, numero_predio, numero_area_corta, key_ordinal, :field,
-                       :value, {field}, import_id, (SELECT min(id) FROM platform.app_user)
+                       :value, COALESCE(CAST(:seen AS text), {field}), import_id,
+                       (SELECT min(id) FROM platform.app_user)
                 FROM platform.transelec_keyed_row
                 WHERE import_id = :import_id AND source_row_number = :row
                 """
             ),
-            {"field": field, "value": value, "import_id": import_id, "row": source_row_number},
+            {
+                "field": field,
+                "value": value,
+                "seen": planilla_value_text,
+                "import_id": import_id,
+                "row": source_row_number,
+            },
         )
 
 
@@ -283,7 +303,57 @@ def test_every_read_sees_an_applied_edit(client: TestClient, tmp_path: Path) -> 
     assert after["aprobados_pmf_count"] == before["aprobados_pmf_count"] + 1
     assert after["en_tramite_pmf_count"] == before["en_tramite_pmf_count"] - 1
 
-    csv_text = client.get("/transelec/export.csv", params={"q": "MP001"}).content.decode(
-        "utf-8-sig"
+    exported = _export_estado_resumido(client, "MP001")
+    assert exported == {"A1": "Aprobado", "A2": "En tramite"}
+
+
+def _export_estado_resumido(client: TestClient, pmf: str) -> dict[str, str]:
+    """Estado resumido per N Area de Corta for one PMF, read from /export.csv."""
+
+    body = client.get("/transelec/export.csv", params={"q": pmf}).content.decode("utf-8-sig")
+    return {
+        row["N Area de Corta"]: row["Estado resumido"]
+        for row in csv.DictReader(io.StringIO(body), delimiter=";")
+        if row["PMF"] == pmf
+    }
+
+
+def test_a_conflicting_edit_is_invisible_on_every_read(client: TestClient, tmp_path: Path) -> None:
+    """en_conflicto: the cell differs from both the value seen at edit time
+    and the web value, so the planilla value is shown and nothing is flagged."""
+
+    _login_with_grants(client, "transelec-admin", ADMIN)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+
+    summary_before = client.get("/transelec/summary").json()
+    target = _row(client, "MP001", 0)["source_row_number"]
+    _insert_override(
+        client.engine,
+        import_id=import_id,
+        source_row_number=target,
+        field="estado_resumido",
+        value="Rechazado",
+        planilla_value_text="Observado",  # neither the current cell nor the web value
     )
-    assert "Aprobado" in csv_text
+    with client.engine.connect() as conn:
+        assert (
+            conn.execute(
+                text("SELECT count(*) FROM platform.transelec_field_override")
+            ).scalar_one()
+            == 1
+        )
+
+    detail = _row(client, "MP001", 0)
+    assert detail["estado_resumido"] == "En tramite"
+    assert detail["web_fields"] == []
+
+    by_web_value = client.get("/transelec/pmfs", params={"estado_resumido": "Rechazado"}).json()
+    assert target not in {item["source_row_number"] for item in by_web_value["items"]}
+    assert by_web_value["total_count"] == 0
+
+    searched = client.get("/transelec/pmfs", params={"q": "Rechazado"}).json()
+    assert target not in {item["source_row_number"] for item in searched["items"]}
+
+    assert client.get("/transelec/summary").json() == summary_before
+
+    assert _export_estado_resumido(client, "MP001") == {"A1": "En tramite", "A2": "En tramite"}
