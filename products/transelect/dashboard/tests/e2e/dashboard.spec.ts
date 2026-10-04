@@ -692,3 +692,13 @@ test('Calidad: the PMFs the Estado rule could not place are listed with their re
     '«Estado» y «Estado resumido» no coinciden',
   )
 })
+
+test('Calidad: the PMFs whose «90 dias» differs from the calculation are listed', async ({
+  page,
+}) => {
+  await openCalidad(page)
+  await expect(page.getByTestId('plazo-difiere-count')).toHaveText('5')
+  await expect(page.getByTestId('plazo-difiere-1')).toContainText(
+    'Difiere: la planilla dice 10-05-2026, 40 días antes del cálculo',
+  )
+})
