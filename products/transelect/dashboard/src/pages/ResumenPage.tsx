@@ -52,7 +52,7 @@ import {
   estadoResumidoSegments,
 } from '../lib/summaryView'
 import { useReads, type FilterController } from '../lib/useFilters'
-import { Link, ROUTES } from '../router'
+import { Link, PENDING_QUEUE_HASH, ROUTES } from '../router'
 import { CompositionBar } from '../ui/CompositionBar'
 import { HowCalculated } from '../ui/HowCalculated'
 import { Chip, SectionHeader, StatStrip } from '../ui/Primitives'
@@ -180,7 +180,7 @@ export function ResumenPage({
             />
             <div className="attention">
               {buildAttentionItems(data.summary, {
-                pendientes: ROUTES.estado,
+                pendientes: `${ROUTES.estado}${PENDING_QUEUE_HASH}`,
                 calidad: ROUTES.calidad,
               }).map((item) => (
                 <Link

@@ -218,10 +218,13 @@ test('TR-FUNC-024/032: the Resumen attention card and the old pending rule agree
   await expect(page.getByTestId('kpi-pendientes')).toHaveText('5')
 
   await page.getByRole('link', { name: /Ver la cola de trabajo/ }).click()
-  await expect(page).toHaveURL(/\/transelec\/estado$/)
+  await expect(page).toHaveURL(/\/transelec\/estado#pendientes-prioritarios$/)
   await expect(page.getByTestId('estado-zone')).toBeVisible()
-  await page.getByText('Pendientes prioritarios (regla anterior)').click()
+  // The card lands on the queue itself: open, in view, no click on the disclosure.
+  await expect(page.getByTestId('legacy-pending')).toHaveJSProperty('open', true)
   await expect(page.getByTestId('pending-count')).toHaveText('5 de 12')
+  await expect(page.getByTestId('pending-count')).toBeInViewport()
+  await expect(page.getByText('Pendientes prioritarios (regla anterior)')).toBeFocused()
 
   // Unfiltered, there is nothing to clear, so no button pretends to act.
   await expect(page.getByTestId('clear-estado-filters')).toHaveCount(0)

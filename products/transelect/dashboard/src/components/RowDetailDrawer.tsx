@@ -363,7 +363,11 @@ export function RowDetailDrawer({
             </Fact>
             <Fact label="N.º ingreso">
               {cell(current.numero_ingreso, 'Sin ingreso')}
-              <OficinaVirtualLink numero={current.numero_ingreso} testId="drawer-ov-1" />
+              <OficinaVirtualLink
+                key={current.numero_ingreso ?? ''}
+                numero={current.numero_ingreso}
+                testId="drawer-ov-1"
+              />
             </Fact>
             <Fact label="Fecha ingreso">
               <SourceDate row={current} field="fecha_ingreso" missing="Sin fecha" />
@@ -382,7 +386,11 @@ export function RowDetailDrawer({
                     {cell(current.numero_ingreso_2, 'Sin segundo ingreso')}
                   </span>
                   {current.numero_ingreso_2 && (
-                    <OficinaVirtualLink numero={current.numero_ingreso_2} testId="drawer-ov-2" />
+                    <OficinaVirtualLink
+                      key={current.numero_ingreso_2}
+                      numero={current.numero_ingreso_2}
+                      testId="drawer-ov-2"
+                    />
                   )}
                 </Fact>
                 <Fact label="Fecha ingreso 2">

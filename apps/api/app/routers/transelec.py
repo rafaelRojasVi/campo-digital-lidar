@@ -1592,6 +1592,9 @@ def get_lifecycle(
     Rows come only from ``_fetch_filtered_rows`` so the shared filter
     contract — and whatever relation that function reads — applies here as
     it does to every other read.
+
+    Each PMF's "first row" is taken within the filtered scope, not across the
+    whole import.
     """
 
     import_id = _require_active_import_id(connection)

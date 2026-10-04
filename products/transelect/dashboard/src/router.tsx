@@ -32,6 +32,9 @@ export const ROUTES = {
   accesos: '/transelec/accesos',
 } as const
 
+/** The fragment that sends a reader to the legacy pending queue on Estado (TR-FUNC-024). */
+export const PENDING_QUEUE_HASH = '#pendientes-prioritarios'
+
 export type Route = (typeof ROUTES)[keyof typeof ROUTES]
 
 /** The routes only an operator or administrator may open. */
@@ -45,6 +48,8 @@ export const ADMIN_ROUTES: readonly Route[] = [
 interface RouterContextValue {
   pathname: string
   search: string
+  /** The fragment, with its «#» (or ''): a marker a page may honor, never part of the filters. */
+  hash: string
   navigate: (path: string, options?: { replace?: boolean }) => void
 }
 
@@ -52,16 +57,21 @@ const RouterContext = createContext<RouterContextValue | undefined>(undefined)
 
 // Vite's base serves the app at "/transelec/"; one trailing slash is dropped
 // so that entry resolves like "/transelec" and every route compares cleanly.
-function splitLocation(value: string): { pathname: string; search: string } {
-  const index = value.indexOf('?')
-  const rawPath = index === -1 ? value : value.slice(0, index)
-  const search = index === -1 ? '' : value.slice(index)
+function splitLocation(value: string): { pathname: string; search: string; hash: string } {
+  const hashIndex = value.indexOf('#')
+  const hash = hashIndex === -1 ? '' : value.slice(hashIndex)
+  const withoutHash = hashIndex === -1 ? value : value.slice(0, hashIndex)
+  const index = withoutHash.indexOf('?')
+  const rawPath = index === -1 ? withoutHash : withoutHash.slice(0, index)
+  const search = index === -1 ? '' : withoutHash.slice(index)
   const pathname = rawPath.length > 1 && rawPath.endsWith('/') ? rawPath.slice(0, -1) : rawPath
-  return { pathname, search }
+  return { pathname, search, hash }
 }
 
-function currentLocation(): { pathname: string; search: string } {
-  return splitLocation(`${window.location.pathname}${window.location.search}`)
+function currentLocation(): { pathname: string; search: string; hash: string } {
+  return splitLocation(
+    `${window.location.pathname}${window.location.search}${window.location.hash}`,
+  )
 }
 
 export function RouterProvider({
@@ -83,7 +93,7 @@ export function RouterProvider({
 
   const navigate = useCallback((path: string, options?: { replace?: boolean }) => {
     const next = splitLocation(path)
-    const current = `${window.location.pathname}${window.location.search}`
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
 
     if (path !== current) {
       // A filter change is a replace, not a push: typing six characters into
@@ -94,7 +104,11 @@ export function RouterProvider({
     }
 
     setLocation((previous) =>
-      previous.pathname === next.pathname && previous.search === next.search ? previous : next,
+      previous.pathname === next.pathname &&
+      previous.search === next.search &&
+      previous.hash === next.hash
+        ? previous
+        : next,
     )
 
     // Only a real section change returns to the top. A filter change leaves
@@ -103,8 +117,8 @@ export function RouterProvider({
   }, [])
 
   const value = useMemo<RouterContextValue>(
-    () => ({ pathname: location.pathname, search: location.search, navigate }),
-    [location.pathname, location.search, navigate],
+    () => ({ pathname: location.pathname, search: location.search, hash: location.hash, navigate }),
+    [location.pathname, location.search, location.hash, navigate],
   )
 
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>

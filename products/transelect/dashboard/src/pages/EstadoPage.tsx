@@ -36,6 +36,7 @@ import { lifecycleGroupSegments, lifecycleStepSegments } from '../lib/lifecycle'
 import { selectOverdueRows } from '../lib/overdue'
 import { collectAllRows } from '../lib/rowCollection'
 import { useReads, type FilterController } from '../lib/useFilters'
+import { PENDING_QUEUE_HASH, useRouter } from '../router'
 import { CompositionBar } from '../ui/CompositionBar'
 import { HowCalculated } from '../ui/HowCalculated'
 import { Chip, SectionHeader } from '../ui/Primitives'
@@ -49,6 +50,7 @@ export function EstadoPage({
   sourceFields?: readonly string[] | null
 }) {
   const { filters, replaceFilters, reset } = filterController
+  const { hash } = useRouter()
   const key = JSON.stringify(filters)
 
   const { data, loading, failure } = useReads<TranselecLifecycle>(
@@ -216,6 +218,7 @@ export function EstadoPage({
           <section className="ruled">
             <LegacyPendingSection
               filters={filters}
+              reveal={hash === PENDING_QUEUE_HASH}
               selectedRow={openRow?.source_row_number ?? null}
               onOpenRow={setOpenRow}
             />

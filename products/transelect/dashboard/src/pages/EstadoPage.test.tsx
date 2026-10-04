@@ -29,9 +29,9 @@ const controller: FilterController = {
   reset: () => {},
 }
 
-function renderPage() {
+function renderPage(path = '/transelec/estado') {
   render(
-    <RouterProvider initialPath="/transelec/estado">
+    <RouterProvider initialPath={path}>
       <EstadoPage filterController={controller} sourceFields={null} />
     </RouterProvider>,
   )
@@ -79,6 +79,13 @@ describe('EstadoPage', () => {
     await waitFor(() =>
       expect(within(legacy).getByTestId('pending-count')).toHaveTextContent('2 de 6'),
     )
+  })
+
+  it('opens the old pending rule and focuses it when the page is reached with the marker', async () => {
+    renderPage('/transelec/estado#pendientes-prioritarios')
+    const legacy = await screen.findByTestId('legacy-pending')
+    expect(legacy).toHaveAttribute('open')
+    expect(within(legacy).getByText('Pendientes prioritarios (regla anterior)')).toHaveFocus()
   })
 
   it('offers no clear button when nothing is filtered', async () => {

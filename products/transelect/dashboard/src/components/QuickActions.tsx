@@ -14,13 +14,14 @@
  * Explorador, next to the filters they set. The other four were never really
  * shortcuts at all and now have real homes:
  *
- *   024 ¿Qué falta presentar a CONAF?  Resumen attention card → Pendientes
+ *   024 ¿Qué falta presentar a CONAF?  Resumen attention card → Estado, legacy queue
+ *                                      opened and scrolled into view
  *   025 ¿A qué PMF corresponde un N.º de ingreso?
  *                                      the Explorador's own search field
  *   027 ¿Cuál es la superficie de corta?
  *                                      the Resumen's scale strip
  *   031 ¿Qué ingresos superaron 90 días?
- *                                      the Pendientes toggle
+ *                                      the Estado page's 90-day toggle
  *
  * Every preset below still starts from a clean filter state, exactly as the
  * source's `quick()` did by calling `resetFilters()` before each branch.

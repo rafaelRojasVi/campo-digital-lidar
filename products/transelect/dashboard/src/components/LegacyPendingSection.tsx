@@ -8,7 +8,7 @@
  * Moved here unchanged from the former `PendientesPage`; its stage bar keeps
  * its old tones inside this closed disclosure.
  */
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { type ResumenRow, type TranselecFilterState, type TranselecPending, getPending } from '../api'
 import { cell, formatInteger, formatNumber } from '../format'
 import { PENDING_STAGE_LABELS, PENDING_STAGE_ORDER } from '../lib/pendingStage'
@@ -33,11 +33,15 @@ export function LegacyPendingSection({
   filters,
   selectedRow,
   onOpenRow,
+  reveal = false,
 }: {
   filters: TranselecFilterState
   selectedRow: number | null
   onOpenRow: (row: ResumenRow) => void
+  /** Open the disclosure, scroll it into view and focus its summary (TR-FUNC-024). */
+  reveal?: boolean
 }) {
+  const details = useRef<HTMLDetailsElement>(null)
   const key = JSON.stringify(filters)
 
   const { data, loading, failure } = useReads<TranselecPending>(
@@ -49,8 +53,16 @@ export function LegacyPendingSection({
     [key],
   )
 
+  useEffect(() => {
+    const element = details.current
+    if (!reveal || !element) return
+    element.open = true
+    element.scrollIntoView({ block: 'start' })
+    element.querySelector('summary')?.focus({ preventScroll: true })
+  }, [reveal])
+
   return (
-    <details className="how legacy-pending" data-testid="legacy-pending">
+    <details ref={details} className="how legacy-pending" data-testid="legacy-pending">
       <summary>Pendientes prioritarios (regla anterior)</summary>
       <div className="how-body">
         {failure && <AlertBanner title={failure.title}>{failure.message}</AlertBanner>}
