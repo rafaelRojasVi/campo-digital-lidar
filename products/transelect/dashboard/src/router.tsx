@@ -30,6 +30,7 @@ export const ROUTES = {
   importar: '/transelec/importar',
   versiones: '/transelec/versiones',
   accesos: '/transelec/accesos',
+  ediciones: '/transelec/ediciones',
 } as const
 
 /** The fragment that sends a reader to the legacy pending queue on Estado (TR-FUNC-024). */
@@ -43,6 +44,7 @@ export const ADMIN_ROUTES: readonly Route[] = [
   ROUTES.importar,
   ROUTES.versiones,
   ROUTES.accesos,
+  ROUTES.ediciones,
 ]
 
 interface RouterContextValue {

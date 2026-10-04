@@ -43,6 +43,7 @@ import { QualityPanel } from '../components/QualityPanel'
 import { ReforestacionPanel } from '../components/ReforestacionPanel'
 import { ReforestationChips } from '../components/ReforestationChips'
 import { ReportPanel } from '../components/ReportPanel'
+import { WebEditConflicts } from '../components/WebEditConflicts'
 import { AlertBanner, LoadingBlock, StateBlock } from '../components/StateViews'
 import { activeFilterChips, withoutChip } from '../lib/filterUrl'
 import { useReads, type FilterController } from '../lib/useFilters'
@@ -54,7 +55,13 @@ interface CalidadData {
   report: TranselecReport
 }
 
-export function CalidadPage({ filterController }: { filterController: FilterController }) {
+export function CalidadPage({
+  filterController,
+  canEdit = false,
+}: {
+  filterController: FilterController
+  canEdit?: boolean
+}) {
   const { filters, replaceFilters } = filterController
   const key = JSON.stringify(filters)
 
@@ -139,6 +146,8 @@ export function CalidadPage({ filterController }: { filterController: FilterCont
 
       {data && (
         <div className="stack">
+          <WebEditConflicts canEdit={canEdit} />
+
           <section aria-labelledby="quality-title">
             <SectionHeader
               id="quality-title"

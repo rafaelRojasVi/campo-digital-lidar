@@ -67,7 +67,7 @@ const SANTIAGO_DATE = new Intl.DateTimeFormat('es-CL', {
 })
 
 /** dd-mm-aaaa of an edit timestamp in America/Santiago (same zone as the Excel note). */
-function formatEditDate(iso: string): string {
+export function formatEditDate(iso: string): string {
   const parsed = new Date(iso)
   if (Number.isNaN(parsed.getTime())) return formatDate(iso)
   const parts = SANTIAGO_DATE.formatToParts(parsed)

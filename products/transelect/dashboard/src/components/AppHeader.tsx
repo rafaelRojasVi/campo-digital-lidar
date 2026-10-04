@@ -62,7 +62,7 @@ const NAV: readonly NavItem[] = [
     to: ROUTES.datos,
     label: 'Datos',
     privileged: true,
-    also: [ROUTES.importar, ROUTES.versiones],
+    also: [ROUTES.importar, ROUTES.versiones, ROUTES.ediciones],
   },
 ]
 

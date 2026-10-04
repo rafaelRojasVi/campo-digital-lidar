@@ -294,6 +294,7 @@ TRANSELEC_SPA_PAGE_PATHS = frozenset(
         "transelec/importar",
         "transelec/versiones",
         "transelec/accesos",
+        "transelec/ediciones",
     }
 )
 

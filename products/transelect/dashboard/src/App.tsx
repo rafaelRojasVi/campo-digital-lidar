@@ -219,17 +219,19 @@ function Shell() {
           />
         )
       case ROUTES.calidad:
-        return <CalidadPage filterController={filterController} />
+        return <CalidadPage filterController={filterController} canEdit={publisher} />
       case ROUTES.datos:
       case ROUTES.importar:
       case ROUTES.versiones:
       case ROUTES.accesos:
+      case ROUTES.ediciones:
         return (
           <DatosPage
             route={route}
             activeImport={activeImport}
             onActiveVersionChanged={onActiveVersionChanged}
             isAdmin={isTranselecAdmin(me)}
+            activeImportId={activeImport?.import_id ?? null}
           />
         )
       default:

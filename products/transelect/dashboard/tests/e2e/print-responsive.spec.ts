@@ -16,6 +16,31 @@ import { stubPlatform } from './stubs'
 
 test.beforeEach(async ({ page }) => {
   await stubPlatform(page)
+  // One synthetic edit per status for the «Ediciones web» pane.
+  await page.route('**/api/transelec/overrides', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        ['en_conflicto', 'huerfana', 'aplicada'].map((status, index) => ({
+          id: index + 1,
+          field: 'estado_resumido',
+          field_label: 'Estado resumido',
+          status,
+          pmf: `MP-SINTETICO-${index + 1}`,
+          rol: '1',
+          numero_predio: '1',
+          numero_area_corta: 'A1',
+          source_row_number: status === 'huerfana' ? null : index + 2,
+          web_value: 'Aprobado',
+          planilla_value_at_edit: 'En tramite',
+          planilla_value_now: 'Desistido',
+          created_by_display_name: 'Ana Pérez',
+          created_at: '2026-10-04T15:00:00+00:00',
+        })),
+      ),
+    }),
+  )
 })
 
 test('TR-FUNC-038/045: print emulation hides the chrome and un-clips every table', async ({
@@ -111,6 +136,7 @@ for (const [label, width, height] of [
     ['estado', '/transelec/estado', 'estado-zone'],
     ['calidad', '/transelec/calidad', 'quality-panel'],
     ['datos', '/transelec/datos', 'upload-submit'],
+    ['ediciones', '/transelec/ediciones', 'overrides-table'],
   ] as const) {
     test(`TR-FUNC-044: ${section} at ${label} has no horizontal page scroll and no console errors`, async ({
       page,
