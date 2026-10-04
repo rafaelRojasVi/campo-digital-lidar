@@ -10,11 +10,14 @@ The [functional parity matrix](../docs/audit/2026-09-02-functional-parity-matrix
 |---|---|---|
 | `/transelec` | viewer+ | PMF status and work overview |
 | `/transelec/explorador` | viewer+ | Search, filters, row detail and CSV export |
-| `/transelec/pendientes` | viewer+ | Priority queue and 90-day consultation |
+| `/transelec/estado` | viewer+ | Where each PMF stands (`lifecycle_pmf_v1`), the 90-day consultation, and the former pending rule (closed) |
+| `/transelec/pendientes` | viewer+ | Redirects to `/transelec/estado` (kept one release from 2026-10-04) |
 | `/transelec/seguimiento-aef` | viewer+ | AEF tracking by PMF with source rows |
 | `/transelec/calidad` | viewer+ | Data-quality findings, reforestation limits and report |
 | `/transelec/datos` | operator/admin | Import, versions and (admin only) access management |
 | `/transelec/importar`, `/transelec/versiones`, `/transelec/accesos` | role-gated | Direct links to the corresponding Datos panes |
+
+Estado details for operators: the table highlights «Rechazado, esperando recurso»; the legacy «Pendientes prioritarios (regla anterior)» disclosure is full width and closed by default; the Calidad block links to Estado with «Buscar … en Estado», which is a text search, not an exact filter. The design is `docs/superpowers/specs/2026-10-04-transelec-estado-lifecycle-design.md`.
 
 ## Data and access
 
