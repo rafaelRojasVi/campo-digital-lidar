@@ -226,3 +226,15 @@ which records the evidence:
   does. The classifier's input carries only what it classifies.
 - **Old pending rule.** It stays on the Estado page as a closed «Pendientes
   prioritarios (regla anterior)» block.
+
+### Execution refinements (2026-10-04, decided while building)
+
+- **Approval check.** *Estado* counts as approved only when «aprobado» appears
+  as a whole word, so «Desaprobado» is a contradiction and not an approval.
+- **Calidad link.** The per-PMF link reads «Buscar <PMF> en Estado». It runs a
+  text search; there is no exact-PMF filter.
+- **Resumen card.** «Ver la cola de trabajo» opens Estado with the legacy
+  disclosure open and scrolled into view (`#pendientes-prioritarios`), keeping
+  TR-FUNC-024.
+- **Page-path guard test.** The test that keeps API paths off dashboard page
+  paths reads the OpenAPI paths. The first version could never fail.

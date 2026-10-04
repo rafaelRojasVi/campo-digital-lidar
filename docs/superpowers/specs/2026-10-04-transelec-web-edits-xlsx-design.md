@@ -362,3 +362,26 @@ untouched part byte-identical):
   `TRANSELEC_SPA_PAGE_PATHS`.
 - **View columns.** The view's column list is fixed in migration 0012. A test
   fails if a future contract column is missing from it.
+
+### Execution refinements (2026-10-04, decided while building)
+
+- **Text comparison.** It treats U+00A0 (NBSP) as whitespace in both Python and
+  SQL, so a value padded with NBSP equals the plain one.
+- **Concurrent edits.**
+  - Save, discard and keep take a per-cell advisory lock before checking the
+    value the editor saw, so two concurrent edits cannot overwrite each other.
+  - Only a violation of the active-cell unique index maps to 409
+    `value_changed`.
+- **Database checks.** An ended edit must carry `end_reason`, and a stored
+  planilla value sets at most one side (text or date).
+- **Incorporated edits.** Retirement on activation considers only fields the
+  newly active version has a column for. LIMITATION: while an older layout is
+  active, an edit to a «…2» field shows as incorporated or applied until the
+  newer layout returns.
+- **Formula cells.** Skips are recorded in the export's audit row only.
+- **Download.**
+  - The download fetches the file and shows the server's Spanish error, or
+    Spanish copy for 403/5xx.
+  - The patcher places the note anchor among the sheet's top-level elements
+    only, so an Excel 2010 data bar's nested `<extLst>` cannot capture it.
+  - A blank cell starts from the row or column style Excel shows for it.

@@ -212,3 +212,20 @@ Found while writing
   `test_transelec_router.py`; the reads-router fixtures cannot write dates.
 - **Holiday list.** The government page with the official 2026 list is
   located at execution time; `gob.cl/feriados` answered 404 on 2026-10-04.
+
+### Execution refinements (2026-10-04, decided while building)
+
+- **Column position.** «Plazo CONAF» sits right after «PMF» (`EstadoColumn.after`)
+  so it stays visible at 390 px and at 1280 px.
+- **Vencidos filter.** It is a toggle button, «¿Qué PMF superaron los 90 días
+  hábiles?» / «Ver todos los PMF», rather than a chip. A printed vencidos view
+  states its scope and the server date.
+- **Calidad block.** It lists the PMFs whose «90 dias» differs, up to 10, each
+  with «Buscar <PMF> en Estado», and links to Estado with the current filters.
+- **Failures and dates.**
+  - A `/plazos` failure shows Spanish text with «Reintentar».
+  - A base date whose deadline would overflow the calendar reads
+    `sin_fecha_texto` for that PMF instead of failing the request.
+- **OPEN QUESTION.** A «-» in *Fecha de ingreso2* gives `sin_fecha_texto` with
+  no fallback to ingreso 1. Source Contract V2 treats «-» as empty.
+- **OPEN QUESTION.** The Calidad «difiere» list includes closed PMFs.
