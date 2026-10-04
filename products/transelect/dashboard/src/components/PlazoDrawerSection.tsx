@@ -13,7 +13,7 @@ import {
   plazoBaseText,
   plazoText,
 } from '../lib/plazo'
-import { Fact } from './RowDetailDrawer'
+import { Fact } from './Fact'
 import { LoadingBlock } from './StateViews'
 
 export type PlazoDrawerStatus = 'loading' | 'error' | 'empty'
@@ -23,6 +23,10 @@ const TITLE = 'Plazo CONAF (90 días hábiles)'
 function daysText(detail: PlazoDetail): string {
   const { elapsed_business_days: elapsed, remaining_business_days: remaining } = detail.entry
   if (elapsed === null || remaining === null) return '—'
+  if (detail.entry.estado === 'vencido' && remaining === 0) {
+    // Friday's deadline seen on a Saturday: nothing left, nothing counted past it.
+    return `Venció el ${formatDate(detail.entry.deadline)} · ${formatInteger(elapsed)} días hábiles transcurridos`
+  }
   if (remaining < 0) {
     return `${formatInteger(elapsed)} transcurridos · ${formatInteger(-remaining)} desde el vencimiento`
   }

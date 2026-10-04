@@ -24,7 +24,6 @@
  * say so instead of implying a row has missing data.
  */
 import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
 import {
   EMPTY_FILTERS,
   type AefPmf,
@@ -54,19 +53,11 @@ import { classifyFailure, type FailureView } from '../lib/apiState'
 import type { PlazoDetail } from '../lib/plazo'
 import { Drawer } from '../ui/Drawer'
 import { AlertBanner, LoadingBlock } from './StateViews'
+import { Fact } from './Fact'
 import { OficinaVirtualLink } from './OficinaVirtualLink'
 import { PlazoDrawerNotice, PlazoDrawerSection, type PlazoDrawerStatus } from './PlazoDrawerSection'
 import { SourceDate } from './SourceDate'
 import { StatusPill } from './StatusPill'
-
-export function Fact({ label, children, wide = false }: { label: string; children: ReactNode; wide?: boolean }) {
-  return (
-    <div className={`fact${wide ? ' wide' : ''}`}>
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  )
-}
 
 function rowsLabel(rows: readonly number[]): string {
   return `${rows.length === 1 ? 'fila' : 'filas'} ${rows.join(', ')}`

@@ -326,7 +326,7 @@ test('no section shows a raw rule identifier in its reading text', async ({ page
     // are still there for audit, one «Cómo se calcula» away.
     const text = await page.locator('main').innerText()
     expect(text, path).not.toMatch(
-      /_legacy|_first_row|pmf_from_source_rows|lifecycle_pmf|canónic|deduplica/,
+      /_legacy|_first_row|pmf_from_source_rows|lifecycle_pmf|plazo_conaf|canónic|deduplica/,
     )
   }
 })
@@ -403,45 +403,58 @@ test('TR-FUNC-030: the company preset opens the Empresa filter and nothing else'
   await expect(page.getByTestId('rows-total')).toContainText('60 áreas de corta')
 })
 
-test('TR-FUNC-031: the overdue consultation uses a computed reference date, never a frozen literal', async ({
+test('TR-FUNC-031: the overdue question is answered with the server date in Chile, never a frozen literal', async ({
   page,
 }) => {
   await openEstado(page)
-  await page.getByRole('button', { name: '¿Qué ingresos superaron 90 días?' }).click()
+  await page.getByRole('button', { name: '¿Qué PMF superaron los 90 días hábiles?' }).click()
 
-  const panel = page.getByTestId('overdue-panel')
-  await expect(panel).toBeVisible()
-  await expect(page.getByTestId('overdue-count')).not.toContainText('(0 ')
+  const note = page.getByTestId('plazo-vencidos-note')
+  await expect(note).toBeVisible()
+  // PMF-001 and PMF-004 are the stub's two vencidos.
+  await expect(page.getByTestId('plazo-vencidos-count')).toHaveText('2')
   // The source dashboards froze this comparison at 2026-08-26.
-  await expect(panel).not.toContainText('26-08-2026')
-  await expect(panel).toContainText('02-09-2026')
-  await expect(panel).toContainText('hora observada del servidor')
+  await expect(note).not.toContainText('26-08-2026')
+  await expect(note).toContainText('02-09-2026')
+  await expect(note).toContainText('la fecha del servidor en Chile')
+  // The former rule counts áreas de corta (rows), not PMF.
+  await expect(page.getByTestId('plazo-legacy-count')).toHaveText('60')
+  await expect(page.getByTestId('estado-table').locator('tbody tr')).toHaveCount(2)
 
-  await page.getByTestId('overdue-close').click()
-  await expect(panel).toBeHidden()
+  await page.getByRole('button', { name: 'Ver todos los PMF' }).click()
+  await expect(note).toBeHidden()
+  await expect(page.getByTestId('estado-table').locator('tbody tr')).toHaveCount(6)
 })
 
-test('TR-FUNC-017/031: the overdue panel follows a filter change instead of going stale', async ({
+test('TR-FUNC-017/031: the vencidos view follows a filter change instead of going stale', async ({
   page,
 }) => {
-  await page.goto('/transelec/estado')
-  await expect(page.getByTestId('estado-zone')).toBeVisible()
-  await page.getByRole('button', { name: '¿Qué ingresos superaron 90 días?' }).click()
+  await openEstado(page)
+  await page.getByRole('button', { name: '¿Qué PMF superaron los 90 días hábiles?' }).click()
+  await expect(page.getByTestId('plazo-vencidos-count')).toHaveText('2')
 
-  const panel = page.getByTestId('overdue-panel')
-  await expect(panel).toBeVisible()
-  // Unfiltered scope: the stub serves 60 rows, all of them overdue.
-  await expect(page.getByTestId('overdue-count')).toContainText('(60 ')
-
-  // The panel's own copy claims its scope is the active filters. Arriving
-  // with a filter in the URL must move it with the rest of the section.
   await page.goto('/transelec/estado?q=rechaz')
   await expect(page.getByTestId('estado-zone')).toBeVisible()
-  await page.getByRole('button', { name: '¿Qué ingresos superaron 90 días?' }).click()
-  await expect(page.getByTestId('overdue-count')).toContainText('(8 ')
-  await expect(page.getByTestId('overdue-panel')).toContainText(
-    'El alcance es el de los filtros activos',
-  )
+  await page.getByRole('button', { name: '¿Qué PMF superaron los 90 días hábiles?' }).click()
+  await expect(page.getByTestId('plazo-vencidos-count')).toHaveText('1')
+  await expect(page.getByTestId('plazo-legacy-count')).toHaveText('8')
+})
+
+test('Estado: the «Plazo CONAF» column and the drawer explain each term', async ({ page }) => {
+  await openEstado(page)
+  const headers = page.getByTestId('estado-table').locator('thead th')
+  await expect(headers.last()).toHaveText('Plazo CONAF')
+  await expect(page.getByTestId('plazo-1')).toContainText('Vencido')
+  await expect(page.getByTestId('plazo-1')).toContainText('venció el 19-06-2026 · hace 51 días hábiles')
+  await expect(page.getByTestId('plazo-2')).toContainText('Por vencer')
+  await expect(page.getByTestId('plazo-3')).toContainText('quedan 68 días hábiles')
+  await expect(page.getByTestId('plazo-5')).toContainText('No aplica')
+
+  await page.getByTestId('estado-row-1').locator('td').first().click()
+  const block = page.getByTestId('drawer-plazo')
+  await expect(block).toContainText('Fecha de ingreso1 · 10-02-2026')
+  await expect(block).toContainText('Difiere: la planilla dice 10-05-2026, 40 días antes del cálculo')
+  await expect(block).toContainText('holidays 0.105')
 })
 
 test('TR-FUNC-032/033: the old pending rule keeps its count, its stages once, and its detail table', async ({

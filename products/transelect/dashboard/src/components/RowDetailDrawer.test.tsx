@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RowDetailDrawer } from "./RowDetailDrawer";
-import { makeLifecycleRow, makePlazos, makeRow } from "../test/factories";
+import { makeLifecycleRow, makePlazoPmf, makePlazos, makeRow } from "../test/factories";
 import { plazoDetail } from "../lib/plazo";
 import type { AefPmf, AefPmfField, TranselecAef } from "../api";
 
@@ -497,6 +497,27 @@ describe("RowDetailDrawer — Plazo CONAF (plazo_conaf_90_habiles_v1)", () => {
     expect(block).toHaveTextContent("Difiere: la planilla dice 02-06-2026, 42 días antes del cálculo");
     expect(block).toHaveTextContent("02-09-2026");
     expect(block).toHaveTextContent("holidays 0.105");
+  });
+
+  it("reads a vencido PMF with no days left as overdue, not as «0 por transcurrir»", () => {
+    const row = makeLifecycleRow({ source_row_number: 3, pmf: "MP002" });
+    const data = makePlazos({
+      pmfs: [
+        makePlazoPmf({
+          pmf: "MP002",
+          source_row_number: 3,
+          estado: "vencido",
+          deadline: "2026-09-01",
+          elapsed_business_days: 90,
+          remaining_business_days: 0,
+        }),
+      ],
+    });
+    render(<RowDetailDrawer row={row} plazo={plazoDetail(data, "MP002")} onClose={() => {}} />);
+
+    const block = screen.getByTestId("drawer-plazo");
+    expect(block).toHaveTextContent("Venció el 01-09-2026 · 90 días hábiles transcurridos");
+    expect(block).not.toHaveTextContent("por transcurrir");
   });
 
   it("has no Plazo CONAF block when opened without one", () => {
