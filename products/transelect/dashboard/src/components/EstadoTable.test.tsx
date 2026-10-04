@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { EstadoTable } from './EstadoTable'
 import type { EstadoColumn } from '../lib/estadoColumns'
-import { makeLifecycle } from '../test/factories'
+import { plazoColumn } from '../lib/plazoColumn'
+import { indexPlazos } from '../lib/plazo'
+import { makeLifecycle, makePlazos } from '../test/factories'
 
 const rows = makeLifecycle().rows
 
@@ -65,6 +67,57 @@ describe('EstadoTable', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+
+  it('shows the «Plazo CONAF» column joined by PMF, and a dash where there is none', () => {
+    const byPmf = indexPlazos(makePlazos())
+    byPmf.delete('MP003')
+    render(
+      <EstadoTable
+        rows={rows}
+        selectedRow={null}
+        onOpen={() => {}}
+        extraColumns={[plazoColumn(byPmf, false)]}
+      />,
+    )
+    expect(screen.getByRole('columnheader', { name: 'Plazo CONAF' })).toBeInTheDocument()
+    expect(screen.getByTestId('plazo-3')).toHaveTextContent('Vencido')
+    expect(screen.getByTestId('plazo-3')).toHaveTextContent('venció el 14-07-2026 · hace 35 días hábiles')
+    // MP003 (row 5) has no entry: its plazo cell holds only a dash.
+    expect(screen.queryByTestId('plazo-5')).toBeNull()
+    const cell = screen.getByTestId('estado-row-5').querySelector('td[data-col="plazo"]')
+    expect(cell).toHaveTextContent(/^—$/)
+  })
+
+  it('words the plazo with its status text, and wraps the long ones in the cell', () => {
+    render(
+      <EstadoTable
+        rows={rows}
+        selectedRow={null}
+        onOpen={() => {}}
+        extraColumns={[plazoColumn(indexPlazos(makePlazos()), false)]}
+      />,
+    )
+    expect(screen.getByTestId('plazo-7')).toHaveTextContent('Fechas distintas')
+    expect(screen.getByTestId('plazo-7')).toHaveTextContent(
+      'Las filas del PMF tienen fechas de ingreso distintas',
+    )
+    expect(screen.getByTestId('plazo-2')).toHaveTextContent('No aplica')
+    expect(screen.getByTestId('estado-row-7').querySelector('td[data-col="plazo"]')).not.toBeNull()
+  })
+
+  it('says it is still calculating while the plazo read is on its way', () => {
+    render(
+      <EstadoTable
+        rows={rows}
+        selectedRow={null}
+        onOpen={() => {}}
+        extraColumns={[plazoColumn(new Map(), true)]}
+      />,
+    )
+    const cell = screen.getByTestId('estado-row-2').querySelector('td[data-col="plazo"]')
+    expect(cell).toHaveTextContent('Calculando…')
+    expect(screen.queryByTestId('plazo-2')).toBeNull()
   })
 
   it('says so when the scope has no PMF', () => {

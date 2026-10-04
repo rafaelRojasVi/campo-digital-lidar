@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RowDetailDrawer } from "./RowDetailDrawer";
-import { makeLifecycleRow, makeRow } from "../test/factories";
+import { makeLifecycleRow, makePlazos, makeRow } from "../test/factories";
+import { plazoDetail } from "../lib/plazo";
 import type { AefPmf, AefPmfField, TranselecAef } from "../api";
 
 vi.mock("../api", async (importOriginal) => {
@@ -458,5 +459,83 @@ describe("RowDetailDrawer — Proceso CONAF (lifecycle_pmf_v1)", () => {
     );
     fireEvent.keyDown(screen.getByTestId("drawer-ov-1-link"), { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("RowDetailDrawer — Plazo CONAF (plazo_conaf_90_habiles_v1)", () => {
+  beforeEach(() => {
+    vi.mocked(getPmfDetail).mockReset();
+    vi.mocked(getAef).mockReset();
+    vi.mocked(getAef).mockResolvedValue({
+      ok: true,
+      data: { pmfs: [] } as unknown as TranselecAef,
+    });
+    vi.mocked(getPmfDetail).mockResolvedValue({
+      ok: true,
+      data: {
+        pmf: "MP002",
+        row_count: 1,
+        basis_estado_resumido: "estado_resumido_first_row",
+        estado_resumido: "En tramite",
+        rows: [makeRow({ source_row_number: 3, pmf: "MP002" })],
+      },
+    });
+  });
+
+  it("explains the term: where it counts from, when it ends and the planilla's «90 dias»", () => {
+    const row = makeLifecycleRow({ source_row_number: 3, pmf: "MP002" });
+    render(
+      <RowDetailDrawer row={row} plazo={plazoDetail(makePlazos(), "MP002")} onClose={() => {}} />,
+    );
+
+    const block = screen.getByTestId("drawer-plazo");
+    expect(block).toHaveTextContent("Plazo CONAF (90 días hábiles)");
+    expect(block).toHaveTextContent("Vencido");
+    expect(block).toHaveTextContent("Fecha de ingreso1 · 04-03-2026");
+    expect(block).toHaveTextContent("14-07-2026");
+    expect(block).toHaveTextContent("125 transcurridos");
+    expect(block).toHaveTextContent("Difiere: la planilla dice 02-06-2026, 42 días antes del cálculo");
+    expect(block).toHaveTextContent("02-09-2026");
+    expect(block).toHaveTextContent("holidays 0.105");
+  });
+
+  it("has no Plazo CONAF block when opened without one", () => {
+    render(<RowDetailDrawer row={makeRow({ source_row_number: 3, pmf: "MP002" })} onClose={() => {}} />);
+    expect(screen.queryByTestId("drawer-plazo")).toBeNull();
+  });
+
+  it("says the term is being calculated while /plazos is pending", () => {
+    render(
+      <RowDetailDrawer
+        row={makeRow({ source_row_number: 3, pmf: "MP002" })}
+        plazoStatus="loading"
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("drawer-plazo")).toHaveTextContent("Calculando el plazo…");
+  });
+
+  it("says the term could not be loaded, and keeps the rest of the drawer", async () => {
+    render(
+      <RowDetailDrawer
+        row={makeRow({ source_row_number: 3, pmf: "MP002" })}
+        plazoStatus="error"
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("drawer-plazo")).toHaveTextContent("No se pudo cargar el plazo");
+    expect(screen.getByRole("heading", { name: "Tramitación" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("drawer-sibling-count")).toBeInTheDocument());
+  });
+
+  it("says when the PMF has no entry in the plazo read", () => {
+    render(
+      <RowDetailDrawer
+        row={makeRow({ source_row_number: 3, pmf: "MP002" })}
+        plazoStatus="empty"
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("drawer-plazo")).toHaveTextContent("Este PMF no tiene plazo calculado");
   });
 });

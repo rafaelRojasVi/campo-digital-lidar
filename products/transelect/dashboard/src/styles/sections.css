@@ -1072,7 +1072,8 @@ a.status-card .status-card-go {
  * table past the screen.
  */
 .estado-table td[data-col='paso'],
-.estado-table td[data-col='tipo_rechazo'] {
+.estado-table td[data-col='tipo_rechazo'],
+.estado-table td[data-col='plazo'] {
   min-width: 14rem;
   max-width: 22rem;
   white-space: normal;

@@ -51,13 +51,15 @@ import {
   lifecycleStepText,
 } from '../lib/lifecycle'
 import { classifyFailure, type FailureView } from '../lib/apiState'
+import type { PlazoDetail } from '../lib/plazo'
 import { Drawer } from '../ui/Drawer'
 import { AlertBanner, LoadingBlock } from './StateViews'
 import { OficinaVirtualLink } from './OficinaVirtualLink'
+import { PlazoDrawerNotice, PlazoDrawerSection, type PlazoDrawerStatus } from './PlazoDrawerSection'
 import { SourceDate } from './SourceDate'
 import { StatusPill } from './StatusPill'
 
-function Fact({ label, children, wide = false }: { label: string; children: ReactNode; wide?: boolean }) {
+export function Fact({ label, children, wide = false }: { label: string; children: ReactNode; wide?: boolean }) {
   return (
     <div className={`fact${wide ? ' wide' : ''}`}>
       <dt>{label}</dt>
@@ -215,6 +217,8 @@ export function RowDetailDrawer({
   onClose,
   sourceFields,
   lifecycle = null,
+  plazo = null,
+  plazoStatus,
 }: {
   row: ResumenRow
   onClose: () => void
@@ -222,6 +226,10 @@ export function RowDetailDrawer({
   sourceFields?: readonly string[] | null
   /** Where the PMF stands (`lifecycle_pmf_v1`), when the Estado section opens it. */
   lifecycle?: LifecycleRow | null
+  /** CONAF's 90-business-day term for this PMF, when the Estado section opens it. */
+  plazo?: PlazoDetail | null
+  /** Shown instead of the term while it is pending, failed or absent. */
+  plazoStatus?: PlazoDrawerStatus
 }) {
   const sourceHasAef = aefInSource(sourceFields)
   const sourceHasIngreso2 = ingreso2InSource(sourceFields)
@@ -350,6 +358,12 @@ export function RowDetailDrawer({
               Categorías provisionales hasta que Campo Digital las confirme.
             </p>
           </section>
+        )}
+
+        {plazo ? (
+          <PlazoDrawerSection detail={plazo} />
+        ) : (
+          plazoStatus && <PlazoDrawerNotice status={plazoStatus} />
         )}
 
         <section className="drawer-section" aria-labelledby="drawer-tramitacion">

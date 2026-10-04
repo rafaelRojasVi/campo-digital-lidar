@@ -1710,3 +1710,11 @@
 .drawer-section .hint {
   overflow-wrap: anywhere;
 }
+
+/* «Plazo CONAF» cell: the status pill, then its date line. */
+.plazo-cell {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-3);
+}
