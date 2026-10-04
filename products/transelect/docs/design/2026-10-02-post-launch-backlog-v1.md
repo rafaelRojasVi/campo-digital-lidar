@@ -23,6 +23,13 @@ question 11 of the Spanish note. Also FACT: no Rodales snapshot is published
 (`forestry.publication_state` null, zero events, zero uploads), and the
 migration head is `0010`.
 
+**Update (2026-10-04):** PR-0 is merged (#70) and live. Production has
+served `main` at `802fa3f` since 2026-10-03, and the migration head is
+`0011` (read-only query, 2026-10-04). Production therefore runs parser `@3`
+and can read the `…1` / `…2` headers. The two paragraphs above describe
+2026-10-02. Re-importing the client's current planilla still waits on open
+question 11 (which revision is current) and an explicit instruction.
+
 Evidence labels follow [the documentation policy](../../../../docs/DOCUMENTATION_POLICY.md).
 
 ## 1. Evidence from the 30-Sept-2026 workbook

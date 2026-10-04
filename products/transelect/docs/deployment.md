@@ -11,6 +11,12 @@ Container packaging: **built and locally verified** (this document).
   outside. Railway HTTP logs from 2026-09-26 show a Campo Digital user
   signing in with Google and uploading, validating and publishing a
   workbook, all answered `200`.
+- **FACT (2026-10-04):** production serves `main` at `802fa3f` (PR #71),
+  deployed 2026-10-03 13:22 UTC (Railway deployment list). The migration
+  head is `0011` (read-only query, 2026-10-04), so parser `@3` from PR #70
+  is live. `/health` and `/ready` answer `200`, the deploy log starts with
+  the `campo-entrypoint` line, and the forestry and Transelec API routes
+  answer `401` signed out.
 - Railway auto-deploy is off, so deploys are manual. Since 2026-09-28 the
   service deploys from `main`.
 - **DECISION (2026-09-28):** no backups. The Hobby plan has no scheduled
@@ -226,6 +232,86 @@ document, "no implicit destructive migration on app startup"); apply
 `alembic upgrade head` as a separate release step against this image before
 routing traffic to it.
 
+### PostGIS image
+
+**FACT (2026-10-04, read-only query and the Railway API):** the production
+PostGIS service runs the image `postgis/postgis:16-master`, a tag built from
+PostGIS's development branch. It holds PostgreSQL 16.15 with PostGIS
+`3.7.0dev` (`3.6.0rc2-620-gb8c7b0142`) and GEOS `3.15.0dev`. The `postgis`
+and `postgis_topology` extensions are both at `3.7.0dev`, and the database
+is 19 MB.
+
+TLS comes from `POSTGRES_INITDB_ARGS` (`ssl=on` with the image's Debian
+snakeoil certificate), and the app connects with `sslmode=require`
+(observed: TLSv1.3).
+
+**FACT:** CI (`persistence-ci.yml`) and `compose.yaml` test against
+`postgis/postgis:17-3.5@sha256:624f5195…` (PostgreSQL 17.5, PostGIS 3.5.2).
+That image ships the snakeoil certificate at the same paths (checked
+locally). So production differs from what is tested in both the PostgreSQL
+major and the PostGIS version.
+
+**FACT (Docker Hub, 2026-10-04):** no stable `16-3.6` or `16-3.7` tag
+exists. PostGIS 3.6 is published only for PostgreSQL 17 (alpine) and 18,
+and 3.7 is unreleased. `16-master` was last pushed on 2026-08-31 (index
+digest `sha256:afaf08e1937d753762cfdb943c69ed46296bf50faa80c5f89494e2d0d12980de`),
+before the PostGIS deploy of 2026-09-17. **INFERENCE:** production runs
+that digest, and a PostGIS redeploy after the tag moves would pull a newer
+development build under the existing extension catalog.
+
+**PROPOSAL (not decided):** move production to the CI image. It cannot be
+done in place: 16 → 17 is a major upgrade, and 3.7.0dev → 3.5.2 is an
+extension downgrade. At 19 MB, a dump and restore is the simple path.
+
+0. Optional stop-gap: set the PostGIS image to
+   `postgis/postgis@sha256:afaf08e1…` (the digest above). The bits stay the
+   same, but PostGIS restarts.
+1. Rehearse locally. Take a dump ("Manual database backup", below; it is
+   client data), restore it with `pg_restore --no-owner` into the
+   `compose.yaml` database, read every `pg_restore` warning, check that
+   `alembic current` says `0011`, and run the app against it.
+2. On Railway, create a new service from the pinned 17-3.5 image with the
+   same `POSTGRES_INITDB_ARGS` and a new volume.
+3. Announce a short write freeze to Campo Digital. Take the final dump,
+   restore it into the new service, compare row counts of
+   `platform.transelec_resumen_row`, `platform.product_grant` and
+   `platform.audit_event`, and point the app's `POSTGRES_*` variables at
+   the new service. Deploy, then run the smoke checks and a real sign-in.
+4. Rollback: leave the old service and its volume untouched and point the
+   variables back. Anything written after the cutover is lost on rollback.
+5. Delete the old service only as a separate, later decision.
+
+**RESULT (rehearsal of step 1, 2026-10-04).** The production dump was taken
+inside the PostGIS container (see "Without the TCP proxy" below). It was
+161,224 bytes, with its sha256 verified on both ends. It was restored into
+a throwaway container from the pinned 17-3.5 image, started with
+production's `POSTGRES_INITDB_ARGS`, so TLS came up `on`.
+
+- A plain `pg_restore` reports two errors, both from PostGIS topology. The
+  image's init script already created the `topology` schema, and 3.7.0dev's
+  `topology.topology` has a `useslargeids` column that 3.5.2 lacks. Both
+  topology tables are empty in production, and no migration or app code
+  uses topology. **DECISION:** restore with those entries filtered out:
+
+  ```sh
+  pg_restore --list prod.dump | grep -v -E " topology | SCHEMA - topology" > toc.list
+  pg_restore --no-owner --no-privileges -L toc.list -d <db> prod.dump   # exit 0, no errors
+  ```
+
+  The target database must come from `template_postgis`, or have
+  `CREATE EXTENSION postgis` run first.
+- All 27 tables matched production's row counts exactly, including
+  `platform.transelec_resumen_row` (2,187), `platform.audit_event` and
+  `platform.product_grant`.
+- Against the restored database, `alembic current` reports `0011 (head)`
+  and `upgrade head` has nothing to do. The API's `/health` and `/ready`
+  answer `200`, and with a dev session `/api/transelec/summary` answers
+  `200` with its full structure.
+
+**LIMITATION:** the rehearsal ran locally, not on Railway, and with dev
+auth rather than Google sign-in. Steps 2–3 still have to prove the Railway
+side.
+
 ## Manual database backup
 
 The 2026-09-28 decision above stands: nothing backs up production on a
@@ -241,8 +327,15 @@ uploaded workbook files on the `/data` volume (see "Object storage").
 
 1. On Railway, enable the PostGIS service's TCP proxy. This exposes the
    database on a public host and port while it is on.
-2. Copy `DATABASE_PUBLIC_URL` from the PostGIS service's variables and pass
-   it through the environment only, never as an argument or in a file:
+2. Build the public URL and pass it through the environment only, never as
+   an argument or in a file. **FACT (2026-10-04):** the PostGIS service
+   defines no `DATABASE_PUBLIC_URL`. Its `DATABASE_URL` and
+   `DATABASE_PRIVATE_URL` point at the private network. Compose it from the
+   TCP proxy's host and port and the service's `POSTGRES_USER`,
+   `POSTGRES_PASSWORD` and `POSTGRES_DB`, as
+   `postgresql://USER:PASSWORD@HOST:PORT/DB`. The server accepts the
+   script's `PGSSLMODE=require` (see "PostGIS image"), and `pg_dump` must
+   be version 16 or newer:
 
    ```sh
    read -rs DATABASE_PUBLIC_URL && export DATABASE_PUBLIC_URL
@@ -251,6 +344,15 @@ uploaded workbook files on the `/data` volume (see "Object storage").
    ```
 
 3. Disable the TCP proxy again.
+
+**Without the TCP proxy** (used on 2026-10-04, no Railway setting changed):
+run `pg_dump` inside the PostGIS container over `railway ssh`. Use the local
+socket (`-h /var/run/postgresql`), because the container's `PGHOST` points
+at the private network. Write the dump to a temp file, print its sha256, and
+stream it back base64-encoded, deleting the temp file in the same command.
+Decode it locally into `~/campo-digital-backups` (mode `600`) and compare
+the checksum. No password leaves the container, and the database is never
+exposed publicly. Its `pg_dump` is the server's own version.
 
 What the script guarantees, from its own code:
 
