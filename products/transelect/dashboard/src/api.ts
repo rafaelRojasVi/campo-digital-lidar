@@ -287,6 +287,51 @@ export interface TranselecLifecycle {
   rows: LifecycleRow[]
 }
 
+/** `plazo_conaf_90_habiles_v1` — see transelec_ingestion/plazo_conaf.py. */
+export type PlazoEstado =
+  | 'vencido'
+  | 'por_vencer'
+  | 'en_plazo'
+  | 'sin_fecha'
+  | 'sin_fecha_texto'
+  | 'conflicto'
+  | 'no_aplica'
+
+export type PlazoCruce = 'coincide' | 'difiere' | 'sin_dato' | 'sin_calculo'
+
+/** One PMF's CONAF term. Dates are ISO `YYYY-MM-DD`; days are business days. */
+export interface PlazoPmf {
+  pmf: string
+  /** The PMF's first row in the filtered scope (the Estado table's row). */
+  source_row_number: number
+  estado: PlazoEstado
+  base_field: 'fecha_ingreso_2' | 'fecha_ingreso' | null
+  base_date: string | null
+  base_source_rows: number[]
+  deadline: string | null
+  elapsed_business_days: number | null
+  remaining_business_days: number | null
+  planilla_90_dias: string | null
+  cruce: PlazoCruce
+  diferencia_dias: number | null
+  legacy_vencido: boolean
+}
+
+export interface TranselecPlazos {
+  basis: string
+  legacy_basis: string
+  /** The server's date in Chile (`America/Santiago`). */
+  observed_on: string
+  calendar: { source: string; country: string; version: string }
+  plazo_habiles: number
+  por_vencer_umbral: number
+  total_pmf_count: number
+  estados: Record<PlazoEstado, number>
+  cruce_difiere_count: number
+  legacy_vencido_row_count: number
+  pmfs: PlazoPmf[]
+}
+
 export interface OwnerStatusRow {
   tipo_propietario: string | null
   owner_stage: string | null
@@ -616,39 +661,14 @@ interface CsrfToken {
 
 let csrfToken: CsrfToken | null = null
 
-/**
- * The most recent `Date` response header observed from the platform API.
- *
- * TR-FUNC-031's one mechanical bug fix needs a reference "today" that
- * actually advances, and the source-ingestion rule is that observation time
- * is platform infrastructure, never workbook data. The read API exposes no
- * "server now" endpoint, but every response carries the server's own `Date`
- * header — that is the reference this app uses, so "today" is the API
- * process's clock rather than the viewer's. Null until the first response.
- */
-let serverClock: Date | null = null
-
-export function observedServerNow(): Date | null {
-  return serverClock
-}
-
-/** Test seam: reset the module's cached session/clock observations. */
+/** Test seam: reset the module's cached session observations. */
 export function resetApiClientState(): void {
   csrfToken = null
-  serverClock = null
-}
-
-function rememberServerClock(response: Response): void {
-  const header = response.headers.get('date')
-  if (!header) return
-  const parsed = new Date(header)
-  if (!Number.isNaN(parsed.getTime())) serverClock = parsed
 }
 
 async function fetchCsrfToken(): Promise<CsrfToken | null> {
   try {
     const response = await fetch('/api/auth/csrf', { credentials: 'include' })
-    rememberServerClock(response)
     if (!response.ok) return null
     const body = (await response.json()) as { csrf_token?: string; header_name?: string }
     if (!body.csrf_token) return null
@@ -684,7 +704,6 @@ export function onUnauthorized(listener: () => void): () => void {
 }
 
 function observe(response: Response): Response {
-  rememberServerClock(response)
   if (response.status === 401) {
     for (const listener of unauthorizedListeners) listener()
   }
@@ -911,6 +930,11 @@ export function getPending(filters: TranselecFilterState): Promise<ApiResult<Tra
  */
 export function getLifecycle(filters: TranselecFilterState): Promise<ApiResult<TranselecLifecycle>> {
   return request<TranselecLifecycle>(withParams('/api/transelec/lifecycle', filterParams(filters)))
+}
+
+/** `GET /transelec/plazos` — CONAF's 90 business days per PMF. */
+export function getPlazos(filters: TranselecFilterState): Promise<ApiResult<TranselecPlazos>> {
+  return request<TranselecPlazos>(withParams('/api/transelec/plazos', filterParams(filters)))
 }
 
 export function getOwnerStatus(

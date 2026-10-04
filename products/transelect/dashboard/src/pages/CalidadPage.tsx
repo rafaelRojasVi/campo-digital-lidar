@@ -21,20 +21,24 @@
  * reproduced rather than reconciled; the section now explains the difference
  * in plain words and shows both predio counts side by side.
  */
+import { PlazoFailureBanner } from '../components/PlazoFailureBanner'
 import { useCallback } from 'react'
 import {
   type TranselecLifecycle,
   type TranselecOwnerStatus,
+  type TranselecPlazos,
   type TranselecReport,
   type TranselecSummary,
   getLifecycle,
   getOwnerStatus,
+  getPlazos,
   getReport,
   getSummary,
 } from '../api'
 import { ConflictPanel } from '../components/ConflictPanel'
 import { LifecycleQualityPanel } from '../components/LifecycleQualityPanel'
 import { OwnerStatusTable } from '../components/OwnerStatusTable'
+import { PlazoQualityPanel } from '../components/PlazoQualityPanel'
 import { QualityPanel } from '../components/QualityPanel'
 import { ReforestacionPanel } from '../components/ReforestacionPanel'
 import { ReforestationChips } from '../components/ReforestationChips'
@@ -66,7 +70,11 @@ export function CalidadPage({ filterController }: { filterController: FilterCont
       if (!report.ok) return report
       return {
         ok: true,
-        data: { summary: summary.data, ownerStatus: ownerStatus.data, report: report.data },
+        data: {
+          summary: summary.data,
+          ownerStatus: ownerStatus.data,
+          report: report.data,
+        },
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [key]),
@@ -77,6 +85,16 @@ export function CalidadPage({ filterController }: { filterController: FilterCont
   const lifecycleRead = useReads<TranselecLifecycle>(
     useCallback(
       () => getLifecycle(filters),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [key],
+    ),
+    [key],
+  )
+
+  // Its own read, like the lifecycle: a /plazos failure stays inside its block.
+  const plazosRead = useReads<TranselecPlazos>(
+    useCallback(
+      () => getPlazos(filters),
       // eslint-disable-next-line react-hooks/exhaustive-deps
       [key],
     ),
@@ -157,6 +175,27 @@ export function CalidadPage({ filterController }: { filterController: FilterCont
               </AlertBanner>
             ) : (
               <LoadingBlock label="Cargando los PMF por revisar…" lines={2} />
+            )}
+          </section>
+
+          <section className="ruled" aria-labelledby="plazo-difiere-title">
+            <SectionHeader
+              id="plazo-difiere-title"
+              title="PMF cuya fecha «90 dias» no coincide con el plazo calculado"
+              meta="La planilla se compara con 90 días hábiles desde el ingreso más reciente; no se corrige."
+            />
+            {plazosRead.data ? (
+              <PlazoQualityPanel plazos={plazosRead.data} filters={filters} />
+            ) : plazosRead.failure ? (
+              <PlazoFailureBanner
+                failure={plazosRead.failure}
+                rawFailure={plazosRead.rawFailure}
+                loading={plazosRead.loading}
+                onRetry={plazosRead.reload}
+                scope="El servidor no pudo contar los días hábiles, así que no se puede comparar la columna «90 dias» con el cálculo."
+              />
+            ) : (
+              <LoadingBlock label="Cargando los plazos por revisar…" lines={2} />
             )}
           </section>
 

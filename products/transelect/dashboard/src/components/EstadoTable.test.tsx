@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { EstadoTable } from './EstadoTable'
 import type { EstadoColumn } from '../lib/estadoColumns'
-import { makeLifecycle } from '../test/factories'
+import { plazoColumn } from '../lib/plazoColumn'
+import { indexPlazos } from '../lib/plazo'
+import { makeLifecycle, makePlazos } from '../test/factories'
 
 const rows = makeLifecycle().rows
 
@@ -28,15 +30,24 @@ describe('EstadoTable', () => {
     expect(screen.getByTestId('estado-row-2').querySelector('.estado-attention')).toBeNull()
   })
 
-  it('appends extra columns after its own, so a later basis adds one column', () => {
+  it('places an extra column after a named base column, or last without one', () => {
     const plazo: EstadoColumn = {
       key: 'plazo',
       header: 'Plazo CONAF',
       render: (row) => `plazo de ${row.pmf}`,
+      after: 'pmf',
     }
-    render(<EstadoTable rows={rows} selectedRow={null} onOpen={() => {}} extraColumns={[plazo]} />)
+    const last: EstadoColumn = {
+      key: 'ultimo',
+      header: 'Ultima',
+      render: () => 'x',
+    }
+    render(
+      <EstadoTable rows={rows} selectedRow={null} onOpen={() => {}} extraColumns={[plazo, last]} />,
+    )
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent)
-    expect(headers[headers.length - 1]).toBe('Plazo CONAF')
+    expect(headers.slice(0, 3)).toEqual(['PMF', 'Plazo CONAF', 'Grupo'])
+    expect(headers[headers.length - 1]).toBe('Ultima')
     expect(screen.getByTestId('estado-row-2')).toHaveTextContent('plazo de MP001')
   })
 
@@ -65,6 +76,59 @@ describe('EstadoTable', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+
+  it('shows the «Plazo CONAF» column joined by PMF, and a dash where there is none', () => {
+    const byPmf = indexPlazos(makePlazos())
+    byPmf.delete('MP003')
+    render(
+      <EstadoTable
+        rows={rows}
+        selectedRow={null}
+        onOpen={() => {}}
+        extraColumns={[plazoColumn(byPmf, false)]}
+      />,
+    )
+    expect(screen.getByRole('columnheader', { name: 'Plazo CONAF' })).toBeInTheDocument()
+    expect(screen.getByTestId('plazo-3')).toHaveTextContent('Vencido')
+    expect(screen.getByTestId('plazo-3')).toHaveTextContent(
+      'venció el 14-07-2026 · hace 35 días hábiles',
+    )
+    // MP003 (row 5) has no entry: its plazo cell holds only a dash.
+    expect(screen.queryByTestId('plazo-5')).toBeNull()
+    const cell = screen.getByTestId('estado-row-5').querySelector('td[data-col="plazo"]')
+    expect(cell).toHaveTextContent(/^—$/)
+  })
+
+  it('words the plazo with its status text, and wraps the long ones in the cell', () => {
+    render(
+      <EstadoTable
+        rows={rows}
+        selectedRow={null}
+        onOpen={() => {}}
+        extraColumns={[plazoColumn(indexPlazos(makePlazos()), false)]}
+      />,
+    )
+    expect(screen.getByTestId('plazo-7')).toHaveTextContent('Fechas distintas')
+    expect(screen.getByTestId('plazo-7')).toHaveTextContent(
+      'Las filas del PMF tienen fechas de ingreso distintas',
+    )
+    expect(screen.getByTestId('plazo-2')).toHaveTextContent('No aplica')
+    expect(screen.getByTestId('estado-row-7').querySelector('td[data-col="plazo"]')).not.toBeNull()
+  })
+
+  it('says it is still calculating while the plazo read is on its way', () => {
+    render(
+      <EstadoTable
+        rows={rows}
+        selectedRow={null}
+        onOpen={() => {}}
+        extraColumns={[plazoColumn(new Map(), true)]}
+      />,
+    )
+    const cell = screen.getByTestId('estado-row-2').querySelector('td[data-col="plazo"]')
+    expect(cell).toHaveTextContent('Calculando…')
+    expect(screen.queryByTestId('plazo-2')).toBeNull()
   })
 
   it('says so when the scope has no PMF', () => {

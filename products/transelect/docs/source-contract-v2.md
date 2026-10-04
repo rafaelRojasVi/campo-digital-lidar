@@ -322,10 +322,14 @@ error.
 - The meaning of AEF values (`Presentado`, `Solicitado, se puede cortar`) is
   not defined by the source; values are grouped by literal text only.
 - 120 text cells in `Fecha de ingreso` / `90 dias` (116 with two dates, 4
-  `-`) still have no date; their raw text is kept and shown. The 90-day
-  overdue view (TR-FUNC-031, `90 dias`) does not count those rows.
+  `-`) still have no date; their raw text is kept and shown. The server's
+  90-business-day term (`plazo_conaf_90_habiles_v1`, which replaced the
+  browser-only overdue panel of TR-FUNC-031) reports them as
+  `sin_fecha_texto` («sin fecha legible»); the old `90 dias` rule is kept as
+  `vencimiento_columna_90_dias_legacy` and does not count those rows.
 - The 67 parsed text dates now have a date where V1 had none; the 3 in
-  `90 dias` now take part in the 90-day overdue view.
+  `90 dias` now take part in the legacy comparison. The term itself is
+  computed from the most recent ingreso, never from `90 dias`.
 - The PMF-level presentation rests on the observed layout and a team
   decision, not on a confirmed definition of AEF.
 - The 30-Sept-2026 `…2` columns are blank, so nothing yet exercises the

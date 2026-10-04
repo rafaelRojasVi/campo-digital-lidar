@@ -12,7 +12,6 @@ import {
   getSummary,
   layoutReportFromFailure,
   logout,
-  observedServerNow,
   publishImport,
   resetApiClientState,
   transelecRole,
@@ -117,13 +116,6 @@ describe('transport', () => {
     expect(path).toBe('/api/transelec/summary')
     expect(init.credentials).toBe('include')
     expect(init.headers).toBeUndefined()
-  })
-
-  it('records the server Date header as the observed reference clock (TR-FUNC-031)', async () => {
-    expect(observedServerNow()).toBeNull()
-    fetchMock.mockResolvedValueOnce(jsonResponse({}))
-    await getSummary(EMPTY_FILTERS)
-    expect(observedServerNow()?.toISOString()).toBe('2026-09-02T21:10:00.000Z')
   })
 
   it('fetches a CSRF token at runtime and sends it on a mutation', async () => {

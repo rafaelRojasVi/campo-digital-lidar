@@ -1,40 +1,42 @@
 /**
- * `/transelec/estado` — where each plan (PMF) stands in CONAF's process.
+ * `/transelec/estado` — where each plan (PMF) stands in CONAF's process, and
+ * how much of CONAF's 90-business-day term is left.
  *
- * Replaces «Pendientes» (meeting of 2026-10-02; spec
- * docs/superpowers/specs/2026-10-04-transelec-estado-lifecycle-design.md).
- * Everything is computed by `GET /transelec/lifecycle` under the current
- * filter state with `lifecycle_pmf_v1`: the group from the first row's
- * «Estado resumido», the step inside «En trámite» from its «Estado». A
- * rejection is a step, never an end. Whatever the rule does not recognize is
- * «Sin clasificar», with its reason, and is listed in Calidad.
+ * Replaces «Pendientes» (meeting of 2026-10-02; specs
+ * docs/superpowers/specs/2026-10-04-transelec-estado-lifecycle-design.md and
+ * docs/superpowers/specs/2026-10-04-transelec-plazo-90-habiles-design.md).
+ * `GET /transelec/lifecycle` gives each PMF's group and step
+ * (`lifecycle_pmf_v1`); `GET /transelec/plazos` gives its term
+ * (`plazo_conaf_90_habiles_v1`), joined to the table by PMF through
+ * `EstadoTable`'s `extraColumns`. Both follow the current filter state.
  *
- * Kept from the former page: the filter chips with one «Quitar filtros»
- * button, the 90-day consultation toggle (TR-FUNC-031), and — closed by
- * default — the old «Pendientes prioritarios» rule (`LegacyPendingSection`).
- *
- * `EstadoTable` takes `extraColumns`, so the 90 días hábiles work adds
- * «Plazo CONAF» without touching this page's rule.
+ * TR-FUNC-031 («¿Qué ingresos superaron 90 días?») is answered by the server
+ * now: business days in Chile's calendar from the most recent ingreso, with
+ * «today» the server's date in Chile. The browser-only panel that compared
+ * the planilla's «90 dias» with the response's `Date` header is gone; its
+ * rule is kept by the API as `vencimiento_columna_90_dias_legacy` and its
+ * count is shown beside the new one. The old «Pendientes prioritarios» rule
+ * stays, closed, in `LegacyPendingSection`.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   type LifecycleRow,
   type ResumenRow,
   type TranselecLifecycle,
+  type TranselecPlazos,
   getLifecycle,
-  observedServerNow,
+  getPlazos,
 } from '../api'
 import { EstadoTable } from '../components/EstadoTable'
+import { PlazoFailureBanner } from '../components/PlazoFailureBanner'
 import { LegacyPendingSection } from '../components/LegacyPendingSection'
-import { OverduePanel } from '../components/OverduePanel'
 import { RowDetailDrawer } from '../components/RowDetailDrawer'
 import { AlertBanner, LoadingBlock, StateBlock } from '../components/StateViews'
-import { formatInteger } from '../format'
-import { classifyFailure } from '../lib/apiState'
+import { formatDate, formatInteger } from '../format'
 import { activeFilterChips, withoutChip } from '../lib/filterUrl'
 import { lifecycleGroupSegments, lifecycleStepSegments } from '../lib/lifecycle'
-import { selectOverdueRows } from '../lib/overdue'
-import { collectAllRows } from '../lib/rowCollection'
+import { indexPlazos, plazoDetail } from '../lib/plazo'
+import { plazoColumn } from '../lib/plazoColumn'
 import { useReads, type FilterController } from '../lib/useFilters'
 import { PENDING_QUEUE_HASH, useRouter } from '../router'
 import { CompositionBar } from '../ui/CompositionBar'
@@ -62,48 +64,41 @@ export function EstadoPage({
     [key],
   )
 
+  // A separate read: the lifecycle table stands on its own if the plazo
+  // calculation fails, with a dash in its column and one banner.
+  const plazos = useReads<TranselecPlazos>(
+    useCallback(
+      () => getPlazos(filters),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [key],
+    ),
+    [key],
+  )
+  const plazoIndex = useMemo(() => indexPlazos(plazos.data), [plazos.data])
+
   const [openRow, setOpenRow] = useState<ResumenRow | null>(null)
-  const [overdueOpen, setOverdueOpen] = useState(false)
-  const [overdueRows, setOverdueRows] = useState<ResumenRow[]>([])
-  const [overdueLoading, setOverdueLoading] = useState(false)
-  const [overdueError, setOverdueError] = useState<string | null>(null)
-  const [overdueReference, setOverdueReference] = useState<Date | null>(null)
-  const overdueRequestId = useRef(0)
+  const [soloVencidos, setSoloVencidos] = useState(false)
 
-  // The 90-day consultation, moved unchanged from the former Pendientes
-  // page: it follows the filter state like every other read, so it never
-  // shows rows computed under a scope the page has left.
-  useEffect(() => {
-    if (!overdueOpen) return
-
-    const id = ++overdueRequestId.current
-    let cancelled = false
-    setOverdueLoading(true)
-    setOverdueError(null)
-    setOverdueRows([])
-
-    const reference = observedServerNow() ?? new Date()
-    setOverdueReference(reference)
-
-    void collectAllRows(filters).then((result) => {
-      if (cancelled || id !== overdueRequestId.current) return
-      setOverdueLoading(false)
-      if (!result.ok) {
-        setOverdueError(classifyFailure(result).message)
-        return
-      }
-      setOverdueRows(selectOverdueRows(result.rows, reference))
-    })
-
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overdueOpen, key])
+  // Without a plazo read there is nothing to filter by: leave the view, so the
+  // table never shows every PMF under a stuck «Ver todos los PMF».
+  if (plazos.failure && soloVencidos) setSoloVencidos(false)
 
   const chips = activeFilterChips(filters)
   const openLifecycle: LifecycleRow | null =
     openRow && data ? (data.rows.find((entry) => entry.pmf === openRow.pmf) ?? null) : null
+  const rows =
+    data && soloVencidos && plazos.data
+      ? data.rows.filter((row) => plazoIndex.get(row.pmf)?.estado === 'vencido')
+      : (data?.rows ?? [])
+  const sinContar = plazos.data
+    ? plazos.data.estados.sin_fecha_texto + plazos.data.estados.conflicto
+    : 0
+  const openPlazo = openRow ? plazoDetail(plazos.data, openRow.pmf) : null
+  const plazoStatus = plazos.failure
+    ? 'error'
+    : plazos.loading && !plazos.data
+      ? 'loading'
+      : 'empty'
 
   if (failure && !data) {
     return (
@@ -121,7 +116,7 @@ export function EstadoPage({
             Estado <span className="hint">(provisional)</span>
           </>
         }
-        meta="Dónde está cada PMF en la tramitación CONAF. Un rechazo es un paso, no un final."
+        meta="Dónde está cada PMF en la tramitación CONAF y cuánto le queda del plazo de 90 días hábiles. Un rechazo es un paso, no un final."
       />
 
       {chips.length > 0 && (
@@ -140,6 +135,17 @@ export function EstadoPage({
       )}
 
       {failure && data && <AlertBanner title={failure.title}>{failure.message}</AlertBanner>}
+      {plazos.failure && (
+        <div style={{ marginBottom: 'var(--s-5)' }}>
+          <PlazoFailureBanner
+            failure={plazos.failure}
+            rawFailure={plazos.rawFailure}
+            loading={plazos.loading}
+            onRetry={plazos.reload}
+            scope="El servidor no pudo contar los días hábiles. La columna «Plazo CONAF» y la pregunta de vencidos no están disponibles; el resto de la página sí."
+          />
+        </div>
+      )}
 
       {!data && loading && <LoadingBlock label="Cargando el estado de los PMF…" shape="bar" />}
 
@@ -165,10 +171,17 @@ export function EstadoPage({
             El grupo sale del «Estado resumido» de la primera fila de cada PMF; el paso, de su
             «Estado». «Rechazado» es un paso dentro de «En trámite»: todo rechazo termina en
             «Aprobado», «Descartado» o «Desistido». Lo que esta regla no reconoce queda «Sin
-            clasificar» y se lista en Calidad. Categorías provisionales hasta que Campo Digital las
+            clasificar» y se lista en Calidad. El plazo CONAF cuenta 90 días hábiles desde el
+            ingreso más reciente. Categorías y plazo provisionales hasta que Campo Digital los
             confirme.
           </p>
-          <HowCalculated bases={[data.basis]} testId="estado-how" />
+          <HowCalculated
+            bases={[
+              data.basis,
+              ...(plazos.data ? [plazos.data.basis, plazos.data.legacy_basis] : []),
+            ]}
+            testId="estado-how"
+          />
 
           <div className="btns no-print" style={{ margin: 'var(--s-5) 0' }}>
             {chips.length > 0 && (
@@ -183,35 +196,59 @@ export function EstadoPage({
             )}
             <button
               type="button"
-              className={overdueOpen ? 'btn' : 'btn alt'}
-              aria-pressed={overdueOpen}
-              onClick={() => setOverdueOpen((value) => !value)}
+              className={soloVencidos ? 'btn' : 'btn alt'}
+              disabled={!plazos.data}
+              onClick={() => setSoloVencidos((value) => !value)}
               data-quick="overdue"
             >
-              {overdueOpen ? 'Ocultar los ingresos sobre 90 días' : '¿Qué ingresos superaron 90 días?'}
+              {soloVencidos ? 'Ver todos los PMF' : '¿Qué PMF superaron los 90 días hábiles?'}
             </button>
           </div>
 
-          {overdueOpen && (
-            <OverduePanel
-              rows={overdueRows}
-              reference={overdueReference}
-              loading={overdueLoading}
-              error={overdueError}
-              onClose={() => setOverdueOpen(false)}
-            />
-          )}
+          <div role="status">
+            {soloVencidos && plazos.data && (
+              <p
+                className="hint"
+                data-testid="plazo-vencidos-note"
+                style={{ marginBottom: 'var(--s-5)' }}
+              >
+                <b data-testid="plazo-vencidos-count">
+                  {formatInteger(plazos.data.estados.vencido)}
+                </b>{' '}
+                PMF con el plazo CONAF vencido al <b>{formatDate(plazos.data.observed_on)}</b>, la
+                fecha del servidor en Chile, no una fecha fija. Con la regla anterior (fecha «90
+                dias» de la planilla anterior a hoy, sin «Aprobado») serían{' '}
+                <b data-testid="plazo-legacy-count">
+                  {formatInteger(plazos.data.legacy_vencido_row_count)}
+                </b>{' '}
+                áreas de corta.
+                {sinContar > 0 && (
+                  <>
+                    {' '}
+                    Sin contar <b>{formatInteger(sinContar)}</b> PMF cuya fecha de ingreso no se
+                    pudo leer o difiere entre filas.
+                  </>
+                )}
+              </p>
+            )}
+          </div>
 
           <section className="ruled" aria-labelledby="estado-rows-title">
             <SectionHeader
               id="estado-rows-title"
-              title="PMF del alcance"
-              meta={`${formatInteger(data.rows.length)} PMF · seleccione uno para ver su detalle`}
+              title={soloVencidos ? 'PMF con el plazo CONAF vencido' : 'PMF del alcance'}
+              meta={
+                soloVencidos && plazos.data
+                  ? `${formatInteger(rows.length)} de ${formatInteger(data.rows.length)} PMF · vencidos al ${formatDate(plazos.data.observed_on)}`
+                  : `${formatInteger(rows.length)} PMF · seleccione uno para ver su detalle`
+              }
             />
             <EstadoTable
-              rows={data.rows}
+              rows={rows}
               selectedRow={openRow?.source_row_number ?? null}
               onOpen={setOpenRow}
+              extraColumns={[plazoColumn(plazoIndex, plazos.loading)]}
+              emptyText={soloVencidos ? 'Ningún PMF del alcance superó el plazo.' : undefined}
             />
           </section>
 
@@ -230,6 +267,8 @@ export function EstadoPage({
         <RowDetailDrawer
           row={openRow}
           lifecycle={openLifecycle}
+          plazo={openPlazo}
+          plazoStatus={plazoStatus}
           onClose={() => setOpenRow(null)}
           sourceFields={sourceFields}
         />

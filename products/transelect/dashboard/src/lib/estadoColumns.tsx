@@ -4,7 +4,8 @@
  * Kept in `lib/` rather than beside the component so the component module
  * exports only components (oxlint `react/only-export-components`). A later
  * basis — the 90 días hábiles «Plazo CONAF» — adds a column by passing
- * `extraColumns` to `EstadoTable`; it never edits this list.
+ * `extraColumns` to `EstadoTable` (with `after: 'pmf'` to sit beside the PMF);
+ * it never edits this list.
  */
 import type { ReactNode } from 'react'
 import type { LifecycleRow } from '../api'
@@ -21,6 +22,8 @@ export interface EstadoColumn {
   key: string
   header: string
   render: (row: LifecycleRow) => ReactNode
+  /** An extra column only: the base column it follows (default: after the last). */
+  after?: string
 }
 
 export const ESTADO_COLUMNS: readonly EstadoColumn[] = [

@@ -34,6 +34,7 @@ from transelec_ingestion.resumen_layout import (
     PmfFieldValue,
     chronology_flags,
     resolve_pmf_field,
+    value_or_unread_text,
 )
 
 
@@ -116,12 +117,7 @@ def tracking_value(row: AefInputRow, name: str) -> Any:
     that raw text, so the cell is neither lost nor mistaken for a blank.
     """
 
-    value = getattr(row, name)
-    if value is None and name in row.text_dates:
-        evidence = row.text_dates[name]
-        if evidence.get("parsed") is None:
-            return evidence.get("raw")
-    return value
+    return value_or_unread_text(getattr(row, name), row.text_dates, name)
 
 
 def has_tracking(row: AefInputRow) -> bool:

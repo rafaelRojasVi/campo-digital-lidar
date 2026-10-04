@@ -74,6 +74,28 @@ export const RULES: Record<string, RuleExplanation> = {
     ],
     sourceColumns: ['PMF', 'Estado resumido', 'Estado', 'N Ingreso', 'N Ingreso2', 'Tipo de rechazo'],
   },
+  plazo_conaf_90_habiles_v1: {
+    name: 'Plazo CONAF de 90 días hábiles',
+    steps: [
+      'Para cada PMF, la fecha de inicio es «Fecha de ingreso2» si la tiene; si no, «Fecha de ingreso1». Un reingreso vuelve a contar el plazo.',
+      'Si la fecha más reciente no se puede leer, no se usa la anterior: el PMF queda «Sin fecha legible».',
+      'Las fechas se leen en todas las filas del PMF; si las filas traen fechas distintas, no se elige ninguna («Fechas distintas»).',
+      'El día 1 es el primer día hábil después del ingreso; el plazo vence el día hábil 90. Son hábiles los días de lunes a viernes que no son feriados nacionales de Chile. Los feriados regionales no se descuentan.',
+      '«Hoy» es la fecha del servidor en Chile, no la del navegador ni la columna «Hoy» de la planilla.',
+      'Vencido si hoy es posterior al vencimiento; por vencer si quedan 10 días hábiles o menos; los PMF Aprobados, Descartados o Desistidos no aplican.',
+      'La columna «90 dias» de la planilla se compara con este cálculo; nunca se reemplaza.',
+      'Regla provisional hasta que Campo Digital confirme cuándo empieza el plazo y si se suspende.',
+    ],
+    sourceColumns: ['PMF', 'Fecha de ingreso2', 'Fecha de ingreso1', '90 dias', 'Estado resumido'],
+  },
+  vencimiento_columna_90_dias_legacy: {
+    name: 'Ingresos sobre 90 días, regla anterior',
+    steps: [
+      'Fila por fila: «Estado resumido» distinto de «Aprobado» y fecha «90 dias» de la planilla anterior a hoy.',
+      'Usa la fecha que trae la planilla, sin contar días hábiles. Se muestra solo para comparar con el plazo calculado.',
+    ],
+    sourceColumns: ['Estado resumido', '90 dias'],
+  },
   owner_stage_legacy: {
     name: 'Estado de cada predio en la tabla por propietario',
     steps: [

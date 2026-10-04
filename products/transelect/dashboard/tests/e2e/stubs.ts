@@ -253,6 +253,91 @@ export function lifecycleBody() {
   }
 }
 
+/**
+ * `GET /transelec/plazos`: one entry per `lifecycleBody()` PMF (PMF-001 …
+ * PMF-006), read on 2026-09-02 like every stubbed `Date` header. A filtered
+ * request keeps only PMF-001, so a filter change visibly moves the counts.
+ */
+export function plazosBody(filtered: boolean) {
+  const entry = (index: number, plazo: Record<string, unknown>) => ({
+    pmf: `PMF-${String(index).padStart(3, '0')}`,
+    source_row_number: index,
+    estado: 'en_plazo',
+    base_field: 'fecha_ingreso',
+    base_date: '2026-02-10',
+    base_source_rows: [index],
+    deadline: '2026-06-19',
+    elapsed_business_days: 141,
+    remaining_business_days: -51,
+    planilla_90_dias: '2026-05-10',
+    cruce: 'difiere',
+    diferencia_dias: -40,
+    legacy_vencido: true,
+    ...plazo,
+  })
+  const all = [
+    entry(1, { estado: 'vencido' }),
+    entry(2, {
+      estado: 'por_vencer',
+      base_date: '2026-04-30',
+      deadline: '2026-09-09',
+      elapsed_business_days: 85,
+      remaining_business_days: 5,
+      diferencia_dias: -122,
+    }),
+    entry(3, {
+      estado: 'en_plazo',
+      base_field: 'fecha_ingreso_2',
+      base_date: '2026-08-03',
+      deadline: '2026-12-10',
+      elapsed_business_days: 22,
+      remaining_business_days: 68,
+      diferencia_dias: -214,
+    }),
+    entry(4, { estado: 'vencido' }),
+    entry(5, {
+      estado: 'no_aplica',
+      elapsed_business_days: null,
+      remaining_business_days: null,
+      legacy_vencido: false,
+    }),
+    entry(6, {
+      estado: 'conflicto',
+      base_date: null,
+      base_source_rows: [6, 7],
+      deadline: null,
+      elapsed_business_days: null,
+      remaining_business_days: null,
+      cruce: 'sin_calculo',
+      diferencia_dias: null,
+    }),
+  ]
+  const pmfs = filtered ? all.slice(0, 1) : all
+  const count = (estado: string) => pmfs.filter((item) => item.estado === estado).length
+  return {
+    basis: 'plazo_conaf_90_habiles_v1',
+    legacy_basis: 'vencimiento_columna_90_dias_legacy',
+    observed_on: '2026-09-02',
+    calendar: { source: 'holidays', country: 'CL', version: '0.105' },
+    plazo_habiles: 90,
+    por_vencer_umbral: 10,
+    total_pmf_count: pmfs.length,
+    estados: {
+      vencido: count('vencido'),
+      por_vencer: count('por_vencer'),
+      en_plazo: count('en_plazo'),
+      sin_fecha: 0,
+      sin_fecha_texto: 0,
+      conflicto: count('conflicto'),
+      no_aplica: count('no_aplica'),
+    },
+    cruce_difiere_count: pmfs.filter((item) => item.cruce === 'difiere').length,
+    // The former row-level rule over the stubbed rows (60 unfiltered, 8 filtered).
+    legacy_vencido_row_count: filtered ? 8 : 60,
+    pmfs,
+  }
+}
+
 export interface StubOptions {
   /** Force a status on every Transelec read (401/403/404 state tests). */
   readStatus?: number
@@ -379,6 +464,12 @@ export async function stubPlatform(page: Page, options: StubOptions = {}): Promi
   await page.route('**/api/transelec/lifecycle*', (route) => {
     if (fail) return json(route, failBody, fail)
     return json(route, lifecycleBody())
+  })
+
+  await page.route('**/api/transelec/plazos*', (route) => {
+    if (fail) return json(route, failBody, fail)
+    const url = new URL(route.request().url())
+    return json(route, plazosBody(isFiltered(url)))
   })
 
 

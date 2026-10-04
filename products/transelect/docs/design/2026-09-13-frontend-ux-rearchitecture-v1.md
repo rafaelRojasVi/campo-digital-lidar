@@ -204,9 +204,25 @@ with its scope and its server-clock reference stated as they are today.
 The page leads with each PMF's lifecycle group and step (`lifecycle_pmf_v1`)
 and highlights «Rechazado, esperando recurso» in the table. The
 pending-priority zone described above is kept unchanged, full width, inside a
-closed «Pendientes prioritarios (regla anterior)» disclosure. The 90-day toggle
-stays on the page. Calidad links to it with «Buscar … en Estado» (a search,
-not an exact filter). The old address redirects for one release.
+closed «Pendientes prioritarios (regla anterior)» disclosure. The 90-day question
+(«¿Qué PMF superaron los 90 días hábiles?») is answered by the server's
+`plazo_conaf_90_habiles_v1` (90 business days in Chile's calendar from the
+most recent ingreso; «today» is the server's date in Chile), shown as the
+«Plazo CONAF» column right after «PMF». The browser-only panel that compared
+the planilla's «90 dias» with the response's `Date` header was removed on
+2026-10-04; its rule is kept by the API as
+`vencimiento_columna_90_dias_legacy` and its count is shown beside the new
+one (DECISION; design in
+`docs/superpowers/specs/2026-10-04-transelec-plazo-90-habiles-design.md`).
+The «vencidos» toggle filters the table to the overdue PMFs and prints that
+context (the filter and the server's date) on the printed page. If the
+`/plazos` read fails, the page shows a Spanish error with «Reintentar» and
+the rest of Estado keeps working. Calidad lists the PMFs whose «90 dias»
+differs from the calculated term (capped at 10), each with «Buscar … en
+Estado». The first business day counts as day 1 after the ingreso
+(INFERENCE from Ley 19.880, not confirmed with CONAF). Calidad links to
+Estado with «Buscar … en Estado» (a search, not an exact filter). The old
+address redirects for one release.
 
 ### 4.4 Calidad y reportes (`/transelec/calidad`)
 

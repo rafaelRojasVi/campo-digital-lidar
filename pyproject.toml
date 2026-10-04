@@ -25,6 +25,7 @@ analysis = [
 ]
 transelec = [
   "python-calamine>=0.8,<0.9",
+  "holidays>=0.105,<1",
 ]
 geometry-extra = [
   "open3d>=0.18",

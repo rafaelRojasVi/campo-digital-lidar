@@ -47,7 +47,7 @@ import re
 import unicodedata
 import xml.parsers.expat
 import zipfile
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from pathlib import Path
@@ -1503,6 +1503,22 @@ def resolve_pmf_field(entries: Iterable[tuple[int, Any]]) -> PmfFieldValue:
         source_rows=tuple(sorted(row for variant in variants for row in variant.source_rows)),
         variants=variants,
     )
+
+
+def value_or_unread_text(value: Any, text_dates: Mapping[str, Mapping[str, Any]], name: str) -> Any:
+    """A date column's value, else the raw text of its unparsed cell, else None.
+
+    A date column that is NULL because its cell held text the importer could
+    not read as one date (``source_text_dates``) yields that text, so the cell
+    is neither lost nor mistaken for a blank. Only a ``str`` raw counts.
+    """
+
+    if value is None and name in text_dates:
+        evidence = text_dates[name]
+        if evidence.get("parsed") is None:
+            raw = evidence.get("raw")
+            return raw if isinstance(raw, str) else None
+    return value
 
 
 def _pmf_conflict_issues(

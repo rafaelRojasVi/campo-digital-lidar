@@ -24,7 +24,6 @@
  * say so instead of implying a row has missing data.
  */
 import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
 import {
   EMPTY_FILTERS,
   type AefPmf,
@@ -51,20 +50,14 @@ import {
   lifecycleStepText,
 } from '../lib/lifecycle'
 import { classifyFailure, type FailureView } from '../lib/apiState'
+import type { PlazoDetail } from '../lib/plazo'
 import { Drawer } from '../ui/Drawer'
 import { AlertBanner, LoadingBlock } from './StateViews'
+import { Fact } from './Fact'
 import { OficinaVirtualLink } from './OficinaVirtualLink'
+import { PlazoDrawerNotice, PlazoDrawerSection, type PlazoDrawerStatus } from './PlazoDrawerSection'
 import { SourceDate } from './SourceDate'
 import { StatusPill } from './StatusPill'
-
-function Fact({ label, children, wide = false }: { label: string; children: ReactNode; wide?: boolean }) {
-  return (
-    <div className={`fact${wide ? ' wide' : ''}`}>
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  )
-}
 
 function rowsLabel(rows: readonly number[]): string {
   return `${rows.length === 1 ? 'fila' : 'filas'} ${rows.join(', ')}`
@@ -215,6 +208,8 @@ export function RowDetailDrawer({
   onClose,
   sourceFields,
   lifecycle = null,
+  plazo = null,
+  plazoStatus,
 }: {
   row: ResumenRow
   onClose: () => void
@@ -222,6 +217,10 @@ export function RowDetailDrawer({
   sourceFields?: readonly string[] | null
   /** Where the PMF stands (`lifecycle_pmf_v1`), when the Estado section opens it. */
   lifecycle?: LifecycleRow | null
+  /** CONAF's 90-business-day term for this PMF, when the Estado section opens it. */
+  plazo?: PlazoDetail | null
+  /** Shown instead of the term while it is pending, failed or absent. */
+  plazoStatus?: PlazoDrawerStatus
 }) {
   const sourceHasAef = aefInSource(sourceFields)
   const sourceHasIngreso2 = ingreso2InSource(sourceFields)
@@ -352,6 +351,12 @@ export function RowDetailDrawer({
           </section>
         )}
 
+        {plazo ? (
+          <PlazoDrawerSection detail={plazo} />
+        ) : (
+          plazoStatus && <PlazoDrawerNotice status={plazoStatus} />
+        )}
+
         <section className="drawer-section" aria-labelledby="drawer-tramitacion">
           <h3 id="drawer-tramitacion">Tramitación</h3>
           <dl className="facts">
@@ -400,7 +405,7 @@ export function RowDetailDrawer({
                 </Fact>
               </>
             )}
-            <Fact label="90 días">
+            <Fact label="«90 dias» de la planilla">
               <SourceDate row={current} field="fecha_90_dias" missing="Sin fecha" />
             </Fact>
             <Fact label="PAS">{cell(current.pas, 'Sin información')}</Fact>
