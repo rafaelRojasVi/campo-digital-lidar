@@ -666,3 +666,13 @@ test('a PMF with two summarized states is disclosed, not double counted', async 
   await expect(page.getByTestId('status-conflict-note')).toContainText('PMF-002')
   await expect(page.getByTestId('status-reconciliation-warning')).toHaveCount(0)
 })
+
+test('Calidad: the PMFs the Estado rule could not place are listed with their reason', async ({
+  page,
+}) => {
+  await openCalidad(page)
+  await expect(page.getByTestId('lifecycle-review-count')).toHaveText('1')
+  await expect(page.getByTestId('lifecycle-review-6')).toContainText(
+    '«Estado» y «Estado resumido» no coinciden',
+  )
+})
