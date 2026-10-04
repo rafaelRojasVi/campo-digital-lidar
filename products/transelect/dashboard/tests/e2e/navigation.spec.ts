@@ -70,6 +70,45 @@ test.describe('sections', () => {
     )
   })
 
+  test('the section bar never overlaps the version stamp, at any desktop width', async ({
+    page,
+  }) => {
+    // The regression this guards: with `min-width: 0`, the nav's nowrap links
+    // overflowed instead of wrapping, and at 1280px — the commonest laptop
+    // width — "Calidad" was printed underneath "Versión activa #N".
+    await page.goto('/transelec')
+    await expect(page.getByTestId('kpi-row')).toBeVisible()
+
+    for (const width of [1024, 1152, 1280, 1366, 1440, 1600]) {
+      await page.setViewportSize({ width, height: 900 })
+
+      const calidad = await nav(page).getByRole('link', { name: 'Calidad' }).boundingBox()
+      const stamp = await page.locator('.version-chip').boundingBox()
+      if (!calidad || !stamp) throw new Error(`nothing measured at ${width}px`)
+
+      const overlaps =
+        calidad.x + calidad.width > stamp.x &&
+        stamp.x + stamp.width > calidad.x &&
+        calidad.y + calidad.height > stamp.y &&
+        stamp.y + stamp.height > calidad.y
+      expect(overlaps, `the shell overlaps itself at ${width}px`).toBe(false)
+    }
+  })
+
+  test('the hosting page is reachable by link but is not a section of the dashboard', async ({
+    page,
+  }) => {
+    // It is a stakeholder page about infrastructure cost, sent by link. If it
+    // ever appears in the section bar it has become a sixth operational
+    // section competing with the work, which is exactly what it must not be.
+    await page.goto('/transelec/alojamiento')
+    await expect(page.getByTestId('host-fly')).toBeVisible()
+    await expect(page.getByTestId('cost-disclaimer')).toContainText('no una cotización')
+
+    await expect(nav(page).getByRole('link')).toHaveCount(5)
+    await expect(nav(page).getByRole('link', { name: 'Alojamiento' })).toHaveCount(0)
+  })
+
   test('the section links are real anchors, so they can be opened in a new tab', async ({
     page,
   }) => {

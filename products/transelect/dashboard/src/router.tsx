@@ -10,6 +10,10 @@
  * reload, and is carried between the four reading sections from one source of
  * truth rather than from four copies of component state.
  *
+ * `/transelec/alojamiento` is a live route that is deliberately absent from
+ * the section navigation (see `AppHeader`'s `NAV`): it is a stakeholder page
+ * about hosting cost, sent by link, not a sixth operational section.
+ *
  * `/transelec/importar` and `/transelec/versiones` are kept as live routes
  * that resolve into the Datos section's two panes, so every link, bookmark
  * and test navigation that predates the rearchitecture still lands correctly.
@@ -23,6 +27,7 @@ export const ROUTES = {
   pendientes: '/transelec/pendientes',
   calidad: '/transelec/calidad',
   datos: '/transelec/datos',
+  alojamiento: '/transelec/alojamiento',
   importar: '/transelec/importar',
   versiones: '/transelec/versiones',
 } as const

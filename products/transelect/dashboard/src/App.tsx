@@ -12,6 +12,7 @@ import { LoginCard } from './components/LoginCard'
 import { LoadingBlock, StateBlock } from './components/StateViews'
 import { classifyFailure, type ApiFailure } from './lib/apiState'
 import { useFilters } from './lib/useFilters'
+import { AlojamientoPage } from './pages/AlojamientoPage'
 import { CalidadPage } from './pages/CalidadPage'
 import { DatosPage } from './pages/DatosPage'
 import { ExploradorPage } from './pages/ExploradorPage'
@@ -168,6 +169,8 @@ function Shell() {
         return <PendientesPage filterController={filterController} />
       case ROUTES.calidad:
         return <CalidadPage filterController={filterController} />
+      case ROUTES.alojamiento:
+        return <AlojamientoPage />
       case ROUTES.datos:
       case ROUTES.importar:
       case ROUTES.versiones:
