@@ -17,6 +17,17 @@ Container packaging: **built and locally verified** (this document).
   is live. `/health` and `/ready` answer `200`, the deploy log starts with
   the `campo-entrypoint` line, and the forestry and Transelec API routes
   answer `401` signed out.
+- **FACT (2026-10-04, checked from outside):** production serves `main` at
+  `f742639` (PRs #80 to #83: Estado, the 90 business days, web edits),
+  Railway deployment `4b99fdf5`, finished 20:32 UTC. `/health` and `/ready`
+  answer `200`. The pages `/transelec/estado` and `/transelec/ediciones`
+  are served, and the new API routes `/transelec/lifecycle`,
+  `/transelec/plazos`, `/transelec/overrides` and `/transelec/export.xlsx`
+  answer `401` signed out. The served bundle carries the new screens.
+  **INFERENCE:** the pre-deploy migration took the database to `0012` (the
+  field-override table and the effective-row view); the deploy would have
+  stopped had it failed. The head was not read. No backup was taken just
+  before this deploy; the latest dump is the cutover's final dump.
 - Railway auto-deploy is off, so deploys are manual. Since 2026-09-28 the
   service deploys from `main`.
 - **DECISION (2026-09-28):** no backups. The Hobby plan has no scheduled
