@@ -33,6 +33,7 @@ from app.deps import SESSION_COOKIE_NAME, get_object_store
 from app.dev_auth import DEFAULT_SEED_GRANTS, DEV_IDENTITY_KIND, SEEDED_DEV_IDENTITIES
 from app.main import app
 from app.object_store import LocalObjectStore
+from app.routers.transelec import plazo_observed_on
 from app.session_store import PlatformSessionStore
 from fastapi.testclient import TestClient
 from httpx import Response
@@ -1273,3 +1274,182 @@ def test_publishing_an_import_with_warnings_requires_an_explicit_acknowledgement
             )
         ).scalar_one()
     assert (metadata["warning_count"], metadata["warnings_acknowledged"]) == (1, True)
+
+
+# ---------------------------------------------------------------------------
+# GET /plazos — plazo_conaf_90_habiles_v1 against real PostgreSQL
+# ---------------------------------------------------------------------------
+
+# Synthetic: one PMF per plazo status, read on Wed 2026-09-02 with Chile's
+# real calendar (holidays inside the windows: 18 Sep, 12 Oct, 8 Dec 2026).
+#
+#  row  PMF    dates                                   → expected
+#   2   PL001  ingreso 2026-08-03, 90 dias 2026-12-10  → en_plazo, coincide
+#   3   PL002  ingreso1 2026-01-05, ingreso2 2026-07-01 → base ingreso2
+#   4   PL003  ingreso 2026-03-02, 90 dias 2026-07-01  → vencido, difiere -9
+#   5   PL004  Aprobado / Aprobado, ingreso 2026-03-02 → no_aplica
+#   6   PL005  ingreso "20-12-2024 09-06-26" (two dates) → sin_fecha_texto
+#   7-8 PL006  ingreso 2026-05-04 / 2026-05-11          → conflicto
+#   9   PL007  no dates                                → sin_fecha
+#  10   PL008  ingreso 2026-04-30                      → por_vencer, 5 left
+#  11   PL009  ingreso 2026-08-03, Sector Sur
+#  12   PL009  no date, Sector Norte                   → the PMF keeps row 11's date
+_PLAZO_TODAY = dt.date(2026, 9, 2)
+
+
+def _plazo_row(pmf: str, number: int, **overrides: Any) -> list[Any]:
+    values: dict[str, Any] = {
+        "pmf": pmf,
+        "numero_predio": str(number),
+        "id_predio_unico": f"{pmf}-{number}",
+        "estado": "En evaluacion",
+        "estado_resumido": "En tramite",
+        "numero_ingreso": f"ING-{pmf}",
+    }
+    values.update(overrides)
+    return _current_row(**values)
+
+
+def _plazo_workbook(tmp_path: Path) -> bytes:
+    return _workbook_bytes(
+        tmp_path,
+        "plazos.xlsx",
+        [
+            _plazo_row(
+                "PL001", 1, fecha_ingreso=dt.date(2026, 8, 3), fecha_90_dias=dt.date(2026, 12, 10)
+            ),
+            _plazo_row(
+                "PL002", 2, fecha_ingreso=dt.date(2026, 1, 5), fecha_ingreso_2=dt.date(2026, 7, 1)
+            ),
+            _plazo_row(
+                "PL003",
+                3,
+                estado="Rechazado",
+                fecha_ingreso=dt.date(2026, 3, 2),
+                fecha_90_dias=dt.date(2026, 7, 1),
+            ),
+            _plazo_row(
+                "PL004",
+                4,
+                estado="Aprobado",
+                estado_resumido="Aprobado",
+                fecha_ingreso=dt.date(2026, 3, 2),
+            ),
+            _plazo_row("PL005", 5, fecha_ingreso="20-12-2024 09-06-26"),
+            _plazo_row("PL006", 6, fecha_ingreso=dt.date(2026, 5, 4)),
+            _plazo_row("PL006", 7, fecha_ingreso=dt.date(2026, 5, 11)),
+            _plazo_row("PL007", 8),
+            _plazo_row("PL008", 9, fecha_ingreso=dt.date(2026, 4, 30)),
+            _plazo_row("PL009", 10, sector="Sector Sur", fecha_ingreso=dt.date(2026, 8, 3)),
+            _plazo_row("PL009", 11, sector="Sector Norte"),
+        ],
+        headers=_CURRENT_HEADERS,
+    )
+
+
+def _publish_plazo_fixture(client: TestClient, engine: Engine, tmp_path: Path) -> None:
+    _login(client, "dev-admin")
+    _, validated = _upload_and_validate(client, engine, _plazo_workbook(tmp_path))
+    assert validated.status_code == 200, validated.text
+    # PL005's two-date cell is a warning the operator acknowledges.
+    published = client.post(
+        f"/transelec/imports/{validated.json()['import_id']}/publish?acknowledge_warnings=true",
+        headers={"Origin": _SAME_ORIGIN},
+    )
+    assert published.status_code == 200, published.text
+    app.dependency_overrides[plazo_observed_on] = lambda: _PLAZO_TODAY
+
+
+def test_plazos_counts_ninety_chilean_business_days_from_the_latest_ingreso(
+    client: TestClient, integration_engine: Engine, tmp_path: Path
+) -> None:
+    _publish_plazo_fixture(client, integration_engine, tmp_path)
+
+    body = client.get("/transelec/plazos").json()
+
+    assert (body["basis"], body["legacy_basis"]) == (
+        "plazo_conaf_90_habiles_v1",
+        "vencimiento_columna_90_dias_legacy",
+    )
+    assert body["observed_on"] == "2026-09-02"
+    assert (body["calendar"]["source"], body["calendar"]["country"]) == ("holidays", "CL")
+    assert body["calendar"]["version"]
+    assert (body["plazo_habiles"], body["por_vencer_umbral"]) == (90, 10)
+    assert body["total_pmf_count"] == 9
+    assert body["estados"] == {
+        "vencido": 1,
+        "por_vencer": 1,
+        "en_plazo": 3,
+        "sin_fecha": 1,
+        "sin_fecha_texto": 1,
+        "conflicto": 1,
+        "no_aplica": 1,
+    }
+    assert [entry["pmf"] for entry in body["pmfs"]] == [f"PL00{n}" for n in range(1, 10)]
+
+    by_pmf = {entry["pmf"]: entry for entry in body["pmfs"]}
+    pl001 = by_pmf["PL001"]
+    assert (pl001["estado"], pl001["base_field"], pl001["deadline"]) == (
+        "en_plazo",
+        "fecha_ingreso",
+        "2026-12-10",
+    )
+    assert (pl001["elapsed_business_days"], pl001["remaining_business_days"]) == (22, 68)
+    assert (pl001["cruce"], pl001["diferencia_dias"]) == ("coincide", 0)
+
+    assert (by_pmf["PL002"]["base_field"], by_pmf["PL002"]["base_date"]) == (
+        "fecha_ingreso_2",
+        "2026-07-01",
+    )
+    assert by_pmf["PL002"]["deadline"] == "2026-11-09"
+
+    pl003 = by_pmf["PL003"]
+    assert (pl003["estado"], pl003["deadline"], pl003["remaining_business_days"]) == (
+        "vencido",
+        "2026-07-10",
+        -37,
+    )
+    assert (pl003["cruce"], pl003["planilla_90_dias"], pl003["diferencia_dias"]) == (
+        "difiere",
+        "2026-07-01",
+        -9,
+    )
+    assert pl003["legacy_vencido"] is True
+
+    assert by_pmf["PL004"]["estado"] == "no_aplica"
+    assert by_pmf["PL004"]["remaining_business_days"] is None
+    assert by_pmf["PL005"]["estado"] == "sin_fecha_texto"
+    assert (by_pmf["PL006"]["estado"], by_pmf["PL006"]["base_source_rows"]) == (
+        "conflicto",
+        [7, 8],
+    )
+    assert by_pmf["PL007"]["estado"] == "sin_fecha"
+    assert (by_pmf["PL008"]["estado"], by_pmf["PL008"]["remaining_business_days"]) == (
+        "por_vencer",
+        5,
+    )
+    assert by_pmf["PL008"]["deadline"] == "2026-09-09"
+
+    assert body["cruce_difiere_count"] == 1
+    assert body["legacy_vencido_row_count"] == 1
+
+
+def test_plazos_follows_the_filters_but_dates_stay_pmf_facts(
+    client: TestClient, integration_engine: Engine, tmp_path: Path
+) -> None:
+    _publish_plazo_fixture(client, integration_engine, tmp_path)
+
+    narrowed = client.get("/transelec/plazos", params={"sector": "Sector Norte"}).json()
+    assert [entry["pmf"] for entry in narrowed["pmfs"]] == ["PL009"]
+    (entry,) = narrowed["pmfs"]
+    # The filter kept row 12, which has no date; the PMF's date is on row 11.
+    assert (entry["estado"], entry["base_date"], entry["base_source_rows"]) == (
+        "en_plazo",
+        "2026-08-03",
+        [11],
+    )
+    assert entry["source_row_number"] == 12
+
+    closed = client.get("/transelec/plazos", params={"estado_resumido": "Aprobado"}).json()
+    assert [entry["pmf"] for entry in closed["pmfs"]] == ["PL004"]
+    assert closed["estados"]["no_aplica"] == 1

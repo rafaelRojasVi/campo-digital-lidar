@@ -34,7 +34,9 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo
 
+import holidays
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -85,6 +87,18 @@ from transelec_ingestion.lifecycle_view import (
 )
 from transelec_ingestion.owner_status_view import OwnerStatusInputRow, build_owner_status
 from transelec_ingestion.pending_view import PendingInputRow, build_pending
+from transelec_ingestion.plazo_conaf import (
+    LEGACY_BASIS,
+    PLAZO_BASIS,
+    PLAZO_HABILES,
+    POR_VENCER_UMBRAL,
+    BaseField,
+    Cruce,
+    PlazoEstado,
+    PlazoInputRow,
+    PmfPlazo,
+    build_plazos,
+)
 from transelec_ingestion.resumen_layout import AEF_TRACKING_FIELDS, PmfFieldValue
 from transelec_ingestion.status_rollups import RolledRow, estado_resumido_first_row
 from transelec_ingestion.summary_view import SummaryInputRow, build_summary
@@ -1617,6 +1631,157 @@ def get_lifecycle(
             )
             for entry in summary.pmfs
         ],
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /plazos — plazo_conaf_90_habiles_v1, CONAF's 90 business days
+#
+# Not a dashboard page path (see the /lifecycle note above): the «Plazo
+# CONAF» column lives on the /transelec/estado page.
+# ---------------------------------------------------------------------------
+
+# CONAF's calendar: business days and "today" are Chilean.
+_CONAF_TIMEZONE = "America/Santiago"
+
+
+def chile_today(now: dt.datetime | None = None) -> dt.date:
+    """The calendar date in Chile at ``now`` (default: the server's clock)."""
+
+    instant = now if now is not None else dt.datetime.now(dt.UTC)
+    return instant.astimezone(ZoneInfo(_CONAF_TIMEZONE)).date()
+
+
+def plazo_observed_on() -> dt.date:
+    """Dependency: today in Chile. Integration tests override it to fix the date."""
+
+    return chile_today()
+
+
+class PlazoEstadoCountsView(BaseModel):
+    vencido: int
+    por_vencer: int
+    en_plazo: int
+    sin_fecha: int
+    sin_fecha_texto: int
+    conflicto: int
+    no_aplica: int
+
+
+class PlazoCalendarView(BaseModel):
+    source: Literal["holidays"]
+    country: Literal["CL"]
+    version: str
+
+
+class PlazoPmfView(BaseModel):
+    pmf: str
+    source_row_number: int
+    estado: PlazoEstado
+    base_field: BaseField | None
+    base_date: str | None
+    base_source_rows: list[int]
+    deadline: str | None
+    elapsed_business_days: int | None
+    remaining_business_days: int | None
+    planilla_90_dias: str | None
+    cruce: Cruce
+    diferencia_dias: int | None
+    legacy_vencido: bool
+
+
+class TranselecPlazosResponse(BaseModel):
+    basis: Literal["plazo_conaf_90_habiles_v1"]
+    legacy_basis: Literal["vencimiento_columna_90_dias_legacy"]
+    observed_on: str
+    calendar: PlazoCalendarView
+    plazo_habiles: int
+    por_vencer_umbral: int
+    total_pmf_count: int
+    estados: PlazoEstadoCountsView
+    cruce_difiere_count: int
+    legacy_vencido_row_count: int
+    pmfs: list[PlazoPmfView]
+
+
+def _to_plazo_input_row(row: Row[Any]) -> PlazoInputRow:
+    return PlazoInputRow(
+        source_row_number=row.source_row_number,
+        pmf=row.pmf,
+        estado_resumido=row.estado_resumido,
+        fecha_ingreso=row.fecha_ingreso,
+        fecha_ingreso_2=row.fecha_ingreso_2,
+        fecha_90_dias=row.fecha_90_dias,
+        text_dates=row.source_text_dates or {},
+    )
+
+
+def _plazo_pmf_view(entry: PmfPlazo) -> PlazoPmfView:
+    return PlazoPmfView(
+        pmf=entry.pmf,
+        source_row_number=entry.source_row_number,
+        estado=entry.estado,
+        base_field=entry.base_field,
+        base_date=_iso(entry.base_date),
+        base_source_rows=list(entry.base_source_rows),
+        deadline=_iso(entry.deadline),
+        elapsed_business_days=entry.elapsed_business_days,
+        remaining_business_days=entry.remaining_business_days,
+        planilla_90_dias=_iso(entry.planilla_90_dias),
+        cruce=entry.cruce,
+        diferencia_dias=entry.diferencia_dias,
+        legacy_vencido=entry.legacy_vencido,
+    )
+
+
+@router.get(
+    "/plazos",
+    response_model=TranselecPlazosResponse,
+    dependencies=[Depends(require_transelec_grant(Action.VIEW))],
+)
+def get_plazos(
+    connection: Annotated[Connection, Depends(get_db_connection)],
+    filters: Annotated[TranselecFilters, Depends(_transelec_filters)],
+    observed_on: Annotated[dt.date, Depends(plazo_observed_on)],
+) -> TranselecPlazosResponse:
+    """Each PMF of the filtered scope, once, with CONAF's 90-business-day term.
+
+    Rows come only from ``_fetch_filtered_rows``. Dates are PMF facts read
+    from every row of each PMF, as ``/aef`` does, so a deadline never moves
+    with an unrelated filter. «No aplica» uses the same filtered rows as the
+    Estado table beside it (``_closed_pmfs``).
+    """
+
+    import_id = _require_active_import_id(connection)
+    rows = _fetch_filtered_rows(connection, import_id=import_id, filters=filters)
+    pmf_rows = (
+        _fetch_filtered_rows(connection, import_id=import_id, filters=TranselecFilters())
+        if filters != TranselecFilters()
+        else rows
+    )
+    # One calendar per request: ``holidays`` fills years in lazily, and a
+    # shared instance would be mutated from several worker threads at once.
+    calendar = holidays.country_holidays("CL")
+    summary = build_plazos(
+        [_to_plazo_input_row(row) for row in rows],
+        pmf_rows=[_to_plazo_input_row(row) for row in pmf_rows],
+        today=observed_on,
+        is_holiday=lambda day: day in calendar,
+        closed_pmfs=_closed_pmfs(rows),
+    )
+
+    return TranselecPlazosResponse(
+        basis=PLAZO_BASIS,
+        legacy_basis=LEGACY_BASIS,
+        observed_on=summary.observed_on.isoformat(),
+        calendar=PlazoCalendarView(source="holidays", country="CL", version=holidays.__version__),
+        plazo_habiles=PLAZO_HABILES,
+        por_vencer_umbral=POR_VENCER_UMBRAL,
+        total_pmf_count=summary.total_pmf_count,
+        estados=PlazoEstadoCountsView(**summary.estados),
+        cruce_difiere_count=summary.cruce_difiere_count,
+        legacy_vencido_row_count=summary.legacy_vencido_row_count,
+        pmfs=[_plazo_pmf_view(entry) for entry in summary.pmfs],
     )
 
 
