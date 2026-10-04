@@ -459,6 +459,7 @@ def retire_incorporated_overrides(
 ) -> int:
     """End every edit the newly active planilla already carries; return how many."""
 
+    fields = sorted(_import_source_fields(connection, import_id=import_id))
     retired = connection.execute(
         text(
             """
@@ -469,9 +470,10 @@ def retire_incorporated_overrides(
               AND s.import_id = :import_id
               AND s.status = 'incorporada'
               AND o.ended_at IS NULL
+              AND o.field = ANY(:fields)
             RETURNING o.id
             """
         ),
-        {"import_id": import_id, "actor": actor_app_user_id},
+        {"import_id": import_id, "actor": actor_app_user_id, "fields": fields},
     ).all()
     return len(retired)

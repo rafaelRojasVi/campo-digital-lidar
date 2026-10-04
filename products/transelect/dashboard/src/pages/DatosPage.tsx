@@ -58,7 +58,10 @@ export function DatosPage({
       )
     }
     if (pane === 'ediciones') {
-      return <EdicionesPage activeImportId={activeImportId} />
+      return <EdicionesPage
+          activeImportId={activeImportId}
+          sourceFields={activeImport?.source_fields ?? null}
+        />
     }
     if (!isAdmin) {
       return (

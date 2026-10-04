@@ -589,6 +589,68 @@ def test_activation_retires_incorporated_edits_and_flags_conflicts(
         keep_override(conn, override_id=current.id, actor_app_user_id=_actor(client.engine))
 
 
+def _new_layout_workbook(tmp_path: Path, name: str, second_ingreso: str) -> bytes:
+    """The 30-Sept layout's «…2» ingreso pair, appended to the legacy columns
+    (header text, not position, binds a column); row MP001 carries the value."""
+
+    import xlsxwriter
+
+    from transelec_ingestion.xlsx_contract import EXPECTED_RESUMEN_HEADERS
+
+    path = tmp_path / name
+    workbook = xlsxwriter.Workbook(path)
+    sheet = workbook.add_worksheet("Resumen")
+    headers = (*EXPECTED_RESUMEN_HEADERS, "Fecha de ingreso2", "N Ingreso2")
+    for column, header in enumerate(headers):
+        sheet.write(0, column, header)
+    for row_index, row in enumerate(_BASE_ROWS, start=1):
+        values = _source_row(**row)
+        for column, value in enumerate(values):
+            if value is not None:
+                if isinstance(value, str):
+                    sheet.write_string(row_index, column, value)
+                else:
+                    sheet.write(row_index, column, value)
+        if row["pmf"] == "MP001" and row["numero_area_corta"] == "A1":
+            sheet.write_string(row_index, len(values) + 1, second_ingreso)
+    workbook.close()
+    return path.read_bytes()
+
+
+def test_older_layout_activation_does_not_retire_a_second_ingreso_edit(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """A field the active layout has no column for reads as blank; that must
+    not count as the planilla having incorporated a cleared «N.º ingreso 2»."""
+
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    first = _publish(client, _new_layout_workbook(tmp_path, "v1.xlsx", "X"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+    _save(
+        client.engine,
+        import_id=first,
+        row=row,
+        field="numero_ingreso_2",
+        value=None,
+        expected="X",
+    )
+    assert _row(client, "MP001", 0)["numero_ingreso_2"] is None
+
+    _publish(client, _workbook(tmp_path, "v2.xlsx"))  # older layout, no «…2»
+    _publish(client, _new_layout_workbook(tmp_path, "v3.xlsx", "X"))
+
+    with client.engine.connect() as conn:
+        ended = conn.execute(
+            text(
+                "SELECT end_reason FROM platform.transelec_field_override "
+                "WHERE field = 'numero_ingreso_2'"
+            )
+        ).all()
+    assert [tuple(item) for item in ended] == [(None,)]
+    assert _row(client, "MP001", 0)["numero_ingreso_2"] is None
+    assert _row(client, "MP001", 0)["web_fields"] == ["numero_ingreso_2"]
+
+
 def test_date_edit_over_raw_text_stores_only_the_text_side(
     client: TestClient, tmp_path: Path
 ) -> None:
@@ -956,6 +1018,34 @@ def test_other_integrity_errors_are_not_value_changed(
     monkeypatch.setattr("app.routers.transelec_edits.save_override", broken_save)
     with pytest.raises(IntegrityError):
         _put(client, import_id, row, "estado", "x", expected="En evaluacion")
+
+
+def test_a_date_edit_cannot_record_both_planilla_sides(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    with (
+        client.engine.begin() as conn,
+        pytest.raises(IntegrityError, match="ck_transelec_field_override_planilla_one_side"),
+    ):
+        conn.execute(
+            text(
+                """
+                INSERT INTO platform.transelec_field_override (
+                    pmf, rol, numero_predio, numero_area_corta, key_ordinal, field,
+                    value_date, planilla_value_text, planilla_value_date,
+                    base_import_id, created_by_app_user_id
+                )
+                SELECT pmf, rol, numero_predio, numero_area_corta, 1, 'fecha_ingreso',
+                       DATE '2026-01-02', 'x', DATE '2026-01-03', :import_id,
+                       (SELECT min(id) FROM platform.app_user)
+                FROM platform.transelec_keyed_row
+                WHERE import_id = :import_id
+                ORDER BY source_row_number
+                LIMIT 1
+                """
+            ),
+            {"import_id": import_id},
+        )
 
 
 def test_noop_save_writes_no_audit_event(client: TestClient, tmp_path: Path) -> None:

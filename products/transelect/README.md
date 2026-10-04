@@ -63,6 +63,8 @@ and the audit that produced them are recorded in:
 - [Reunión del 02-10-2026: cambios pedidos y preguntas (español)](docs/es/2026-10-02-reunion-cambios-y-preguntas.md)
 - [Planilla del 30-sept: segundo ingreso y columnas renombradas (español)](docs/es/2026-10-02-planilla-30sep-segundo-ingreso.md)
 
+Run it locally with `make transelec-dev` from the repository root.
+
 ### Web edits
 
 Operators and administrators can correct eleven status and ingreso fields
@@ -78,11 +80,14 @@ design is `docs/superpowers/specs/2026-10-04-transelec-web-edits-xlsx-design.md`
 - FACT: An edited value is shown everywhere with a «web» chip and its
   provenance (who and when). «Volver al valor de la planilla» ends the edit.
   Web edits never modify the published version or the stored planilla.
+- FACT: A text edit is compared with the planilla after trimming and
+  collapsing whitespace, including non-breaking spaces (NBSP); the comparison
+  is case-sensitive, so «aprobado» and «Aprobado» differ.
 - FACT: Conflicts. When a later published version changes the same cell, the
   planilla wins and the edit is flagged «En conflicto con la planilla».
   «Mantener valor web» re-applies the web value over the new planilla value;
-  «Descartar» deletes the edit. An edit whose row no longer exists is shown
-  as «Sin fila en la versión publicada» and is neither displayed nor written.
+  «Descartar» ends the edit and returns the cell to the planilla value. An edit whose row no longer
+  exists is shown as «Sin fila en la versión publicada» and is neither displayed nor written.
   An edit whose value the planilla already holds is «Ya está en la planilla».
 - FACT: Datos → Ediciones web (`/transelec/ediciones`) lists the edits and
   downloads the uploaded planilla with only the applied edits written. Each
@@ -102,5 +107,3 @@ design is `docs/superpowers/specs/2026-10-04-transelec-web-edits-xlsx-design.md`
   left every untouched package part byte-identical, preserved entry order and
   re-imported with 729 rows and 0 errors. OPEN QUESTION: the check in Excel
   itself is pending.
-
-Run it locally with `make transelec-dev` from the repository root.

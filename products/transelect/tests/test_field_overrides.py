@@ -59,12 +59,13 @@ def test_identity_and_formula_fields_are_not_editable(name: str) -> None:
         ("En tramite", "En tramite"),
         ("  En   tramite \t", "En tramite"),
         ("En\ntramite\r\n", "En tramite"),
+        ("\u00a0En\u00a0 tramite\u00a0", "En tramite"),
         ("", None),
         (" \t\n ", None),
         (None, None),
     ],
 )
-def test_normalize_text_trims_and_collapses_ascii_whitespace(
+def test_normalize_text_trims_and_collapses_whitespace_including_nbsp(
     raw: str | None, expected: str | None
 ) -> None:
     assert normalize_text(raw) == expected

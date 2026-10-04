@@ -52,14 +52,32 @@ const CONFLICT_COPY = {
     "Esta edición ya no está en conflicto. La lista se actualizó.",
 } as const;
 
+const DOWNLOAD_BUSY = "Preparando la planilla…";
+const DOWNLOAD_SERVER_ERROR =
+  "La plataforma no pudo preparar la planilla. Intente de nuevo; si se repite, contacte a soporte.";
+
+/** 403 and a bare 5xx get fixed Spanish copy; 404/409/422 keep the server's own detail. */
+function downloadErrorCopy(result: {
+  status: number;
+  error: string;
+  payload?: unknown;
+}): string {
+  if (result.status === 403) return classifyFailure(result).message;
+  if (result.status >= 500 && result.payload === undefined)
+    return DOWNLOAD_SERVER_ERROR;
+  return result.error;
+}
+
 function plural(count: number, one: string, many: string): string {
   return `${formatInteger(count)} ${count === 1 ? one : many}`;
 }
 
 export function EdicionesPage({
   activeImportId = null,
+  sourceFields = null,
 }: {
   activeImportId?: number | null;
+  sourceFields?: readonly string[] | null;
 }) {
   const [overrides, setOverrides] = useState<TranselecOverride[] | null>(null);
   const [failure, setFailure] = useState<FailureView | null>(null);
@@ -125,12 +143,16 @@ export function EdicionesPage({
   );
 
   const download = useCallback(async () => {
+    // aria-disabled, not disabled: the button keeps keyboard focus while busy.
+    if (downloading) return;
     setDownloading(true);
     setDownloadError(null);
+    setStatus(DOWNLOAD_BUSY);
     const result = await downloadOverridesXlsx();
     setDownloading(false);
+    setStatus("");
     if (!result.ok) {
-      setDownloadError(result.error);
+      setDownloadError(downloadErrorCopy(result));
       return;
     }
     const url = URL.createObjectURL(result.data.blob);
@@ -141,8 +163,9 @@ export function EdicionesPage({
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-    URL.revokeObjectURL(url);
-  }, []);
+    // Safari can abort the save if the URL is revoked in the same tick.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }, [downloading]);
 
   const viewRow = useCallback(async (override: TranselecOverride) => {
     setBusyId(override.id);
@@ -207,12 +230,12 @@ export function EdicionesPage({
           <button
             type="button"
             className="btn"
-            disabled={downloading}
+            aria-disabled={downloading}
             onClick={() => void download()}
             data-testid="download-xlsx"
           >
             {downloading
-              ? "Preparando la planilla…"
+              ? DOWNLOAD_BUSY
               : "Descargar planilla con ediciones (.xlsx)"}
           </button>
         </div>
@@ -251,7 +274,7 @@ export function EdicionesPage({
         >
           {status}
         </div>
-        {status && (
+        {status && status !== DOWNLOAD_BUSY && (
           <p className="hint no-print" aria-hidden="true">
             {status}
           </p>
@@ -403,6 +426,7 @@ export function EdicionesPage({
           onClose={() => setOpenRow(null)}
           canEdit
           activeImportId={activeImportId}
+          sourceFields={sourceFields}
           onRowEdited={reload}
         />
       )}

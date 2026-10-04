@@ -257,9 +257,11 @@ export function RowDetailDrawer({
   // paints one frame of the previous row.
   const currentRowRef = useRef(current.source_row_number)
   const refreshRowRef = useRef(false)
+  const onRowEditedRef = useRef(onRowEdited)
   useEffect(() => {
     currentRowRef.current = current.source_row_number
     refreshRowRef.current = refreshRow
+    onRowEditedRef.current = onRowEdited
   })
 
   if (openedFrom !== row) {
@@ -287,7 +289,7 @@ export function RowDetailDrawer({
             if (refreshRowRef.current) {
               refreshRowRef.current = false
               setRefreshRow(false)
-              onRowEdited?.(fresh)
+              onRowEditedRef.current?.(fresh)
             }
           }
         }

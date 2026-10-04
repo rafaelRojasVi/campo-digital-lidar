@@ -293,6 +293,10 @@ def upgrade() -> None:
             "AND planilla_value_date IS NULL)",
             name="ck_transelec_field_override_value_kind",
         ),
+        sa.CheckConstraint(
+            "NOT (planilla_value_text IS NOT NULL AND planilla_value_date IS NOT NULL)",
+            name="ck_transelec_field_override_planilla_one_side",
+        ),
         sa.CheckConstraint("key_ordinal >= 1", name="ck_transelec_field_override_key_ordinal"),
         # "end_reason IS NOT NULL" is load-bearing: NULL IN (...) is NULL, and
         # a CHECK that evaluates to NULL passes, so without it an edit could
