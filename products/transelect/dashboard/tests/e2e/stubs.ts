@@ -349,6 +349,8 @@ export interface StubOptions {
   extra?: (page: Page) => Promise<void>
   me?: Record<string, unknown> | null
   meStatus?: number
+  /** Extra fields merged into every list row (`/pmfs?`), by 1-based row index. */
+  rowOverrides?: (index: number) => Record<string, unknown>
 }
 
 const DEFAULT_ME = {
@@ -437,6 +439,19 @@ export async function stubPlatform(page: Page, options: StubOptions = {}): Promi
     })
   })
 
+  // Web edits: none by default. Registered before `options.extra` so a test's
+  // own handler wins (Playwright matches the most recently added route first).
+  // `*` does not cross `/`, so the item routes (`/overrides/{id}`, `/keep`)
+  // need their own pattern.
+  await page.route('**/api/transelec/overrides*', (route) => {
+    if (fail) return json(route, failBody, fail)
+    return json(route, [])
+  })
+  await page.route('**/api/transelec/overrides/**', (route) => {
+    if (fail) return json(route, failBody, fail)
+    return json(route, {}, 404)
+  })
+
   if (options.extra) await options.extra(page)
 
   await page.route('**/api/transelec/summary*', (route) => {
@@ -508,7 +523,9 @@ export async function stubPlatform(page: Page, options: StubOptions = {}): Promi
     const remaining = Math.max(0, total - cursor)
     const size = Math.min(limit, remaining)
     return json(route, {
-      items: Array.from({ length: size }, (_, offset) => makeApiRow(cursor + offset + 1)),
+      items: Array.from({ length: size }, (_, offset) =>
+        makeApiRow(cursor + offset + 1, options.rowOverrides?.(cursor + offset + 1) ?? {}),
+      ),
       next_cursor: cursor + size < total ? String(cursor + size) : null,
       has_more: cursor + size < total,
       total_count: total,
