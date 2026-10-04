@@ -8,6 +8,7 @@ no planilla value appears here.
 from __future__ import annotations
 
 import csv
+import datetime as dt
 import io
 from collections.abc import Generator
 from pathlib import Path
@@ -19,6 +20,15 @@ from app.deps import get_object_store
 from app.main import app
 from app.object_store import LocalObjectStore
 from app.routers.transelec import _RESUMEN_ROW_COLUMNS
+from app.transelec_overrides import (
+    FieldNotInSourceError,
+    NotInConflictError,
+    ValueChangedError,
+    VersionChangedError,
+    keep_override,
+    list_overrides,
+    save_override,
+)
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 from test_transelec_reads_router import (
@@ -29,6 +39,8 @@ from test_transelec_reads_router import (
     _upload,
     _workbook_bytes,
 )
+
+from transelec_ingestion.field_overrides import EDITABLE_BY_NAME
 
 ADMIN = (("transelect", Role.ADMIN),)
 OPERATOR = (("transelect", Role.OPERATOR),)
@@ -357,3 +369,262 @@ def test_a_conflicting_edit_is_invisible_on_every_read(client: TestClient, tmp_p
     assert client.get("/transelec/summary").json() == summary_before
 
     assert _export_estado_resumido(client, "MP001") == {"A1": "En tramite", "A2": "En tramite"}
+
+
+# ---------------------------------------------------------------------------
+# Persistence (Task 4)
+# ---------------------------------------------------------------------------
+
+
+def _actor(engine: Engine) -> int:
+    with engine.connect() as conn:
+        return conn.execute(text("SELECT min(id) FROM platform.app_user")).scalar_one()
+
+
+def _save(
+    engine: Engine,
+    *,
+    import_id: int,
+    row: int,
+    field: str,
+    value: Any,
+    expected: Any,
+) -> Any:
+    with engine.begin() as conn:
+        return save_override(
+            conn,
+            import_id=import_id,
+            source_row_number=row,
+            field=EDITABLE_BY_NAME[field],
+            value=value,
+            expected=expected,
+            actor_app_user_id=_actor(engine),
+        )
+
+
+def test_save_then_list_reports_an_applied_edit(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+
+    outcome = _save(
+        client.engine,
+        import_id=import_id,
+        row=row,
+        field="estado_resumido",
+        value="Aprobado",
+        expected="En tramite",
+    )
+
+    assert outcome.changed and outcome.override_id is not None
+    with client.engine.connect() as conn:
+        records = list_overrides(conn, import_id=import_id)
+    assert [(r.field, r.status, r.source_row_number) for r in records] == [
+        ("estado_resumido", "aplicada", row)
+    ]
+    assert records[0].web == ("Aprobado", None)
+    assert records[0].planilla_at_edit == ("En tramite", None)
+    assert records[0].created_by_display_name == "transelec-operator"
+
+
+def test_save_refuses_a_stale_version_and_a_changed_value(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+
+    with pytest.raises(VersionChangedError):
+        _save(
+            client.engine,
+            import_id=import_id + 1000,
+            row=row,
+            field="estado",
+            value="x",
+            expected="En evaluacion",
+        )
+    with pytest.raises(ValueChangedError):
+        _save(
+            client.engine,
+            import_id=import_id,
+            row=row,
+            field="estado",
+            value="x",
+            expected="Otro valor",
+        )
+
+
+def test_resave_supersedes_and_returning_to_the_planilla_discards(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+
+    _save(
+        client.engine,
+        import_id=import_id,
+        row=row,
+        field="estado",
+        value="A",
+        expected="En evaluacion",
+    )
+    _save(client.engine, import_id=import_id, row=row, field="estado", value="B", expected="A")
+    back = _save(
+        client.engine,
+        import_id=import_id,
+        row=row,
+        field="estado",
+        value="En evaluacion",
+        expected="B",
+    )
+    same = _save(
+        client.engine,
+        import_id=import_id,
+        row=row,
+        field="estado",
+        value="En evaluacion",
+        expected="En evaluacion",
+    )
+
+    assert back.override_id is None and back.changed
+    assert not same.changed
+    with client.engine.connect() as conn:
+        history = conn.execute(
+            text(
+                "SELECT value_text, end_reason FROM platform.transelec_field_override "
+                "WHERE field = 'estado' ORDER BY id"
+            )
+        ).all()
+    assert [tuple(item) for item in history] == [("A", "superseded"), ("B", "discarded")]
+    assert _row(client, "MP001", 0)["web_fields"] == []
+
+
+def test_field_without_a_source_column_is_refused(client: TestClient, tmp_path: Path) -> None:
+    """The test builders write the earlier layout, which has no «…2» columns."""
+
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+
+    with pytest.raises(FieldNotInSourceError):
+        _save(
+            client.engine,
+            import_id=import_id,
+            row=row,
+            field="numero_ingreso_2",
+            value="ING-9",
+            expected=None,
+        )
+
+
+def test_activation_retires_incorporated_edits_and_flags_conflicts(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    first = _publish(client, _workbook(tmp_path, "v1.xlsx"))
+    row_a = _row(client, "MP001", 0)["source_row_number"]
+    row_b = _row(client, "MP001", 1)["source_row_number"]
+    _save(
+        client.engine,
+        import_id=first,
+        row=row_a,
+        field="estado_resumido",
+        value="Aprobado",
+        expected="En tramite",
+    )
+    _save(
+        client.engine,
+        import_id=first,
+        row=row_b,
+        field="estado_resumido",
+        value="Aprobado",
+        expected="En tramite",
+    )
+
+    # v2: row A now says what the web said (incorporated); row B changed to
+    # something else (conflict); MP002 is gone (orphan is covered in Task 5).
+    rows = [dict(item) for item in _BASE_ROWS]
+    rows[0]["estado_resumido"] = "Aprobado"
+    rows[1]["estado_resumido"] = "Desistido"
+    second = _publish(client, _workbook(tmp_path, "v2.xlsx", rows))
+
+    with client.engine.connect() as conn:
+        records = list_overrides(conn, import_id=second)
+        ended = (
+            conn.execute(
+                text(
+                    "SELECT end_reason FROM platform.transelec_field_override "
+                    "WHERE ended_at IS NOT NULL"
+                )
+            )
+            .scalars()
+            .all()
+        )
+        audit = conn.execute(
+            text(
+                "SELECT metadata FROM platform.audit_event "
+                "WHERE event_type = 'import.published' ORDER BY id DESC LIMIT 1"
+            )
+        ).scalar_one()
+    assert ended == ["incorporated"]
+    assert [(r.source_row_number, r.status) for r in records] == [(row_b, "en_conflicto")]
+    assert records[0].planilla_now == ("Desistido", None)
+    assert audit["incorporated_overrides"] == 1
+    assert _row(client, "MP001", 1)["estado_resumido"] == "Desistido"  # the planilla wins
+
+    with client.engine.begin() as conn:
+        keep_override(conn, override_id=records[0].id, actor_app_user_id=_actor(client.engine))
+    assert _row(client, "MP001", 1)["estado_resumido"] == "Aprobado"
+    with client.engine.begin() as conn, pytest.raises(NotInConflictError):
+        current = list_overrides(conn, import_id=second)[0]
+        keep_override(conn, override_id=current.id, actor_app_user_id=_actor(client.engine))
+
+
+def test_date_edit_over_raw_text_stores_only_the_text_side(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """MP002's date cell holds raw text; the edit sets a real date, and the
+    planilla side records the text only, so a republish of the same text
+    still matches (``aplicada``)."""
+
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    row = _row(client, "MP002", 0)["source_row_number"]
+
+    outcome = _save(
+        client.engine,
+        import_id=import_id,
+        row=row,
+        field="fecha_ingreso",
+        value=dt.date(2026, 2, 3),
+        expected=None,
+    )
+
+    assert outcome.changed and outcome.override_id is not None
+    with client.engine.connect() as conn:
+        stored = conn.execute(
+            text(
+                "SELECT value_text, value_date, planilla_value_text, planilla_value_date "
+                "FROM platform.transelec_field_override WHERE id = :id"
+            ),
+            {"id": outcome.override_id},
+        ).one()
+        records = list_overrides(conn, import_id=import_id)
+    assert tuple(stored) == (
+        None,
+        dt.date(2026, 2, 3),
+        "2 de enero de 2026 y 3 de febrero de 2026",
+        None,
+    )
+    assert [r.status for r in records] == ["aplicada"]
+
+
+def test_a_v1_import_has_no_second_ingreso_columns() -> None:
+    """V1 (no mapping report) carried the 30 legacy columns: refuse the «…2» pair."""
+
+    from app.transelec_overrides import source_fields
+
+    present = set(source_fields("transelec-resumen-v1", None))
+    assert {"numero_ingreso", "fecha_ingreso"} <= present
+    assert not {"numero_ingreso_2", "fecha_ingreso_2"} & present

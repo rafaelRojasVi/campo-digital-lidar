@@ -53,6 +53,7 @@ from app.deps import ensure_can, get_current_app_user, get_db_connection, get_ob
 from app.object_store import ObjectStore, ObjectStoreError
 from app.routers.ingestion import UploadResponse
 from app.routers.ingestion import upload as generic_upload
+from app.transelec_overrides import retire_incorporated_overrides, source_fields
 from app.transelec_publication import (
     TRANSELEC_PRODUCT_KEY,
     ActivationEventType,
@@ -102,7 +103,7 @@ from transelec_ingestion.plazo_conaf import (
 from transelec_ingestion.resumen_layout import AEF_TRACKING_FIELDS, PmfFieldValue
 from transelec_ingestion.status_rollups import RolledRow, estado_resumido_first_row
 from transelec_ingestion.summary_view import SummaryInputRow, build_summary
-from transelec_ingestion.xlsx_contract import RESUMEN_COLUMNS, TranselecWorkbookError
+from transelec_ingestion.xlsx_contract import TranselecWorkbookError
 
 logger = logging.getLogger(__name__)
 
@@ -504,6 +505,12 @@ def _activate(
                 actor_user_id=user.id,
                 event_type=event_type,
             )
+            # Edits the newly active planilla already carries retire in the
+            # same transaction; otherwise a later change in the planilla would
+            # read as a conflict (spec §2). Audit carries the count only.
+            incorporated = retire_incorporated_overrides(
+                activation, import_id=import_id, actor_app_user_id=user.id
+            )
             record_audit_event(
                 activation,
                 actor_app_user_id=user.id,
@@ -515,6 +522,7 @@ def _activate(
                     "event_type": event_type,
                     "previous_import_id": result.previous_import_id,
                     "publish_event_id": result.publish_event_id,
+                    "incorporated_overrides": incorporated,
                     **(extra_audit_metadata or {}),
                 },
             )
@@ -2121,11 +2129,7 @@ def _source_fields(
     present. A V2 import states its mapped fields in its report.
     """
 
-    if mapping_report is None:
-        if schema_contract_version == "transelec-resumen-v1":
-            return [name for _, name in RESUMEN_COLUMNS]
-        return []
-    return [entry["field"] for entry in mapping_report.get("fields", []) if entry.get("column")]
+    return source_fields(schema_contract_version, mapping_report)
 
 
 @router.get(
