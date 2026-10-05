@@ -68,8 +68,12 @@ export function stateLabel(
     case 'huerfana':
       return 'sin fila en la versión activa'
     case 'incorporada':
-    case 'incorporated':
+      // In force, and the active planilla already holds the web value: true now.
       return 'ya está en la planilla'
+    case 'incorporated':
+      // Ended when a published planilla took the value in. Past tense: after
+      // a restore of an older version the active planilla may not have it.
+      return 'se incorporó a la planilla'
     case 'superseded':
       return 'reemplazada por una edición posterior'
     case 'discarded':

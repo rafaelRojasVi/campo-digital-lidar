@@ -36,7 +36,7 @@ describe('state labels', () => {
     ['en_conflicto', null, 'en conflicto: la planilla cambió', false],
     ['huerfana', null, 'sin fila en la versión activa', false],
     ['incorporada', null, 'ya está en la planilla', true],
-    ['incorporated', 'Ana', 'ya está en la planilla', true],
+    ['incorporated', 'Ana', 'se incorporó a la planilla', true],
     ['superseded', 'Ana', 'reemplazada por una edición posterior', true],
     ['discarded', 'Ana', 'revertida al valor de la planilla · Ana', true],
     ['kept', 'Luis', 'conservada al resolver un conflicto · Luis', true],
