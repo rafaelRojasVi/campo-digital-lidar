@@ -257,6 +257,16 @@ export function RowDetailDrawer({
   const [editState, setEditState] = useState<EditState>('idle')
   const [pendingRow, setPendingRow] = useState<ResumenRow | null>(null)
   const switchTrigger = useRef<HTMLElement | null>(null)
+  // The «Ver la fila N» button that was clicked is gone once its row is the
+  // current one; focus goes to the new row's provenance instead, which says
+  // which row is now open and keeps the keyboard inside the panel.
+  const provenanceRef = useRef<HTMLSpanElement>(null)
+  const focusAfterSwitch = useRef(false)
+  useEffect(() => {
+    if (!focusAfterSwitch.current) return
+    focusAfterSwitch.current = false
+    provenanceRef.current?.focus()
+  }, [current.source_row_number])
 
   // A different row chosen behind the panel replaces the one shown here.
   // Adjusted during render rather than in an effect, so the panel never
@@ -368,6 +378,7 @@ export function RowDetailDrawer({
   const chooseRow = (entry: ResumenRow) => {
     if (editState === 'saving') return
     if (editState === 'idle') {
+      focusAfterSwitch.current = true
       setCurrent(entry)
       return
     }
@@ -418,7 +429,12 @@ export function RowDetailDrawer({
       headerExtra={
         <div className="drawer-meta">
           <StatusPill value={current.estado_resumido} />
-          <span className="provenance" data-testid="drawer-provenance">
+          <span
+            className="provenance"
+            data-testid="drawer-provenance"
+            ref={provenanceRef}
+            tabIndex={-1}
+          >
             Fila de origen {formatInteger(current.source_row_number)} de la hoja «Resumen»
           </span>
         </div>
@@ -650,6 +666,7 @@ export function RowDetailDrawer({
           tone="danger"
           onConfirm={() => {
             setEditState('idle')
+            focusAfterSwitch.current = true
             setCurrent(pendingRow)
             setPendingRow(null)
           }}

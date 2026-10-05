@@ -773,6 +773,23 @@ describe("RowDetailDrawer — editing first, and switching rows (indicator spec 
     expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
   });
 
+  it("moves focus to the new row's provenance after a switch, so the keyboard stays in the drawer", async () => {
+    render(
+      <RowDetailDrawer row={tracked} onClose={() => {}} canEdit activeImportId={7} />,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Ver la fila 3" }));
+    expect(screen.getByTestId("drawer-provenance")).toHaveFocus();
+    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
+
+    // And after confirming that an unsaved change may go.
+    await userEvent.click(await screen.findByRole("button", { name: "Ver la fila 2" }));
+    await typeInEstado(" nuevo");
+    await userEvent.click(screen.getByRole("button", { name: "Ver la fila 3" }));
+    await userEvent.click(screen.getByRole("button", { name: "Descartar el cambio" }));
+    expect(screen.getByTestId("drawer-provenance")).toHaveFocus();
+    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
+  });
+
   it("holds row switches while a save is in flight, then lets the save land here", async () => {
     let finish!: (value: ReturnType<typeof saved>) => void;
     vi.mocked(saveOverride).mockReturnValue(
