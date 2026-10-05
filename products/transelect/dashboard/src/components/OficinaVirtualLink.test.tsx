@@ -25,6 +25,32 @@ describe("OficinaVirtualLink keyboard and click isolation", () => {
     expect(onRowClick).not.toHaveBeenCalled();
   });
 
+  it("opens CONAF's result for a plain N.º, with the number already entered", () => {
+    render(<OficinaVirtualLink numero=" 123456 " />);
+    expect(screen.getByTestId("oficina-virtual-link")).toHaveAttribute(
+      "href",
+      "https://oficinavirtual.conaf.cl/consultas/action.php?nsolicitud=123456",
+    );
+  });
+
+  it("opens the empty consulta page for a planilla-style N.º CONAF cannot answer", () => {
+    // CONAF answers «No fue posible realizar su consulta» to «n/n-n/n».
+    render(<OficinaVirtualLink numero="12/34-5/26" />);
+    expect(screen.getByTestId("oficina-virtual-link")).toHaveAttribute(
+      "href",
+      "https://oficinavirtual.conaf.cl/consultas/index.php",
+    );
+    expect(screen.getByTestId("oficina-virtual-copy")).toBeInTheDocument();
+  });
+
+  it("opens CONAF's empty consulta page without an N.º", () => {
+    render(<OficinaVirtualLink numero={null} />);
+    expect(screen.getByTestId("oficina-virtual-link")).toHaveAttribute(
+      "href",
+      "https://oficinavirtual.conaf.cl/consultas/index.php",
+    );
+  });
+
   it("offers no copy button without an N.º", () => {
     render(<OficinaVirtualLink numero={null} />);
     expect(screen.queryByTestId("oficina-virtual-copy")).toBeNull();

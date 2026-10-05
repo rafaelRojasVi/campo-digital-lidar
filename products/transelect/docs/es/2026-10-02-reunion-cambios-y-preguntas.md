@@ -151,6 +151,13 @@ Decidido:
 - **Oficina Virtual (pregunta 8, en parte).** La consulta de CONAF es un
   formulario con el campo «N.º de solicitud». No existe un enlace directo
   por número, así que el panel abrirá la página y permitirá copiar el número.
+  *Actualización 05-10-2026:* la página de resultados de CONAF también acepta
+  el número en la dirección (`action.php?nsolicitud=…`). El panel abre el
+  resultado con el número ya ingresado cuando es un número simple
+  («123456»). Con un número de la forma `n/n-n/n`, CONAF responde «No fue
+  posible realizar su consulta en este momento», también desde su
+  formulario, así que para esos el panel abre la consulta vacía y permite
+  copiar el número. Ver la pregunta 13.
 
 Siguen abiertas las preguntas 2 a 4, 6, 7, 10 y 11. En la pregunta 2, además
 de 0 y 1 aparece el valor 2.
