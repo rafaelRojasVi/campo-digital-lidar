@@ -1,8 +1,10 @@
 # Transelec: show which values were edited on the web, and their history
 
-Date: 2026-10-05. Status: implemented on `feat/transelec-edits-indicator`
+Date: 2026-10-05. Status: implemented in PR #91
 ([plan](../plans/2026-10-05-transelec-web-edits-indicator.md), whose
-"Deviations" section lists the calls made while building it). Design
+"Deviations" section lists the calls made while building it), deployed
+2026-10-05 as Railway deployment `20c79b8c`
+([deployment record](../../../products/transelect/docs/deployment.md)). Design
 approved by Rafael in chat and revised the same day after three reviews
 (backend, frontend, UI and accessibility).
 Follows [web edits and the «web» download](2026-10-04-transelec-web-edits-xlsx-design.md)

@@ -3,9 +3,15 @@
 ## Status
 
 Implemented 2026-09-30 on branch `feat/rodales-upload-review-publish` (from
-`main` at `f1b3ebb`, which includes [Rodales hosted release V1](hosted-release-v1.md)).
-**Not merged, not deployed, and no Rodales version was published on any
-hosted system.** Migration `0010` is part of this change.
+`main` at `f1b3ebb`, which includes [Rodales hosted release V1](hosted-release-v1.md))
+and merged the same day (PR #69). Migration `0010` is part of this change.
+
+- **FACT (2026-10-05):** deployed. Production's database is at `0012`
+  (Transelec `deployment.md`), past `0010`, and production serves the same
+  Rodales bundle as `main` at `f984e18`, with these pages.
+- **FACT (production dump of 2026-10-04 13:30 UTC):** no Rodales version
+  has been uploaded or published, and no one can yet: nobody holds a
+  `forestry` grant (see the hosted release's status).
 
 ## What it does
 

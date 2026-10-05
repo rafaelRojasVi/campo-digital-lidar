@@ -3,9 +3,32 @@
 ## Status
 
 Implemented 2026-09-29 on branch `feat/rodales-hosted-v1` (from `main` at
-`c19fe1b`). **Not merged, not deployed, and no snapshot has been imported
-into the hosted database.** This document is the runbook for doing those
-three things, in that order, when Rafael decides to.
+`c19fe1b`) and merged the same day (PR #67). This document is the runbook
+for deploying it, importing the snapshot and granting the first admin, in
+that order.
+
+- **FACT (2026-10-05, checked from outside):** step 1 is done. Production
+  answers `200` on `/rodales/`, with a bundle identical to one built from
+  `main` at `f984e18`, and `401` on `/api/forestry/snapshots` signed out.
+- **FACT (production dump of 2026-10-04 13:30 UTC):** steps 2 and 3 are
+  not. Every `forestry` table is empty and no account holds a `forestry`
+  grant, so the front door shows no Rodales card to anyone.
+- **FACT (2026-10-05, the Railway variable and the same dump):**
+  `PLATFORM_BOOTSTRAP_ADMINS` names a `forestry` address that is not the
+  email Javier Guerra's Google account signs in with. The match is exact
+  (`maybe_grant_configured_product_admins`), so his sign-ins never granted
+  anything. Against the restored dump, locally: the configured value grants
+  nothing; his sign-in address grants `forestry` ADMIN, and the Rodales card
+  and the «Sin versión publicada» page appear.
+- **DECISION (2026-10-05):** set the variable to his sign-in address
+  (step 3). **RESULT (2026-10-05 12:30 UTC):** Rafael set it. Railway
+  redeployed the same commit as deployment `96946275` (`SUCCESS`, pre-deploy
+  ran no upgrade, the app started, which also validates the value, and
+  `/ready` answers `200`). The grant is created at his next sign-in; whether
+  that happened is not recorded here. Once he holds the grant,
+  the snapshot can also be loaded with «Cargar versión»
+  ([Upload, review, publish V1](upload-review-publish-v1.md), deployed)
+  instead of the import script in step 2.
 
 It is step 3 of the
 [unified platform design](../../../docs/superpowers/specs/2026-09-28-unified-platform-design.md),
