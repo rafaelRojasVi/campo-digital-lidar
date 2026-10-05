@@ -110,13 +110,38 @@ export function overrideFor(
   )
 }
 
+/** Spacing as the server compares it: NBSP is a space, runs collapse, ends trim. */
+function spaced(value: string): string {
+  return value.replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' ')
+}
+
+/** Two spellings of one value share this key: case, accents and spacing ignored. */
+export function suggestionKey(value: string): string {
+  return spaced(value).normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('es')
+}
+
+/**
+ * One suggestion per value of `field` in `rows`, ignoring case, accents and
+ * spacing (indicator spec §10): each group shows the spelling the rows use
+ * most, ties going to the first in Spanish order. Picking one writes it as
+ * shown; typing any other value is still allowed, and the server's own
+ * comparison rules are unchanged.
+ */
 export function suggestionsFrom(rows: readonly ResumenRow[], field: EditableFieldName): string[] {
-  const values = new Set<string>()
+  const groups = new Map<string, Map<string, number>>()
   for (const row of rows) {
-    const value = row[field]
-    if (value && value.trim()) values.add(value.trim())
+    const spelling = spaced(row[field] ?? '')
+    if (!spelling) continue
+    const key = suggestionKey(spelling)
+    const counts = groups.get(key) ?? new Map<string, number>()
+    counts.set(spelling, (counts.get(spelling) ?? 0) + 1)
+    groups.set(key, counts)
   }
-  return [...values].sort((a, b) => a.localeCompare(b, 'es'))
+  const byUseThenOrder = ([a, uses]: [string, number], [b, other]: [string, number]) =>
+    other - uses || a.localeCompare(b, 'es')
+  return [...groups.values()]
+    .map((counts) => [...counts.entries()].sort(byUseThenOrder)[0][0])
+    .sort((a, b) => a.localeCompare(b, 'es'))
 }
 
 let suggestionCache: { importId: number; values: Partial<Record<EditableFieldName, string[]>> } | null =
