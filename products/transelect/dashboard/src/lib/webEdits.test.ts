@@ -9,6 +9,7 @@ import {
   overrideFor,
   specFor,
   suggestionsFrom,
+  webFieldsDescription,
   webTooltip,
 } from './webEdits'
 
@@ -87,5 +88,17 @@ describe('web edit helpers', () => {
     })
     expect(canEdit(grant('operator'))).toBe(true)
     expect(canEdit(grant('viewer'))).toBe(false)
+  })
+})
+
+describe('webFieldsDescription', () => {
+  it('names the edited fields, joined with «y»', () => {
+    expect(webFieldsDescription(['numero_ingreso_2'])).toBe('N.º ingreso 2 editado en la web')
+    expect(webFieldsDescription(['reingreso_tec', 'reingreso_legal'])).toBe(
+      'Reingreso técnico y Reingreso legal editados en la web',
+    )
+    expect(webFieldsDescription(['fecha_ingreso', 'fecha_ingreso_2', 'fecha_90_dias'])).toBe(
+      'Fecha ingreso, Fecha ingreso 2 y 90 días editados en la web',
+    )
   })
 })

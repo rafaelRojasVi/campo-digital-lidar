@@ -5,7 +5,7 @@ import { EstadoTable } from './EstadoTable'
 import type { EstadoColumn } from '../lib/estadoColumns'
 import { plazoColumn } from '../lib/plazoColumn'
 import { indexPlazos } from '../lib/plazo'
-import { makeLifecycle, makePlazos } from '../test/factories'
+import { makeLifecycle, makeLifecycleRow, makePlazos } from '../test/factories'
 
 const rows = makeLifecycle().rows
 
@@ -134,5 +134,71 @@ describe('EstadoTable', () => {
   it('says so when the scope has no PMF', () => {
     render(<EstadoTable rows={[]} selectedRow={null} onOpen={() => {}} />)
     expect(screen.getByText('No hay PMF en el alcance seleccionado.')).toBeInTheDocument()
+  })
+})
+
+describe('EstadoTable — «web» marks (indicator spec §7)', () => {
+  const cellOf = (row: HTMLElement, col: string) =>
+    row.querySelector(`td[data-col="${col}"]`) as HTMLElement
+
+  it('marks each cell whose value was edited, naming the fields for screen readers', () => {
+    const edited = [
+      makeLifecycleRow({ source_row_number: 1, pmf: 'MP001', web_fields: ['numero_ingreso_2'] }),
+      makeLifecycleRow({ source_row_number: 2, pmf: 'MP002', web_fields: ['estado_resumido'] }),
+      makeLifecycleRow({
+        source_row_number: 4,
+        pmf: 'MP004',
+        web_fields: ['reingreso_tec', 'reingreso_legal'],
+      }),
+      makeLifecycleRow({ source_row_number: 3, pmf: 'MP003', web_fields: [] }),
+    ]
+    render(<EstadoTable rows={edited} selectedRow={null} onOpen={() => {}} />)
+
+    const first = screen.getByTestId('estado-row-1')
+    expect(within(cellOf(first, 'ingresos')).getByTestId('web-chip')).toHaveTextContent(
+      'web, N.º ingreso 2 editado en la web',
+    )
+    expect(within(first).getAllByTestId('web-chip')).toHaveLength(1)
+
+    const second = screen.getByTestId('estado-row-2')
+    for (const col of ['grupo', 'paso']) {
+      expect(within(cellOf(second, col)).getByTestId('web-chip')).toHaveTextContent(
+        'Estado resumido editado en la web',
+      )
+    }
+    expect(
+      within(cellOf(screen.getByTestId('estado-row-4'), 'reingresos')).getByTestId('web-chip'),
+    ).toHaveTextContent('Reingreso técnico y Reingreso legal editados en la web')
+    expect(
+      within(screen.getByTestId('estado-row-3')).queryByTestId('web-chip'),
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId('estado-web-note')).toHaveTextContent(
+      'Los valores marcados «web» se editaron en el panel; la planilla publicada no cambió.',
+    )
+  })
+
+  it('marks the plazo cell for an edited date', () => {
+    render(
+      <EstadoTable
+        rows={[makeLifecycleRow({ source_row_number: 1, web_fields: ['fecha_90_dias'] })]}
+        selectedRow={null}
+        onOpen={() => {}}
+        extraColumns={[plazoColumn(new Map(), false)]}
+      />,
+    )
+    expect(
+      within(cellOf(screen.getByTestId('estado-row-1'), 'plazo')).getByTestId('web-chip'),
+    ).toHaveTextContent('90 días editado en la web')
+  })
+
+  it('shows no note when no line has an edited value', () => {
+    render(
+      <EstadoTable
+        rows={[makeLifecycleRow({ web_fields: [] })]}
+        selectedRow={null}
+        onOpen={() => {}}
+      />,
+    )
+    expect(screen.queryByTestId('estado-web-note')).not.toBeInTheDocument()
   })
 })

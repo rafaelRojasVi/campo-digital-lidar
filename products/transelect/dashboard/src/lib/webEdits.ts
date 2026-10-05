@@ -54,6 +54,22 @@ export function isWebField(row: Pick<ResumenRow, 'web_fields'>, field: EditableF
   return (row.web_fields ?? []).includes(field)
 }
 
+const FIELD_LIST = new Intl.ListFormat('es', { type: 'conjunction' })
+
+/** «N.º ingreso 2 editado en la web»; several fields joined with «y». */
+export function webFieldsDescription(fields: readonly EditableFieldName[]): string {
+  const labels = fields.map((field) => specFor(field).label)
+  return `${FIELD_LIST.format(labels)} ${labels.length === 1 ? 'editado' : 'editados'} en la web`
+}
+
+/** The fields among `fields` this row shows as edited on the web, in that order. */
+export function editedAmong(
+  row: Pick<ResumenRow, 'web_fields'>,
+  fields: readonly EditableFieldName[],
+): EditableFieldName[] {
+  return fields.filter((field) => isWebField(row, field))
+}
+
 export function displayValue(spec: EditableFieldSpec, value: string | null | undefined): string {
   if (value == null || value.trim() === '') return ''
   return spec.kind === 'date' ? formatDate(value) : value
