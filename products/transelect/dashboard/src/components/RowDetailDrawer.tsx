@@ -56,6 +56,7 @@ import { isWebField, loadSuggestions } from '../lib/webEdits'
 import { classifyFailure, type FailureView } from '../lib/apiState'
 import type { PlazoDetail } from '../lib/plazo'
 import { Drawer } from '../ui/Drawer'
+import { DrawerConfirm } from './DrawerConfirm'
 import { EditableFieldsSection } from './EditableFieldsSection'
 import { AlertBanner, LoadingBlock } from './StateViews'
 import { Fact } from './Fact'
@@ -251,6 +252,11 @@ export function RowDetailDrawer({
   const [overrides, setOverrides] = useState<TranselecOverride[]>([])
   const [overridesStatus, setOverridesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [suggestions, setSuggestions] = useState<Partial<Record<EditableFieldName, string[]>>>({})
+  // An open editor holding a change (reported by «Campos editables»): choosing
+  // another row asks before throwing it away.
+  const dirtyRef = useRef(false)
+  const [pendingRow, setPendingRow] = useState<ResumenRow | null>(null)
+  const switchTrigger = useRef<HTMLElement | null>(null)
 
   // A different row chosen behind the panel replaces the one shown here.
   // Adjusted during render rather than in an effect, so the panel never
@@ -359,6 +365,43 @@ export function RowDetailDrawer({
     firstRow.source_row_number !== current.source_row_number &&
     cell(detail.estado_resumido) !== cell(current.estado_resumido)
 
+  const chooseRow = (entry: ResumenRow) => {
+    if (!dirtyRef.current) {
+      setCurrent(entry)
+      return
+    }
+    switchTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    setPendingRow(entry)
+  }
+
+  // Keyed by row, so another row starts with no open editor and no stale
+  // «Se guardó el cambio». For editors it leads the panel; viewers keep it
+  // where it was, after Tramitación.
+  const editables = (canEdit || (current.web_fields ?? []).length > 0) && (
+    <EditableFieldsSection
+      key={current.source_row_number}
+      row={current}
+      activeImportId={activeImportId}
+      canEdit={canEdit}
+      sourceFields={sourceFields ?? null}
+      overrides={overrides}
+      overridesStatus={overridesStatus}
+      suggestions={suggestions}
+      onDirtyChange={(dirty) => {
+        dirtyRef.current = dirty
+      }}
+      onSaved={(updated) => {
+        // A save answers for the row its editor was opened on. If the reader
+        // has moved to another row since, the panel stays where it is.
+        if (updated.source_row_number === currentRowRef.current) setCurrent(updated)
+        setReloadToken((value) => value + 1)
+        onRowEdited?.(updated)
+      }}
+      onReload={() => setReloadToken((value) => value + 1)}
+      onRowEdited={() => setRefreshRow(true)}
+    />
+  )
+
   const where = [
     cell(current.predio_ref, 'Sin predio de reforestación informado'),
     current.rol ? `rol ${current.rol}` : null,
@@ -383,6 +426,8 @@ export function RowDetailDrawer({
       }
     >
       <div className="drawer-sections">
+        {canEdit && editables}
+
         {countedDifferently && (
           <p className="drawer-note" data-testid="drawer-counted-as">
             En las cifras del panel este PMF se cuenta como «{cell(detail?.estado_resumido, 'sin estado')}»,
@@ -425,24 +470,30 @@ export function RowDetailDrawer({
 
         <section className="drawer-section" aria-labelledby="drawer-tramitacion">
           <h3 id="drawer-tramitacion">Tramitación</h3>
+          {/* Editors read and change these in «Campos editables» above; the
+              same values twice pushed the editor ~1,100 px down. */}
           <dl className="facts">
-            <Fact label="Estado vigente" wide web={isWebField(current, 'estado')}>
-              {cell(current.estado, 'Sin información')}
-            </Fact>
-            <Fact label="Motivo" wide web={isWebField(current, 'tipo_rechazo')}>
-              {cell(current.tipo_rechazo, 'Sin motivo registrado')}
-            </Fact>
-            <Fact label="N.º ingreso" web={isWebField(current, 'numero_ingreso')}>
-              {cell(current.numero_ingreso, 'Sin ingreso')}
-              <OficinaVirtualLink
-                key={current.numero_ingreso ?? ''}
-                numero={current.numero_ingreso}
-                testId="drawer-ov-1"
-              />
-            </Fact>
-            <Fact label="Fecha ingreso" web={isWebField(current, 'fecha_ingreso')}>
-              <SourceDate row={current} field="fecha_ingreso" missing="Sin fecha" />
-            </Fact>
+            {!canEdit && (
+              <>
+                <Fact label="Estado vigente" wide web={isWebField(current, 'estado')}>
+                  {cell(current.estado, 'Sin información')}
+                </Fact>
+                <Fact label="Motivo" wide web={isWebField(current, 'tipo_rechazo')}>
+                  {cell(current.tipo_rechazo, 'Sin motivo registrado')}
+                </Fact>
+                <Fact label="N.º ingreso" web={isWebField(current, 'numero_ingreso')}>
+                  {cell(current.numero_ingreso, 'Sin ingreso')}
+                  <OficinaVirtualLink
+                    key={current.numero_ingreso ?? ''}
+                    numero={current.numero_ingreso}
+                    testId="drawer-ov-1"
+                  />
+                </Fact>
+                <Fact label="Fecha ingreso" web={isWebField(current, 'fecha_ingreso')}>
+                  <SourceDate row={current} field="fecha_ingreso" missing="Sin fecha" />
+                </Fact>
+              </>
+            )}
             {sourceHasIngreso2 === false ? (
               <Fact label="Segundo ingreso" wide>
                 <span className="hint" data-testid="drawer-ingreso-2-absent">
@@ -451,53 +502,40 @@ export function RowDetailDrawer({
                 </span>
               </Fact>
             ) : (
-              <>
-                <Fact label="N.º ingreso 2" web={isWebField(current, 'numero_ingreso_2')}>
-                  <span data-testid="drawer-numero-ingreso-2">
-                    {cell(current.numero_ingreso_2, 'Sin segundo ingreso')}
-                  </span>
-                  {current.numero_ingreso_2 && (
-                    <OficinaVirtualLink
-                      key={current.numero_ingreso_2}
-                      numero={current.numero_ingreso_2}
-                      testId="drawer-ov-2"
-                    />
-                  )}
-                </Fact>
-                <Fact label="Fecha ingreso 2" web={isWebField(current, 'fecha_ingreso_2')}>
-                  <span data-testid="drawer-fecha-ingreso-2">
-                    <SourceDate row={current} field="fecha_ingreso_2" missing="Sin fecha" />
-                  </span>
-                </Fact>
-              </>
+              !canEdit && (
+                <>
+                  <Fact label="N.º ingreso 2" web={isWebField(current, 'numero_ingreso_2')}>
+                    <span data-testid="drawer-numero-ingreso-2">
+                      {cell(current.numero_ingreso_2, 'Sin segundo ingreso')}
+                    </span>
+                    {current.numero_ingreso_2 && (
+                      <OficinaVirtualLink
+                        key={current.numero_ingreso_2}
+                        numero={current.numero_ingreso_2}
+                        testId="drawer-ov-2"
+                      />
+                    )}
+                  </Fact>
+                  <Fact label="Fecha ingreso 2" web={isWebField(current, 'fecha_ingreso_2')}>
+                    <span data-testid="drawer-fecha-ingreso-2">
+                      <SourceDate row={current} field="fecha_ingreso_2" missing="Sin fecha" />
+                    </span>
+                  </Fact>
+                </>
+              )
             )}
-            <Fact label="«90 dias» de la planilla" web={isWebField(current, 'fecha_90_dias')}>
-              <SourceDate row={current} field="fecha_90_dias" missing="Sin fecha" />
-            </Fact>
+            {!canEdit && (
+              <Fact label="«90 dias» de la planilla" web={isWebField(current, 'fecha_90_dias')}>
+                <SourceDate row={current} field="fecha_90_dias" missing="Sin fecha" />
+              </Fact>
+            )}
             <Fact label="PAS">{cell(current.pas, 'Sin información')}</Fact>
             <Fact label="Empresa">{cell(current.empresa, 'Sin información')}</Fact>
             <Fact label="Propietario">{cell(current.tipo_propietario, 'Sin información')}</Fact>
           </dl>
         </section>
 
-        {(canEdit || (current.web_fields ?? []).length > 0) && (
-          <EditableFieldsSection
-            row={current}
-            activeImportId={activeImportId}
-            canEdit={canEdit}
-            sourceFields={sourceFields ?? null}
-            overrides={overrides}
-            overridesStatus={overridesStatus}
-            suggestions={suggestions}
-            onSaved={(updated) => {
-              setCurrent(updated)
-              setReloadToken((value) => value + 1)
-              onRowEdited?.(updated)
-            }}
-            onReload={() => setReloadToken((value) => value + 1)}
-            onRowEdited={() => setRefreshRow(true)}
-          />
-        )}
+        {!canEdit && editables}
 
         {sourceHasAef !== false && (
           <PmfAefSection pmf={pmfAef} loading={pmfAefLoading} failed={pmfAefFailed} />
@@ -553,7 +591,7 @@ export function RowDetailDrawer({
                                 <button
                                   type="button"
                                   className="row-switch"
-                                  onClick={() => setCurrent(entry)}
+                                  onClick={() => chooseRow(entry)}
                                   aria-label={`Ver la fila ${entry.source_row_number}`}
                                 >
                                   {entry.source_row_number}
@@ -605,6 +643,27 @@ export function RowDetailDrawer({
           </dl>
         </section>
       </div>
+      {pendingRow && (
+        <DrawerConfirm
+          title="¿Descartar el cambio sin guardar?"
+          confirmLabel="Descartar el cambio"
+          tone="danger"
+          onConfirm={() => {
+            dirtyRef.current = false
+            setCurrent(pendingRow)
+            setPendingRow(null)
+          }}
+          onCancel={() => {
+            setPendingRow(null)
+            switchTrigger.current?.focus()
+          }}
+        >
+          <p>
+            Hay un cambio sin guardar en la fila {formatInteger(current.source_row_number)}. Si abre
+            la fila {formatInteger(pendingRow.source_row_number)}, ese cambio se pierde.
+          </p>
+        </DrawerConfirm>
+      )}
     </Drawer>
   )
 }

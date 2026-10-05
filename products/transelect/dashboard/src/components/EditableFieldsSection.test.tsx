@@ -71,7 +71,7 @@ describe('EditableFieldsSection', () => {
       expectedValue: 'En tramite',
     })
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ estado_resumido: 'Aprobado' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('Se guardó')
+    expect(await screen.findByTestId('editables-status')).toHaveTextContent('Se guardó')
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Editar Estado resumido' })).toHaveFocus(),
     )
@@ -250,7 +250,7 @@ describe('EditableFieldsSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
     await userEvent.clear(screen.getByLabelText('Nuevo valor de Estado vigente'))
     await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('Estado vigente se dejó vacío.')
+    expect(await screen.findByTestId('editables-status')).toHaveTextContent('Estado vigente se dejó vacío.')
   })
 
   it('tells the page to refresh the row after a revert and after Recargar', async () => {
@@ -397,5 +397,26 @@ describe('EditableFieldsSection — the shared edits log', () => {
     )
     await userEvent.click(screen.getByTestId('confirm-accept'))
     await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('EditableFieldsSection — unsaved changes', () => {
+  it('reports when the open editor holds a change, and when it no longer does', async () => {
+    const onDirtyChange = vi.fn()
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow({ estado: 'En evaluacion' })}
+        canEdit
+        onSaved={vi.fn()}
+        onDirtyChange={onDirtyChange}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false)
+    await userEvent.type(screen.getByLabelText('Nuevo valor de Estado vigente'), ' x')
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false)
   })
 })

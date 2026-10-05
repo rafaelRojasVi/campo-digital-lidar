@@ -14,7 +14,6 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { createPortal } from 'react-dom'
 import {
   type EditableFieldName,
   type OverrideConflictCode,
@@ -33,7 +32,8 @@ import {
   webTooltip,
 } from '../lib/webEdits'
 import { useWebEdits } from '../lib/webEditsState'
-import { ConfirmDialog } from './ConfirmDialog'
+import { DrawerConfirm } from './DrawerConfirm'
+import { OficinaVirtualLink } from './OficinaVirtualLink'
 import { SourceDate } from './SourceDate'
 import { AlertBanner } from './StateViews'
 import { WebChip } from './WebChip'
@@ -44,8 +44,6 @@ const RELOAD_COPY = {
   value_changed:
     'Otra persona cambió este valor mientras lo editaba. Recargue para ver el valor actual.',
 } as const
-
-const FOCUSABLE = 'button:not([disabled])'
 
 export function EditableFieldsSection({
   row,
@@ -58,6 +56,7 @@ export function EditableFieldsSection({
   onSaved,
   onReload,
   onRowEdited,
+  onDirtyChange,
 }: {
   row: ResumenRow
   activeImportId: number | null
@@ -72,6 +71,8 @@ export function EditableFieldsSection({
   onReload: () => void
   /** Called after a revert or reload so surfaces showing this row can refresh it. */
   onRowEdited?: () => void
+  /** Told whether an open editor holds a value different from the one it opened with. */
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const { refresh: refreshEdits } = useWebEdits()
   const [editing, setEditing] = useState<EditableFieldName | null>(null)
@@ -95,6 +96,12 @@ export function EditableFieldsSection({
   const setFocusTarget = (id: string) => {
     focusTarget.current = id
   }
+
+  // The drawer asks before a row switch would throw an unsaved change away.
+  const dirty = editing !== null && draft !== (seenValue ?? '')
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
 
   useEffect(() => {
     if (!focusTarget.current || editing !== null || reverting !== null) return
@@ -198,29 +205,6 @@ export function EditableFieldsSection({
     cancel(spec)
   }
 
-  const onDialogKeyDown = (event: KeyboardEvent<HTMLElement>, spec: EditableFieldSpec) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation()
-      event.preventDefault()
-      setReverting(null)
-      setFocusTarget(`revert-${spec.name}`)
-    } else if (event.key === 'Tab') {
-      // The drawer's own Tab containment does not know about this dialog.
-      const buttons = [...event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE)]
-      if (buttons.length === 0) return
-      event.stopPropagation()
-      const first = buttons[0]
-      const last = buttons[buttons.length - 1]
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-  }
-
   return (
     <section
       className="drawer-section"
@@ -319,6 +303,17 @@ export function EditableFieldsSection({
                       </span>
                       {web && <WebChip />}
                     </span>
+                    {/* For editors, Tramitación no longer repeats the N.º de
+                        ingreso, so its CONAF link and «Copiar N.º» live here. */}
+                    {canEdit &&
+                      (spec.name === 'numero_ingreso' ||
+                        (spec.name === 'numero_ingreso_2' && row.numero_ingreso_2)) && (
+                        <OficinaVirtualLink
+                          key={row[spec.name] ?? ''}
+                          numero={row[spec.name]}
+                          testId={spec.name === 'numero_ingreso' ? 'drawer-ov-1' : 'drawer-ov-2'}
+                        />
+                      )}
                     {web && (
                       <span className="editable-provenance" data-testid={`provenance-${spec.name}`}>
                         {override
@@ -379,30 +374,24 @@ export function EditableFieldsSection({
           )
         })}
       </dl>
-      {reverting &&
-        createPortal(
-          <div onKeyDown={(event) => onDialogKeyDown(event, reverting.spec)}>
-            <ConfirmDialog
-              title="Volver al valor de la planilla"
-              confirmLabel="Volver al valor de la planilla"
-              busy={busy}
-              onConfirm={() => void revert(reverting.override, reverting.spec)}
-              onCancel={() => {
-                setReverting(null)
-                setFocusTarget(`revert-${reverting.spec.name}`)
-              }}
-            >
-              <p>
-                {reverting.spec.label} volverá a «
-                {displayValue(reverting.spec, reverting.override.planilla_value_at_edit) ||
-                  '(vacía)'}
-                », el valor que tenía la planilla cuando se editó. Se pierde el valor puesto en la
-                web.
-              </p>
-            </ConfirmDialog>
-          </div>,
-          document.body,
-        )}
+      {reverting && (
+        <DrawerConfirm
+          title="Volver al valor de la planilla"
+          confirmLabel="Volver al valor de la planilla"
+          busy={busy}
+          onConfirm={() => void revert(reverting.override, reverting.spec)}
+          onCancel={() => {
+            setReverting(null)
+            setFocusTarget(`revert-${reverting.spec.name}`)
+          }}
+        >
+          <p>
+            {reverting.spec.label} volverá a «
+            {displayValue(reverting.spec, reverting.override.planilla_value_at_edit) || '(vacía)'}
+            », el valor que tenía la planilla cuando se editó. Se pierde el valor puesto en la web.
+          </p>
+        </DrawerConfirm>
+      )}
     </section>
   )
 }

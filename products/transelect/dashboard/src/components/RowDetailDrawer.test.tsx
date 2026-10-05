@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RowDetailDrawer } from "./RowDetailDrawer";
@@ -9,10 +9,11 @@ import type { AefPmf, AefPmfField, TranselecAef } from "../api";
 vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
   return { ...actual, getPmfDetail: vi.fn(), getAef: vi.fn(), listOverrides: vi.fn().mockResolvedValue({ ok: true, data: [] }),
-    discardOverride: vi.fn().mockResolvedValue({ ok: true, data: undefined }) };
+    discardOverride: vi.fn().mockResolvedValue({ ok: true, data: undefined }),
+    saveOverride: vi.fn() };
 });
 
-const { getPmfDetail, getAef, listOverrides } = await import("../api");
+const { getPmfDetail, getAef, listOverrides, saveOverride } = await import("../api");
 
 const tracked = makeRow({
   source_row_number: 2,
@@ -645,5 +646,154 @@ describe("RowDetailDrawer — web edits", () => {
     });
     await userEvent.click(screen.getByTestId("confirm-accept"));
     await waitFor(() => expect(onRowEdited).toHaveBeenCalledWith(expect.objectContaining({ estado: "Original" })));
+  });
+});
+
+describe("RowDetailDrawer — editing first, and switching rows (indicator spec §9)", () => {
+  const saved = (estado: string) => ({
+    ok: true as const,
+    data: {
+      override_id: 5,
+      changed: true,
+      row: { ...tracked, estado, web_fields: ["estado"] },
+    },
+  });
+
+  beforeEach(() => {
+    vi.mocked(getPmfDetail).mockReset();
+    vi.mocked(getAef).mockReset();
+    vi.mocked(saveOverride).mockReset();
+    vi.mocked(listOverrides).mockReset();
+    vi.mocked(listOverrides).mockResolvedValue({ ok: true, data: [] });
+    vi.mocked(getAef).mockResolvedValue({
+      ok: true,
+      data: { pmfs: [] } as unknown as TranselecAef,
+    });
+    vi.mocked(getPmfDetail).mockResolvedValue({
+      ok: true,
+      data: {
+        pmf: "BN001",
+        row_count: 2,
+        basis_estado_resumido: "estado_resumido_first_row",
+        estado_resumido: "En tramite",
+        rows: [tracked, untracked],
+      },
+    });
+  });
+
+  const tramitacion = () =>
+    screen.getByRole("heading", { name: "Tramitación" }).closest("section") as HTMLElement;
+
+  async function typeInEstado(text: string) {
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Editar Estado vigente" }),
+    );
+    if (text) await userEvent.type(screen.getByLabelText("Nuevo valor de Estado vigente"), text);
+  }
+
+  it("puts «Campos editables» first for editors and leaves Tramitación what is not editable", async () => {
+    render(
+      <RowDetailDrawer row={tracked} onClose={() => {}} canEdit activeImportId={7} />,
+    );
+    await screen.findByRole("button", { name: "Ver la fila 3" });
+    const headings = screen
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
+    expect(headings[0]).toBe("Campos editables");
+    expect(within(tramitacion()).queryByText("Estado vigente")).not.toBeInTheDocument();
+    expect(within(tramitacion()).queryByText("N.º ingreso")).not.toBeInTheDocument();
+    expect(within(tramitacion()).queryByText("Motivo")).not.toBeInTheDocument();
+    expect(within(tramitacion()).getByText("PAS")).toBeInTheDocument();
+    // The CONAF link and «Copiar N.º» moved with the N.º de ingreso.
+    expect(
+      within(screen.getByTestId("drawer-editables")).getByTestId("drawer-ov-1"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByTestId("drawer-ov-1")).toHaveLength(1);
+  });
+
+  it("changes nothing for viewers", async () => {
+    render(<RowDetailDrawer row={tracked} onClose={() => {}} />);
+    await screen.findByRole("button", { name: "Ver la fila 3" });
+    expect(within(tramitacion()).getByText("Estado vigente")).toBeInTheDocument();
+    expect(within(tramitacion()).getByTestId("drawer-ov-1")).toBeInTheDocument();
+  });
+
+  it("starts the editable fields fresh on another row", async () => {
+    vi.mocked(saveOverride).mockResolvedValue(saved("X"));
+    render(
+      <RowDetailDrawer row={tracked} onClose={() => {}} canEdit activeImportId={7} />,
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Editar Estado vigente" }),
+    );
+    await userEvent.clear(screen.getByLabelText("Nuevo valor de Estado vigente"));
+    await userEvent.type(screen.getByLabelText("Nuevo valor de Estado vigente"), "X");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    expect(await screen.findByText("Se guardó el cambio en Estado vigente.")).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Ver la fila 3" }));
+    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
+    expect(screen.getByTestId("editables-status")).toBeEmptyDOMElement();
+  });
+
+  it("asks before discarding an unsaved change when another row is chosen", async () => {
+    render(
+      <RowDetailDrawer row={tracked} onClose={() => {}} canEdit activeImportId={7} />,
+    );
+    await screen.findByRole("button", { name: "Ver la fila 3" });
+    await typeInEstado(" nuevo");
+    await userEvent.click(screen.getByRole("button", { name: "Ver la fila 3" }));
+
+    const dialog = screen.getByRole("dialog", { name: "¿Descartar el cambio sin guardar?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    expect(
+      screen.queryByRole("dialog", { name: "¿Descartar el cambio sin guardar?" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Nuevo valor de Estado vigente")).toHaveValue(
+      "En evaluacion nuevo",
+    );
+    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 2");
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver la fila 3" }));
+    await userEvent.click(screen.getByRole("button", { name: "Descartar el cambio" }));
+    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
+    expect(screen.queryByLabelText("Nuevo valor de Estado vigente")).not.toBeInTheDocument();
+  });
+
+  it("switches rows without asking when the open editor holds no change", async () => {
+    render(
+      <RowDetailDrawer row={tracked} onClose={() => {}} canEdit activeImportId={7} />,
+    );
+    await screen.findByRole("button", { name: "Ver la fila 3" });
+    await typeInEstado("");
+    await userEvent.click(screen.getByRole("button", { name: "Ver la fila 3" }));
+    expect(
+      screen.queryByRole("dialog", { name: "¿Descartar el cambio sin guardar?" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
+  });
+
+  it("a save that lands after a row switch does not switch back", async () => {
+    let finish!: (value: ReturnType<typeof saved>) => void;
+    vi.mocked(saveOverride).mockReturnValue(
+      new Promise((done) => {
+        finish = done;
+      }),
+    );
+    render(
+      <RowDetailDrawer row={tracked} onClose={() => {}} canEdit activeImportId={7} />,
+    );
+    await screen.findByRole("button", { name: "Ver la fila 3" });
+    await typeInEstado(" X");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ver la fila 3" }));
+    await userEvent.click(screen.getByRole("button", { name: "Descartar el cambio" }));
+    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
+
+    await act(async () => finish(saved("En evaluacion X")));
+    expect(saveOverride).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceRowNumber: 2, value: "En evaluacion X" }),
+    );
+    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
   });
 });
