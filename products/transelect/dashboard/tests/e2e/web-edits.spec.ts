@@ -56,11 +56,13 @@ function rowWith(edits: Override[], index = 1) {
 }
 
 /**
- * A stateful stand-in for the override routes: PUT stores the edit, DELETE
- * removes it, and the list, the PMF detail and the rows list all reflect it.
+ * A stateful stand-in for the override routes: PUT stores the edit, ending
+ * any earlier edit of the same cell as the server does; DELETE removes it;
+ * and the list, the PMF detail and the rows list all reflect it.
  */
 function statefulEdits(edits: Override[], saves: unknown[] = []): StubOptions {
-  let nextId = 31;
+  // Above any seeded edit, so ids stay unique as they are on the server.
+  let nextId = Math.max(30, ...edits.map((entry) => entry.id)) + 1;
   return {
     rowOverrides: (index) => {
       const { estado_resumido, web_fields } = rowWith(edits, index) as Record<
@@ -96,6 +98,12 @@ function statefulEdits(edits: Override[], saves: unknown[] = []): StubOptions {
             planilla_value_at_edit: body.expected_value,
             source_row_number: body.source_row_number,
           };
+          const same = edits.findIndex(
+            (other) =>
+              other.field === entry.field &&
+              other.source_row_number === entry.source_row_number,
+          );
+          if (same >= 0) edits.splice(same, 1);
           edits.push(entry);
           return fulfill(route, {
             override_id: entry.id,
@@ -517,9 +525,13 @@ test("the pill opens the log; Esc and an outside click close it, and focus retur
   await expect(log).toBeHidden();
 });
 
-test("a log entry opens the Explorador drawer on its row, and an edit there updates the pill", async ({
+test("a log entry opens the Explorador drawer on its row, and an edit there updates the log", async ({
   page,
 }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
   await stubPlatform(page, withHistory([{ ...BASE_OVERRIDE, id: 31 }]));
   await page.goto("/transelec");
   await page.getByRole("button", { name: "1 edición web" }).click();
@@ -530,21 +542,24 @@ test("a log entry opens the Explorador drawer on its row, and an edit there upda
   const drawer = page.getByTestId("row-drawer");
   await expect(drawer.getByTestId("drawer-provenance")).toContainText("Fila de origen 1");
 
-  // The stub's version has a column for «Estado resumido» only.
+  // The stub's version has a column for «Estado resumido» only. A second
+  // edit of the same cell replaces the first, as the server does.
   await drawer.getByRole("button", { name: "Editar Estado resumido" }).click();
   await drawer.getByLabel("Nuevo valor de Estado resumido").fill("Desistido");
   await drawer.getByRole("button", { name: "Guardar" }).click();
   await expect(drawer.getByTestId("editables-status")).toContainText(
     "Se guardó el cambio en Estado resumido.",
   );
-  await expect(page.getByTestId("edits-pill")).toHaveAttribute(
-    "aria-label",
-    "2 ediciones web",
-  );
 
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await expect(page).toHaveURL(/\/transelec\/explorador\?q=PMF-001$/);
+  const pill = page.getByRole("button", { name: "1 edición web" });
+  await pill.click();
+  const log = page.getByRole("dialog", { name: "Ediciones web" });
+  await expect(log.getByRole("listitem")).toHaveCount(1);
+  await expect(log.getByRole("listitem").first()).toContainText("Desistido");
+  expect(consoleErrors).toEqual([]);
 });
 
 test("a log entry whose row is gone says so instead of opening a drawer", async ({
