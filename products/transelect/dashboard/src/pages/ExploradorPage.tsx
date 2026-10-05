@@ -21,6 +21,7 @@ import {
   type TranselecRowsPage,
   type TranselecSummary,
   exportCsvUrl,
+  getPmfDetail,
   getSummary,
   listRows,
 } from '../api'
@@ -39,6 +40,7 @@ import { formatInteger } from '../format'
 import { activeFilterChips, activeFilterCount, withoutChip } from '../lib/filterUrl'
 import { collectAllRows, deriveFilterOptions } from '../lib/rowCollection'
 import { useReads, type FilterController } from '../lib/useFilters'
+import { ROUTES, useRouter } from '../router'
 import { Chip, Disclosure, SectionHeader, useDisclosure } from '../ui/Primitives'
 
 const DEFAULT_PAGE_SIZE = 25
@@ -109,6 +111,58 @@ export function ExploradorPage({
     setRowsMeta({ total: data.page.total_count, hasMore: data.page.has_more })
     setPageFailure(null)
   }, [data])
+
+  const { search, navigate } = useRouter()
+  const fila = new URLSearchParams(search).get('fila')
+  const [filaMissing, setFilaMissing] = useState(false)
+  const handledFila = useRef<string | null>(null)
+
+  /** The address without `fila`, every filter kept. */
+  const dropFila = useCallback(() => {
+    const params = new URLSearchParams(search)
+    if (!params.has('fila')) return
+    params.delete('fila')
+    const rest = params.toString()
+    navigate(`${ROUTES.explorador}${rest ? `?${rest}` : ''}`, { replace: true })
+  }, [search, navigate])
+
+  // A log entry links here with `?q=<pmf>&fila=<n>` (indicator spec §5): open
+  // that row's drawer once the filtered rows are in. A search for the PMF can
+  // match other PMFs too, so a row past the first page is found through the
+  // PMF's own detail instead.
+  useEffect(() => {
+    if (fila === null) {
+      handledFila.current = null
+      return
+    }
+    if (loading || !data || handledFila.current === fila) return
+    handledFila.current = fila
+    const target = /^\d+$/.test(fila) ? Number(fila) : null
+    const onPage = data.page.items.find((entry) => entry.source_row_number === target)
+    if (onPage) {
+      setFilaMissing(false)
+      setOpenRow(onPage)
+      return
+    }
+    void (async () => {
+      const detail = target !== null && filters.q ? await getPmfDetail(filters.q) : null
+      if (handledFila.current !== fila) return
+      const row = detail?.ok
+        ? detail.data.rows.find((entry) => entry.source_row_number === target)
+        : undefined
+      setFilaMissing(!row)
+      if (row) setOpenRow(row)
+      else dropFila()
+    })()
+  }, [fila, data, loading, filters.q, dropFila])
+
+  // The notice belongs to the link that brought the reader here; a new
+  // filter state is a new question.
+  const [noticeKey, setNoticeKey] = useState(key)
+  if (noticeKey !== key) {
+    setNoticeKey(key)
+    setFilaMissing(false)
+  }
 
   // Filter option lists come from the active version's full row set: the read
   // API exposes no distinct-values endpoint and this work does not change the
@@ -281,6 +335,12 @@ export function ExploradorPage({
           de filtros. Los filtros siguen aplicándose en el servidor sobre el total.
         </AlertBanner>
       )}
+      {filaMissing && (
+        <AlertBanner tone="warn" title="Fila no encontrada.">
+          {' '}
+          No se encontró esta fila en la versión activa.
+        </AlertBanner>
+      )}
       {pageFailure && (
         <AlertBanner title="No se pudo cargar esta página">{pageFailure}</AlertBanner>
       )}
@@ -333,7 +393,10 @@ export function ExploradorPage({
       {openRow && (
         <RowDetailDrawer
           row={openRow}
-          onClose={() => setOpenRow(null)}
+          onClose={() => {
+            setOpenRow(null)
+            dropFila()
+          }}
           sourceFields={sourceFields}
           canEdit={canEdit}
           activeImportId={activeImportId}
