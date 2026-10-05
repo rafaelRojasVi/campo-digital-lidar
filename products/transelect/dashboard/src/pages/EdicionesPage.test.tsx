@@ -1,7 +1,8 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TranselecOverride } from "../api";
+import type { TranselecEditHistory, TranselecOverride } from "../api";
+import { makeHistory, makeHistoryEntry } from "../test/factories";
 import { RouterProvider } from "../router";
 import { EdicionesPage } from "./EdicionesPage";
 import { WebEditsContext } from "../lib/webEditsState";
@@ -524,5 +525,68 @@ describe("EdicionesPage — the shared edits log", () => {
     );
     await userEvent.click(screen.getByTestId("confirm-accept"));
     await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("EdicionesPage — Historial", () => {
+  function renderWithHistory(
+    history: TranselecEditHistory | null,
+    status: "ready" | "error" | "loading" = "ready",
+  ) {
+    return render(
+      <RouterProvider initialPath="/transelec/ediciones">
+        <WebEditsContext.Provider
+          value={{ history, status, refresh: vi.fn(), openLog: vi.fn() }}
+        >
+          <EdicionesPage />
+        </WebEditsContext.Provider>
+      </RouterProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    vi.mocked(listOverrides).mockReset();
+    vi.mocked(listOverrides).mockResolvedValue({ ok: true, data: [] });
+  });
+
+  it("lists the latest edits under «Historial», in the log's format", async () => {
+    renderWithHistory(
+      makeHistory({
+        entries: [
+          makeHistoryEntry({
+            id: 3,
+            state: "discarded",
+            source_row_number: null,
+            ended_by_display_name: "Ana",
+          }),
+          makeHistoryEntry({ id: 2 }),
+        ],
+      }),
+    );
+    const section = await screen.findByTestId("edits-history");
+    expect(
+      within(section).getByRole("heading", { name: "Historial" }),
+    ).toBeInTheDocument();
+    expect(section).toHaveTextContent("Últimas 50 ediciones");
+    expect(within(section).getByTestId("edit-log-3")).toHaveTextContent(
+      "revertida al valor de la planilla · Ana",
+    );
+    expect(within(section).getByTestId("edit-log-2")).toBeInTheDocument();
+  });
+
+  it("says when there is no history yet", async () => {
+    renderWithHistory(makeHistory({ in_force_count: 0, entries: [] }));
+    expect(
+      within(await screen.findByTestId("edits-history")).getByText(
+        "Todavía no hay ediciones web.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says when the history could not be loaded", async () => {
+    renderWithHistory(null, "error");
+    expect(
+      await screen.findByText("No se pudo cargar el historial de ediciones."),
+    ).toBeInTheDocument();
   });
 });

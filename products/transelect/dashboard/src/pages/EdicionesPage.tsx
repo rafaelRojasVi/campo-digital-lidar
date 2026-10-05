@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import {
+  EDIT_HISTORY_LIMIT,
   EMPTY_FILTERS,
   type ResumenRow,
   type TranselecOverride,
@@ -19,6 +20,7 @@ import {
   overrideConflictCode,
 } from "../api";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EditLogList } from "../components/EditLog";
 import { RowDetailDrawer } from "../components/RowDetailDrawer";
 import {
   AlertBanner,
@@ -68,7 +70,11 @@ export function EdicionesPage({
   activeImportId?: number | null;
   sourceFields?: readonly string[] | null;
 }) {
-  const { refresh: refreshEdits } = useWebEdits();
+  const {
+    history: editsHistory,
+    status: editsStatus,
+    refresh: refreshEdits,
+  } = useWebEdits();
   const [overrides, setOverrides] = useState<TranselecOverride[] | null>(null);
   const [failure, setFailure] = useState<FailureView | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -372,6 +378,25 @@ export function EdicionesPage({
               </tbody>
             </table>
           </div>
+        )}
+      </section>
+
+      <section aria-labelledby="historial-title" data-testid="edits-history">
+        <SectionHeader
+          id="historial-title"
+          title="Historial"
+          meta={`Últimas ${EDIT_HISTORY_LIMIT} ediciones, de la más reciente a la más antigua, incluidas las reemplazadas y las revertidas.`}
+        />
+        {editsHistory ? (
+          editsHistory.entries.length === 0 ? (
+            <div className="empty">Todavía no hay ediciones web.</div>
+          ) : (
+            <EditLogList entries={editsHistory.entries} />
+          )
+        ) : editsStatus === "error" ? (
+          <p className="hint">No se pudo cargar el historial de ediciones.</p>
+        ) : (
+          <LoadingBlock label="Cargando el historial…" lines={2} />
         )}
       </section>
 
