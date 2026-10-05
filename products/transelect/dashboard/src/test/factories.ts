@@ -12,6 +12,8 @@ import type {
   PlazoPmf,
   ResumenRow,
   TranselecActiveImport,
+  TranselecEditHistory,
+  TranselecHistoryEntry,
   TranselecImportHistoryRow,
   TranselecLifecycle,
   TranselecOwnerStatus,
@@ -90,6 +92,7 @@ export function makeSummary(overrides: Partial<TranselecSummary> = {}): Transele
     calidad_pmf_sin_numero_ingreso: 2,
     calidad_numero_resolucion: 'No disponible',
     calidad_pmf_estado_resumido_conflictivo: [],
+    web_edited_pmf_count: 0,
     ...overrides,
   }
 }
@@ -381,4 +384,31 @@ export function makePlazos(overrides: Partial<TranselecPlazos> = {}): TranselecP
     ],
     ...overrides,
   }
+}
+
+export function makeHistoryEntry(
+  overrides: Partial<TranselecHistoryEntry> = {},
+): TranselecHistoryEntry {
+  return {
+    id: 41,
+    field: 'estado_resumido',
+    field_label: 'Estado resumido',
+    pmf: 'MP001',
+    rol: '101',
+    numero_predio: '1',
+    numero_area_corta: 'A1',
+    source_row_number: 7,
+    web_value: 'Aprobado',
+    planilla_value_at_edit: 'En tramite',
+    created_by_display_name: 'Dev Admin',
+    created_at: '2026-10-05T12:41:00+00:00',
+    state: 'aplicada',
+    ended_at: null,
+    ended_by_display_name: null,
+    ...overrides,
+  }
+}
+
+export function makeHistory(overrides: Partial<TranselecEditHistory> = {}): TranselecEditHistory {
+  return { in_force_count: 1, needs_review_count: 0, entries: [makeHistoryEntry()], ...overrides }
 }

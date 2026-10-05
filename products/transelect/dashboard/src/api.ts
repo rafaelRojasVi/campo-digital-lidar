@@ -139,6 +139,8 @@ export interface TranselecSummary {
   calidad_pmf_sin_numero_ingreso: number
   calidad_numero_resolucion: string
   calidad_pmf_estado_resumido_conflictivo: EstadoResumidoConflict[]
+  /** PMFs whose counted (first) row shows an edited «Estado resumido» or «Estado». */
+  web_edited_pmf_count: number
 }
 
 /**
@@ -1163,6 +1165,51 @@ export function keepOverride(id: number): Promise<ApiResult<{ override_id: numbe
   return request<{ override_id: number }>(`/api/transelec/overrides/${id}/keep`, {
     method: 'POST',
   })
+}
+
+/** Where an edit stands: its status against the active version while in force, or how it ended. */
+export type EditHistoryState =
+  | OverrideStatus
+  | 'superseded'
+  | 'discarded'
+  | 'kept'
+  | 'incorporated'
+
+export interface TranselecHistoryEntry {
+  id: number
+  field: EditableFieldName
+  field_label: string
+  pmf: string
+  rol: string | null
+  numero_predio: string | null
+  numero_area_corta: string | null
+  /** The active version's row while the edit is in force; null when it has none or ended. */
+  source_row_number: number | null
+  web_value: string | null
+  planilla_value_at_edit: string | null
+  created_by_display_name: string
+  created_at: string
+  state: EditHistoryState
+  ended_at: string | null
+  ended_by_display_name: string | null
+}
+
+export interface TranselecEditHistory {
+  /** Active edits the dashboard shows. */
+  in_force_count: number
+  /** Active edits in conflict with the planilla or without a row. */
+  needs_review_count: number
+  /** The latest edits, active or ended, newest first. */
+  entries: TranselecHistoryEntry[]
+}
+
+export const EDIT_HISTORY_LIMIT = 50
+
+/** The latest web edits, in force or ended (indicator spec §1); every signed-in role may read it. */
+export function getOverrideHistory(
+  limit: number = EDIT_HISTORY_LIMIT,
+): Promise<ApiResult<TranselecEditHistory>> {
+  return request<TranselecEditHistory>(`/api/transelec/overrides/history?limit=${limit}`)
 }
 
 /** The planilla with the applied edits marked «web». */
