@@ -12,7 +12,7 @@
  */
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { makeApiRow, stubPlatform, summaryFixture } from './stubs'
+import { lifecycleBody, makeApiRow, stubPlatform, summaryFixture } from './stubs'
 
 const ZERO_DEFECT_SUMMARY = summaryFixture()
 
@@ -285,14 +285,18 @@ test('Estado: the old Pendientes address lands on Estado with its filters', asyn
   ).toHaveAttribute('aria-current', 'page')
 })
 
-test('Estado: the Oficina Virtual opens CONAF in a new tab and the N.º can be copied', async ({
+test('Estado: the Oficina Virtual opens the N.º in CONAF in a new tab and the N.º can be copied', async ({
   page,
   context,
 }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await openEstado(page)
   const link = page.getByTestId('estado-ov-3-link')
-  await expect(link).toHaveAttribute('href', 'https://oficinavirtual.conaf.cl/consultas/index.php')
+  // The most recent ingreso, already entered: CONAF answers its consulta by GET too.
+  await expect(link).toHaveAttribute(
+    'href',
+    'https://oficinavirtual.conaf.cl/consultas/action.php?nsolicitud=30003',
+  )
   await expect(link).toHaveAttribute('target', '_blank')
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
 
@@ -300,8 +304,34 @@ test('Estado: the Oficina Virtual opens CONAF in a new tab and the N.º can be c
   // Copying inside a row must not open the drawer behind it.
   await expect(page.getByTestId('row-drawer')).toHaveCount(0)
   // The most recent ingreso is the one copied.
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('ING-3-R')
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('30003')
 })
+
+// Javier reads the whole row without scrolling sideways. Ingreso numbers as
+// long as the planilla's («456/789-1/26») and a second ingreso on every row.
+for (const width of [1024, 1280, 1366, 1440]) {
+  test(`Estado: the PMF table fits without scrolling sideways at ${width}px`, async ({ page }) => {
+    const base = lifecycleBody()
+    const body = {
+      ...base,
+      rows: base.rows.map((row) => ({
+        ...row,
+        numero_ingreso: row.numero_ingreso === null ? null : '456/789-1/26',
+        numero_ingreso_2: '4567/890-1/26',
+        tipo_rechazo: row.tipo_rechazo ?? 'Técnico',
+      })),
+    }
+    await page.route('**/api/transelec/lifecycle*', (route) =>
+      route.fulfill({ json: body }),
+    )
+    await page.setViewportSize({ width, height: 900 })
+    await openEstado(page)
+    const table = page.getByTestId('estado-table')
+    await expect(table.locator('tbody tr')).toHaveCount(6)
+    const overflow = await table.evaluate((wrap) => wrap.scrollWidth - wrap.clientWidth)
+    expect(overflow).toBe(0)
+  })
+}
 
 test('Resumen: the work-queue rows open the PMF detail', async ({ page }) => {
   await openResumen(page)

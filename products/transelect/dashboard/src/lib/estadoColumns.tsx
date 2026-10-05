@@ -68,7 +68,7 @@ export const ESTADO_COLUMNS: readonly EstadoColumn[] = [
   },
   {
     key: 'ingresos',
-    header: 'N.º ingreso (1 / 2)',
+    header: 'N.º ingreso (1\u00a0/\u00a02)',
     webFields: ['numero_ingreso', 'numero_ingreso_2'],
     render: (row) => `${cell(row.numero_ingreso, 'Sin ingreso')} / ${cell(row.numero_ingreso_2, '—')}`,
   },

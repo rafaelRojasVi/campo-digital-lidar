@@ -418,18 +418,21 @@ describe("RowDetailDrawer — Proceso CONAF (lifecycle_pmf_v1)", () => {
   it("has no Proceso CONAF block from elsewhere, but always links the Oficina Virtual", () => {
     render(
       <RowDetailDrawer
-        row={makeRow({ source_row_number: 3, pmf: "MP002", numero_ingreso: "ING-7" })}
+        row={makeRow({ source_row_number: 3, pmf: "MP002", numero_ingreso: "4417" })}
         onClose={() => {}}
       />,
     );
 
     expect(screen.queryByTestId("drawer-lifecycle")).toBeNull();
     const link = screen.getByTestId("drawer-ov-1-link");
-    expect(link).toHaveAttribute("href", "https://oficinavirtual.conaf.cl/consultas/index.php");
+    expect(link).toHaveAttribute(
+      "href",
+      "https://oficinavirtual.conaf.cl/consultas/action.php?nsolicitud=4417",
+    );
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(link).toHaveAccessibleName(/pestaña nueva/);
-    expect(screen.getByTestId("drawer-ov-1-copy")).toHaveAccessibleName("Copiar N.º ING-7");
+    expect(screen.getByTestId("drawer-ov-1-copy")).toHaveAccessibleName("Copiar N.º 4417");
   });
 
   it("copies the N.º and says so", async () => {

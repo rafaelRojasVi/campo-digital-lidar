@@ -237,7 +237,7 @@ export function lifecycleBody() {
       row(
         3,
         { lifecycle_group: 'en_tramite', lifecycle_step: 'en_recurso_reposicion' },
-        { estado: 'Recurso reposicion', numero_ingreso_2: 'ING-3-R' },
+        { estado: 'Recurso reposicion', numero_ingreso_2: '30003' },
       ),
       row(4, { lifecycle_group: 'en_tramite', lifecycle_step: 'sin_ingreso' }, { numero_ingreso: null }),
       row(5, { lifecycle_group: 'aprobado' }, { estado: 'Aprobado', estado_resumido: 'Aprobado' }),
