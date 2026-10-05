@@ -57,7 +57,7 @@ import { classifyFailure, type FailureView } from '../lib/apiState'
 import type { PlazoDetail } from '../lib/plazo'
 import { Drawer } from '../ui/Drawer'
 import { DrawerConfirm } from './DrawerConfirm'
-import { EditableFieldsSection } from './EditableFieldsSection'
+import { EditableFieldsSection, type EditState } from './EditableFieldsSection'
 import { AlertBanner, LoadingBlock } from './StateViews'
 import { Fact } from './Fact'
 import { OficinaVirtualLink } from './OficinaVirtualLink'
@@ -252,9 +252,9 @@ export function RowDetailDrawer({
   const [overrides, setOverrides] = useState<TranselecOverride[]>([])
   const [overridesStatus, setOverridesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [suggestions, setSuggestions] = useState<Partial<Record<EditableFieldName, string[]>>>({})
-  // An open editor holding a change (reported by «Campos editables»): choosing
-  // another row asks before throwing it away.
-  const dirtyRef = useRef(false)
+  // What «Campos editables» holds: an unsaved change makes a row switch ask
+  // first; a save in flight holds row switches until it answers.
+  const [editState, setEditState] = useState<EditState>('idle')
   const [pendingRow, setPendingRow] = useState<ResumenRow | null>(null)
   const switchTrigger = useRef<HTMLElement | null>(null)
 
@@ -366,7 +366,8 @@ export function RowDetailDrawer({
     cell(detail.estado_resumido) !== cell(current.estado_resumido)
 
   const chooseRow = (entry: ResumenRow) => {
-    if (!dirtyRef.current) {
+    if (editState === 'saving') return
+    if (editState === 'idle') {
       setCurrent(entry)
       return
     }
@@ -387,9 +388,7 @@ export function RowDetailDrawer({
       overrides={overrides}
       overridesStatus={overridesStatus}
       suggestions={suggestions}
-      onDirtyChange={(dirty) => {
-        dirtyRef.current = dirty
-      }}
+      onEditStateChange={setEditState}
       onSaved={(updated) => {
         // A save answers for the row its editor was opened on. If the reader
         // has moved to another row since, the panel stays where it is.
@@ -592,6 +591,7 @@ export function RowDetailDrawer({
                                   type="button"
                                   className="row-switch"
                                   onClick={() => chooseRow(entry)}
+                                  disabled={editState === 'saving'}
                                   aria-label={`Ver la fila ${entry.source_row_number}`}
                                 >
                                   {entry.source_row_number}
@@ -649,7 +649,7 @@ export function RowDetailDrawer({
           confirmLabel="Descartar el cambio"
           tone="danger"
           onConfirm={() => {
-            dirtyRef.current = false
+            setEditState('idle')
             setCurrent(pendingRow)
             setPendingRow(null)
           }}

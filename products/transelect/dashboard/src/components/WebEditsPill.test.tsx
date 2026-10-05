@@ -26,6 +26,7 @@ describe('the «ediciones web» pill', () => {
     expect(pill).toHaveAttribute('aria-haspopup', 'dialog')
     expect(pill).toHaveAttribute('aria-controls', 'edit-log')
     expect(pill).toHaveAttribute('aria-expanded', 'false')
+    expect(pill).toHaveAttribute('title', '5 ediciones web · 2 por revisar')
     expect(pill.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
     expect(pill).not.toHaveTextContent('✎')
   })

@@ -2486,3 +2486,8 @@ export function suggestionsFrom(rows: readonly ResumenRow[], field: EditableFiel
 - **`products/transelect/docs/deployment.md` is not changed:** it records what production served on a date; the history route goes into the next deploy record.
 - **Two existing `EditableFieldsSection` tests read the section's status by test id:** editors now get the CONAF link in the section, which has its own `role="status"`.
 - **The e2e edit in «a log entry opens the Explorador drawer…» uses «Estado resumido»:** the stub's active version has a column for no other editable field.
+
+## Deviations from the spec (decided after the final review)
+
+- **The pill shows the pencil and the numbers at every width («✎ 5 · 2»)**, not «5 ediciones web · 2 por revisar» above 1023 px (spec §4). Measured on 2026-10-05 in the dev and production builds: with the words the bar overflowed by 111–148 px at 1280 px and 25–62 px at 1366 px, pushing «Proyectos»/«Cerrar sesión» off-screen, and even at the bar's 1440 px maximum the user's name gave way entirely. Numbers only, nothing overflows at 1024–1600 px with two-digit counts. The full text is the pill's accessible name and tooltip, and the log's heading spells it out.
+- **A save in flight holds row switches** («Ver la fila N» is disabled until it answers) instead of being offered as an unsaved change to discard, so its result or error is seen on the row it was made on.

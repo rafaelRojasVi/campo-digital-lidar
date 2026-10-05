@@ -38,6 +38,13 @@ import { SourceDate } from './SourceDate'
 import { AlertBanner } from './StateViews'
 import { WebChip } from './WebChip'
 
+/**
+ * What the open editor holds, for the drawer around it: `unsaved` asks
+ * before a row switch throws the change away; `saving` holds the switch
+ * until the answer arrives, so its result (or error) is seen on this row.
+ */
+export type EditState = 'idle' | 'unsaved' | 'saving'
+
 const RELOAD_COPY = {
   version_changed:
     'Se publicó otra versión de la planilla mientras editaba. Recargue para ver la versión activa.',
@@ -56,7 +63,7 @@ export function EditableFieldsSection({
   onSaved,
   onReload,
   onRowEdited,
-  onDirtyChange,
+  onEditStateChange,
 }: {
   row: ResumenRow
   activeImportId: number | null
@@ -71,8 +78,8 @@ export function EditableFieldsSection({
   onReload: () => void
   /** Called after a revert or reload so surfaces showing this row can refresh it. */
   onRowEdited?: () => void
-  /** Told whether an open editor holds a value different from the one it opened with. */
-  onDirtyChange?: (dirty: boolean) => void
+  /** Told what the open editor holds whenever that changes (see `EditState`). */
+  onEditStateChange?: (state: EditState) => void
 }) {
   const { refresh: refreshEdits } = useWebEdits()
   const [editing, setEditing] = useState<EditableFieldName | null>(null)
@@ -97,11 +104,14 @@ export function EditableFieldsSection({
     focusTarget.current = id
   }
 
-  // The drawer asks before a row switch would throw an unsaved change away.
-  const dirty = editing !== null && draft !== (seenValue ?? '')
+  const editState: EditState = busy
+    ? 'saving'
+    : editing !== null && draft !== (seenValue ?? '')
+      ? 'unsaved'
+      : 'idle'
   useEffect(() => {
-    onDirtyChange?.(dirty)
-  }, [dirty, onDirtyChange])
+    onEditStateChange?.(editState)
+  }, [editState, onEditStateChange])
 
   useEffect(() => {
     if (!focusTarget.current || editing !== null || reverting !== null) return

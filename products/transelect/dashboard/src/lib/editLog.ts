@@ -20,7 +20,7 @@ export const EDIT_LOG_ID = 'edit-log'
 /** How many entries the popover shows; Ediciones web shows every loaded one. */
 export const LOG_PREVIEW_COUNT = 8
 
-export function editsWord(count: number): string {
+function editsWord(count: number): string {
   return count === 1 ? 'edición web' : 'ediciones web'
 }
 

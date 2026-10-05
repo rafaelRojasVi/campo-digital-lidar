@@ -773,7 +773,7 @@ describe("RowDetailDrawer — editing first, and switching rows (indicator spec 
     expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
   });
 
-  it("a save that lands after a row switch does not switch back", async () => {
+  it("holds row switches while a save is in flight, then lets the save land here", async () => {
     let finish!: (value: ReturnType<typeof saved>) => void;
     vi.mocked(saveOverride).mockReturnValue(
       new Promise((done) => {
@@ -786,14 +786,21 @@ describe("RowDetailDrawer — editing first, and switching rows (indicator spec 
     await screen.findByRole("button", { name: "Ver la fila 3" });
     await typeInEstado(" X");
     await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
-    await userEvent.click(screen.getByRole("button", { name: "Ver la fila 3" }));
-    await userEvent.click(screen.getByRole("button", { name: "Descartar el cambio" }));
-    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
+
+    // Not «unsaved»: it is being saved. The switch waits for the answer.
+    const other = screen.getByRole("button", { name: "Ver la fila 3" });
+    expect(other).toBeDisabled();
+    await userEvent.click(other);
+    expect(
+      screen.queryByRole("dialog", { name: "¿Descartar el cambio sin guardar?" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 2");
 
     await act(async () => finish(saved("En evaluacion X")));
     expect(saveOverride).toHaveBeenCalledWith(
       expect.objectContaining({ sourceRowNumber: 2, value: "En evaluacion X" }),
     );
-    expect(screen.getByTestId("drawer-provenance")).toHaveTextContent("Fila de origen 3");
+    expect(await screen.findByText("Se guardó el cambio en Estado vigente.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ver la fila 3" })).toBeEnabled();
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TranselecOverride } from '../api'
@@ -401,22 +401,50 @@ describe('EditableFieldsSection — the shared edits log', () => {
 })
 
 describe('EditableFieldsSection — unsaved changes', () => {
-  it('reports when the open editor holds a change, and when it no longer does', async () => {
-    const onDirtyChange = vi.fn()
+  it('reports an open editor holding a change, a save in flight, and neither', async () => {
+    let finish!: (value: unknown) => void
+    vi.mocked(saveOverride).mockReturnValue(
+      new Promise((done) => {
+        finish = done
+      }) as never,
+    )
+    const onEditStateChange = vi.fn()
+    const row = makeRow({ estado: 'En evaluacion' })
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={row}
+        canEdit
+        onSaved={vi.fn()}
+        onEditStateChange={onEditStateChange}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+    expect(onEditStateChange).toHaveBeenLastCalledWith('idle')
+    await userEvent.type(screen.getByLabelText('Nuevo valor de Estado vigente'), ' x')
+    expect(onEditStateChange).toHaveBeenLastCalledWith('unsaved')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(onEditStateChange).toHaveBeenLastCalledWith('saving')
+    await act(async () =>
+      finish({ ok: true, data: { override_id: 1, changed: true, row } }),
+    )
+    expect(onEditStateChange).toHaveBeenLastCalledWith('idle')
+  })
+
+  it('reports an unsaved change as gone after Cancelar', async () => {
+    const onEditStateChange = vi.fn()
     render(
       <EditableFieldsSection
         {...base}
         row={makeRow({ estado: 'En evaluacion' })}
         canEdit
         onSaved={vi.fn()}
-        onDirtyChange={onDirtyChange}
+        onEditStateChange={onEditStateChange}
       />,
     )
     await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
-    expect(onDirtyChange).toHaveBeenLastCalledWith(false)
     await userEvent.type(screen.getByLabelText('Nuevo valor de Estado vigente'), ' x')
-    expect(onDirtyChange).toHaveBeenLastCalledWith(true)
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
-    expect(onDirtyChange).toHaveBeenLastCalledWith(false)
+    expect(onEditStateChange).toHaveBeenLastCalledWith('idle')
   })
 })

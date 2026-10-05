@@ -8,9 +8,16 @@
  * puts it under the pill (components.css), with a fixed place under the bar
  * where that is unsupported. The pill is not a live region: its numbers
  * change only after the reader's own edits or a tab refocus.
+ *
+ * On screen it is the pencil and the numbers only («✎ 5 · 2»), at every
+ * width: measured on 2026-10-05, the words never fit beside the version
+ * stamp, the name and the session control — the bar overflowed by up to
+ * 148 px at 1280 px, and even at the bar's 1440 px maximum the name gave way
+ * entirely. The full text is the pill's accessible name and its tooltip, and
+ * the log's heading says it again in words.
  */
 import { useEffect, useRef, useState } from 'react'
-import { EDIT_LOG_ID, editsWord, pillLabel, pillVisible } from '../lib/editLog'
+import { EDIT_LOG_ID, pillLabel, pillVisible } from '../lib/editLog'
 import { useWebEdits } from '../lib/webEditsState'
 import { EditLogBody } from './EditLog'
 
@@ -62,6 +69,8 @@ export function WebEditsPill({ canEdit }: { canEdit: boolean }) {
 
   if (!visible) return null
 
+  const label = pillLabel(history)
+
   const close = () => {
     const log = logRef.current
     if (log && typeof log.hidePopover === 'function' && log.matches(':popover-open')) {
@@ -79,17 +88,14 @@ export function WebEditsPill({ canEdit }: { canEdit: boolean }) {
         aria-haspopup="dialog"
         aria-controls={EDIT_LOG_ID}
         aria-expanded={open}
-        aria-label={pillLabel(history)}
+        aria-label={label}
+        title={label}
         data-testid="edits-pill"
       >
         <PencilIcon />
         <span>{history.in_force_count}</span>
-        <span className="edits-pill-words">{editsWord(history.in_force_count)}</span>
         {history.needs_review_count > 0 && (
-          <span className="edits-pill-review">
-            · {history.needs_review_count}
-            <span className="edits-pill-words"> por revisar</span>
-          </span>
+          <span className="edits-pill-review">· {history.needs_review_count}</span>
         )}
       </button>
       <div

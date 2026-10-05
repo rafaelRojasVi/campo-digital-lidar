@@ -481,38 +481,69 @@ test.describe('the shell bar with the «ediciones web» pill', () => {
     entries: Array.from({ length: 10 }, (_, index) => entry(index + 1)),
   }
 
-  for (const width of [1280, 1366, 1440]) {
-    test(`nothing overlaps at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 800 })
-      await stubPlatform(page, { history: HISTORY })
-      await page.goto('/transelec')
-      await expect(page.getByTestId('kpi-row')).toBeVisible()
-      const pill = page.getByTestId('edits-pill')
-      await expect(pill).toBeVisible()
+  // Found by the final review (2026-10-05): with «5 ediciones web · 2 por
+  // revisar» the bar overflowed by up to 148 px at 1280 and 1366 px, pushing
+  // the session control off-screen and the name to nothing. The bar stops
+  // growing at --page-max (1440 px), so 1600 stands for every wider screen.
+  const COUNTS = [
+    [5, 2],
+    [12, 3],
+  ] as const
+  for (const [inForce, toReview] of COUNTS) {
+    for (const width of [1024, 1280, 1366, 1440, 1600]) {
+      test(`with ${inForce}/${toReview} edits nothing overflows at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 })
+        await stubPlatform(page, {
+          history: { ...HISTORY, in_force_count: inForce, needs_review_count: toReview },
+        })
+        await page.goto('/transelec')
+        await expect(page.getByTestId('kpi-row')).toBeVisible()
+        const pill = page.getByTestId('edits-pill')
+        await expect(pill).toBeVisible()
 
-      const links = nav(page).getByRole('link')
-      const last = await links.nth((await links.count()) - 1).boundingBox()
-      const side = await page.locator('.shell-side').boundingBox()
-      const chip = await page.locator('.version-chip').boundingBox()
-      const box = await pill.boundingBox()
-      if (!last || !side || !chip || !box) throw new Error(`bar not measured at ${width}px`)
-      expect(last.x + last.width).toBeLessThanOrEqual(side.x)
-      expect(chip.x + chip.width, 'pill drawn over the version chip').toBeLessThanOrEqual(box.x)
-      expect(box.x + box.width).toBeLessThanOrEqual(width)
-      const clipped = await page
-        .locator('.version-chip')
-        .evaluate((element) => element.scrollWidth > element.clientWidth)
-      expect(clipped, `version chip clipped at ${width}px`).toBe(false)
-    })
+        const bar = await page.evaluate(() => {
+          const doc = document.documentElement
+          const side = document.querySelector('.shell-side') as HTMLElement
+          const controls = [...side.children].map((element) => element.getBoundingClientRect())
+          const links = [...document.querySelectorAll('#secciones a')].map((element) =>
+            element.getBoundingClientRect(),
+          )
+          const visibleLinks = links.filter((rect) => rect.width > 0)
+          return {
+            pageOverflow: doc.scrollWidth - doc.clientWidth,
+            lastControlRight: Math.max(...controls.map((rect) => rect.right)),
+            sideLeft: side.getBoundingClientRect().left,
+            lastLinkRight: visibleLinks.length
+              ? Math.max(...visibleLinks.map((rect) => rect.right))
+              : null,
+          }
+        })
+        expect(bar.pageOverflow, 'the page scrolls sideways').toBe(0)
+        expect(bar.lastControlRight, 'a control past the screen edge').toBeLessThanOrEqual(width)
+        if (bar.lastLinkRight !== null) {
+          expect(bar.lastLinkRight, 'a section under the shell side').toBeLessThanOrEqual(
+            bar.sideLeft,
+          )
+        }
+        const chip = await page.locator('.version-chip').boundingBox()
+        const box = await pill.boundingBox()
+        if (!chip || !box) throw new Error(`bar not measured at ${width}px`)
+        expect(chip.x + chip.width, 'pill drawn over the version chip').toBeLessThanOrEqual(box.x)
+        const clipped = await page
+          .locator('.version-chip')
+          .evaluate((element) => element.scrollWidth > element.clientWidth)
+        expect(clipped, `version chip clipped at ${width}px`).toBe(false)
+      })
+    }
   }
 
-  test('at 1023px the pill keeps its numbers and still names itself in full', async ({ page }) => {
-    await page.setViewportSize({ width: 1023, height: 800 })
+  test('the pill shows its numbers and names itself in full, on hover too', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 800 })
     await stubPlatform(page, { history: HISTORY })
     await page.goto('/transelec')
     const pill = page.getByTestId('edits-pill')
-    await expect(pill).toBeVisible()
     await expect(pill).toHaveAccessibleName('5 ediciones web · 2 por revisar')
+    await expect(pill).toHaveAttribute('title', '5 ediciones web · 2 por revisar')
     expect((await pill.innerText()).replace(/\s+/g, ' ').trim()).toBe('5 · 2')
   })
 

@@ -174,9 +174,9 @@
 
 /* ------------------------------------------------- web edits: pill and log */
 
-/* The header's «N ediciones web» pill (indicator spec §4). The «web» chip's
-   yellow: 6.65:1 text on its fill, and the fill stands well clear of the
-   green bar. The words carry the meaning; colour repeats them. */
+/* The header's edits pill (indicator spec §4): the pencil and the numbers,
+   in the «web» chip's yellow (6.65:1 text on its fill, well clear of the
+   green bar). Its accessible name and tooltip carry the words. */
 .edits-pill {
   anchor-name: --edit-log;
   display: inline-flex;
@@ -1671,11 +1671,6 @@ a.edit-log-target:hover {
 @media (max-width: 1023px) {
   .identity,
   .version-chip span {
-    display: none;
-  }
-
-  /* The pill keeps its pencil and numbers; its accessible name keeps the words. */
-  .edits-pill-words {
     display: none;
   }
 
