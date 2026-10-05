@@ -39,6 +39,11 @@ Container packaging: **built and locally verified** (this document).
   `campo-entrypoint` line and `/ready` `200` probes, the deployment list
   shows it `SUCCESS` with `4b99fdf5` `REMOVED`, and `/health` and `/ready`
   answer `200`.
+- **FACT (2026-10-05 12:30 UTC):** a variable change
+  (`PLATFORM_BOOTSTRAP_ADMINS`, see Rodales
+  [hosted release](../../forestry/docs/hosted-release-v1.md)) redeployed the
+  same `f984e18` as Railway deployment `96946275`: `SUCCESS` in about 30 s,
+  pre-deploy ran no upgrade, `/health` and `/ready` answer `200`.
 - Railway auto-deploy is off, so deploys are manual. Since 2026-09-28 the
   service deploys from `main`.
 - **DECISION (2026-09-28):** no backups. The Hobby plan has no scheduled

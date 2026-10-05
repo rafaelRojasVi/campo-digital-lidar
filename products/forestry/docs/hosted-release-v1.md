@@ -21,7 +21,11 @@ that order.
   nothing; his sign-in address grants `forestry` ADMIN, and the Rodales card
   and the «Sin versión publicada» page appear.
 - **DECISION (2026-10-05):** set the variable to his sign-in address
-  (step 3). Not yet applied when this was written. Once he holds the grant,
+  (step 3). **RESULT (2026-10-05 12:30 UTC):** Rafael set it. Railway
+  redeployed the same commit as deployment `96946275` (`SUCCESS`, pre-deploy
+  ran no upgrade, the app started, which also validates the value, and
+  `/ready` answers `200`). The grant is created at his next sign-in; whether
+  that happened is not recorded here. Once he holds the grant,
   the snapshot can also be loaded with «Cargar versión»
   ([Upload, review, publish V1](upload-review-publish-v1.md), deployed)
   instead of the import script in step 2.
