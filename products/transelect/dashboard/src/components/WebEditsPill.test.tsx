@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { TranselecEditHistory } from '../api'
 import { WebEditsContext } from '../lib/webEditsState'
@@ -154,5 +154,48 @@ describe('the edits log', () => {
       screen.queryByRole('link', { name: /Ediciones web/, hidden: true }),
     ).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Descargar/, hidden: true })).not.toBeInTheDocument()
+  })
+})
+
+describe('the pill while its log is open', () => {
+  function toggle(newState: 'open' | 'closed') {
+    const event = Object.assign(new Event('toggle'), { newState, oldState: newState === 'open' ? 'closed' : 'open' })
+    act(() => {
+      screen.getByTestId('edit-log').dispatchEvent(event)
+    })
+  }
+
+  function view(history: TranselecEditHistory | null) {
+    return (
+      <RouterProvider initialPath={ROUTES.resumen}>
+        <WebEditsContext.Provider
+          value={{ history, status: history ? 'ready' : 'error', refresh: vi.fn(), openLog: vi.fn() }}
+        >
+          <WebEditsPill canEdit />
+        </WebEditsContext.Provider>
+      </RouterProvider>
+    )
+  }
+
+  it('stays, with the last entries, if a refresh empties it while the log is open', () => {
+    const { rerender } = render(view(makeHistory({ in_force_count: 2 })))
+    toggle('open')
+    expect(screen.getByTestId('edits-pill')).toHaveAttribute('aria-expanded', 'true')
+
+    rerender(view(makeHistory({ in_force_count: 0, needs_review_count: 0, entries: [] })))
+    expect(screen.getByTestId('edit-log')).toBeInTheDocument()
+    expect(screen.getByTestId('edits-pill')).toHaveAttribute('aria-label', '2 ediciones web')
+
+    toggle('closed')
+    expect(screen.queryByTestId('edits-pill')).not.toBeInTheDocument()
+  })
+
+  it('comes back closed after it went away', () => {
+    const { rerender } = render(view(makeHistory({ in_force_count: 2 })))
+    toggle('open')
+    toggle('closed')
+    rerender(view(null))
+    rerender(view(makeHistory({ in_force_count: 3 })))
+    expect(screen.getByTestId('edits-pill')).toHaveAttribute('aria-expanded', 'false')
   })
 })

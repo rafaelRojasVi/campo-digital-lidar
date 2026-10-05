@@ -17,6 +17,7 @@
  * the log's heading says it again in words.
  */
 import { useEffect, useRef, useState } from 'react'
+import type { TranselecEditHistory } from '../api'
 import { EDIT_LOG_ID, pillLabel, pillVisible } from '../lib/editLog'
 import { useWebEdits } from '../lib/webEditsState'
 import { EditLogBody } from './EditLog'
@@ -44,11 +45,18 @@ function PencilIcon() {
 
 export function WebEditsPill({ canEdit }: { canEdit: boolean }) {
   const { history } = useWebEdits()
-  const visible = pillVisible(history)
   const pillRef = useRef<HTMLButtonElement>(null)
   const logRef = useRef<HTMLDivElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const [open, setOpen] = useState(false)
+  // A refresh that empties the history (a tab refocus finding nothing in
+  // force, or an error) must not pull the log out from under its reader:
+  // that strands focus and leaves «expanded» on a closed control. While the
+  // log is open it keeps what it was showing; the pill goes once it closes.
+  const [held, setHeld] = useState<TranselecEditHistory | null>(null)
+  if (pillVisible(history) && held !== history) setHeld(history)
+  const shown = pillVisible(history) ? history : open ? held : null
+  const visible = shown !== null
 
   useEffect(() => {
     const log = logRef.current
@@ -67,9 +75,9 @@ export function WebEditsPill({ canEdit }: { canEdit: boolean }) {
     return () => log.removeEventListener('toggle', onToggle)
   }, [visible])
 
-  if (!visible) return null
+  if (!shown) return null
 
-  const label = pillLabel(history)
+  const label = pillLabel(shown)
 
   const close = () => {
     const log = logRef.current
@@ -93,9 +101,9 @@ export function WebEditsPill({ canEdit }: { canEdit: boolean }) {
         data-testid="edits-pill"
       >
         <PencilIcon />
-        <span>{history.in_force_count}</span>
-        {history.needs_review_count > 0 && (
-          <span className="edits-pill-review">· {history.needs_review_count}</span>
+        <span>{shown.in_force_count}</span>
+        {shown.needs_review_count > 0 && (
+          <span className="edits-pill-review">· {shown.needs_review_count}</span>
         )}
       </button>
       <div
@@ -108,7 +116,7 @@ export function WebEditsPill({ canEdit }: { canEdit: boolean }) {
         data-testid="edit-log"
       >
         <EditLogBody
-          history={history}
+          history={shown}
           canEdit={canEdit}
           headingRef={headingRef}
           onNavigate={close}
