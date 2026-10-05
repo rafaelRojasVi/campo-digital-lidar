@@ -119,8 +119,9 @@ export function EditableFieldsSection({
     focusTarget.current = null
   })
 
-  const editable = (spec: EditableFieldSpec) =>
-    canEdit && activeImportId !== null && (sourceFields === null || sourceFields.includes(spec.name))
+  const inSource = (spec: EditableFieldSpec) =>
+    sourceFields === null || sourceFields.includes(spec.name)
+  const editable = (spec: EditableFieldSpec) => canEdit && activeImportId !== null && inSource(spec)
 
   const start = (spec: EditableFieldSpec) => {
     setEditing(spec.name)
@@ -301,7 +302,10 @@ export function EditableFieldsSection({
                   <>
                     <span className="editable-value">
                       <span>
-                        {spec.kind === 'date' ? (
+                        {!inSource(spec) && !web ? (
+                          // Not «Sin dato»: the cell is not empty, the column is absent.
+                          <span className="hint">La planilla publicada no tiene esta columna.</span>
+                        ) : spec.kind === 'date' ? (
                           <SourceDate
                             row={row}
                             field={spec.name as 'fecha_ingreso'}

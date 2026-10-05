@@ -448,3 +448,39 @@ describe('EditableFieldsSection — unsaved changes', () => {
     expect(onEditStateChange).toHaveBeenLastCalledWith('idle')
   })
 })
+
+describe('EditableFieldsSection — a field the planilla has no column for', () => {
+  it('says the column is missing instead of «Sin dato»', () => {
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow({ numero_ingreso_2: null, fecha_ingreso_2: null })}
+        canEdit
+        sourceFields={['estado', 'estado_resumido', 'tipo_rechazo', 'numero_ingreso', 'fecha_ingreso']}
+        onSaved={vi.fn()}
+      />,
+    )
+    for (const field of ['numero_ingreso_2', 'fecha_ingreso_2']) {
+      const row = screen.getByTestId(`editable-${field}`)
+      expect(row).toHaveTextContent('La planilla publicada no tiene esta columna.')
+      expect(row).not.toHaveTextContent('Sin dato')
+    }
+    // A field the planilla has, but empty, still reads «Sin dato».
+    expect(screen.getByTestId('editable-tipo_rechazo')).toHaveTextContent('Sin dato')
+  })
+
+  it('still shows a web value for it, with its chip', () => {
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow({ numero_ingreso_2: 'ING-9', web_fields: ['numero_ingreso_2'] })}
+        canEdit={false}
+        sourceFields={['estado']}
+        onSaved={vi.fn()}
+      />,
+    )
+    const row = screen.getByTestId('editable-numero_ingreso_2')
+    expect(row).toHaveTextContent('ING-9')
+    expect(row).not.toHaveTextContent('no tiene esta columna')
+  })
+})
