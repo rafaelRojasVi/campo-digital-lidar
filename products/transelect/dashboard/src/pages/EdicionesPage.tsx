@@ -13,7 +13,6 @@ import {
   type ResumenRow,
   type TranselecOverride,
   discardOverride,
-  downloadOverridesXlsx,
   keepOverride,
   listOverrides,
   listRows,
@@ -35,6 +34,11 @@ import {
   specFor,
 } from "../lib/webEdits";
 import { useWebEdits } from "../lib/webEditsState";
+import {
+  DOWNLOAD_BUSY,
+  DOWNLOAD_LABEL,
+  useXlsxDownload,
+} from "../lib/xlsxDownload";
 import { SectionHeader } from "../ui/Primitives";
 
 const ORDER: Record<TranselecOverride["status"], number> = {
@@ -52,22 +56,6 @@ const CONFLICT_COPY = {
   not_in_conflict:
     "Esta edición ya no está en conflicto. La lista se actualizó.",
 } as const;
-
-const DOWNLOAD_BUSY = "Preparando la planilla…";
-const DOWNLOAD_SERVER_ERROR =
-  "La plataforma no pudo preparar la planilla. Intente de nuevo; si se repite, contacte a soporte.";
-
-/** 403 and a bare 5xx get fixed Spanish copy; 404/409/422 keep the server's own detail. */
-function downloadErrorCopy(result: {
-  status: number;
-  error: string;
-  payload?: unknown;
-}): string {
-  if (result.status === 403) return classifyFailure(result).message;
-  if (result.status >= 500 && result.payload === undefined)
-    return DOWNLOAD_SERVER_ERROR;
-  return result.error;
-}
 
 function plural(count: number, one: string, many: string): string {
   return `${formatInteger(count)} ${count === 1 ? one : many}`;
@@ -89,8 +77,11 @@ export function EdicionesPage({
   const [confirming, setConfirming] = useState<TranselecOverride | null>(null);
   const [openRow, setOpenRow] = useState<ResumenRow | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const {
+    downloading,
+    error: downloadError,
+    download,
+  } = useXlsxDownload();
 
   useEffect(() => {
     let cancelled = false;
@@ -147,31 +138,6 @@ export function EdicionesPage({
     },
     [reload, refreshEdits],
   );
-
-  const download = useCallback(async () => {
-    // aria-disabled, not disabled: the button keeps keyboard focus while busy.
-    if (downloading) return;
-    setDownloading(true);
-    setDownloadError(null);
-    setStatus(DOWNLOAD_BUSY);
-    const result = await downloadOverridesXlsx();
-    setDownloading(false);
-    setStatus("");
-    if (!result.ok) {
-      setDownloadError(downloadErrorCopy(result));
-      return;
-    }
-    const url = URL.createObjectURL(result.data.blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = result.data.filename;
-    anchor.rel = "noopener";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    // Safari can abort the save if the URL is revoked in the same tick.
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-  }, [downloading]);
 
   const viewRow = useCallback(async (override: TranselecOverride) => {
     setBusyId(override.id);
@@ -237,12 +203,15 @@ export function EdicionesPage({
             type="button"
             className="btn"
             aria-disabled={downloading}
-            onClick={() => void download()}
+            onClick={() => {
+              setStatus("");
+              void download();
+            }}
             data-testid="download-xlsx"
           >
             {downloading
               ? DOWNLOAD_BUSY
-              : "Descargar planilla con ediciones (.xlsx)"}
+              : DOWNLOAD_LABEL}
           </button>
         </div>
         {downloadError && (
@@ -278,9 +247,9 @@ export function EdicionesPage({
           aria-live="polite"
           data-testid="edits-status"
         >
-          {status}
+          {downloading ? DOWNLOAD_BUSY : status}
         </div>
-        {status && status !== DOWNLOAD_BUSY && (
+        {status && (
           <p className="hint no-print" aria-hidden="true">
             {status}
           </p>

@@ -27,6 +27,7 @@ import { formatDate, formatDateTime } from '../format'
 import { Link, ROUTES, useRouter, type Route } from '../router'
 import campoDigitalLogo from '../assets/campo-digital-logo.png'
 import { PLATFORM_FRONT_DOOR_PATH, platformFrontDoorEnabled } from '../runtime/frontDoor'
+import { WebEditsPill } from './WebEditsPill'
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',
@@ -205,13 +206,16 @@ export function AppHeader({
 
         <div className="shell-side">
           {signedIn && activeImport ? (
-            <span
-              className="version-chip"
-              title={`Publicada ${formatDateTime(activeImport.published_at)}`}
-            >
-              <b>Versión activa #{activeImport.import_id}</b>
-              <span>Publicada {formatDate(activeImport.published_at)}</span>
-            </span>
+            <>
+              <span
+                className="version-chip"
+                title={`Publicada ${formatDateTime(activeImport.published_at)}`}
+              >
+                <b>Versión activa #{activeImport.import_id}</b>
+                <span>Publicada {formatDate(activeImport.published_at)}</span>
+              </span>
+              <WebEditsPill canEdit={canPublish} />
+            </>
           ) : null}
           {signedIn && !activeImport && (
             <span className="version-chip none">

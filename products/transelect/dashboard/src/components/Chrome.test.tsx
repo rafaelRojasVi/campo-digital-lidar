@@ -14,7 +14,8 @@ import { AppHeader } from './AppHeader'
 import { NoticeBanner } from './NoticeBanner'
 import { QUICK_ACTIONS, QuickActions } from './QuickActions'
 import { ROUTES, RouterProvider } from '../router'
-import { makeActiveImport } from '../test/factories'
+import { makeActiveImport, makeHistory } from '../test/factories'
+import { WebEditsContext } from '../lib/webEditsState'
 
 vi.mock('../api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api')>()
@@ -278,5 +279,38 @@ describe('QuickActions — the surviving filter presets (TR-FUNC-026/028/029/030
     expect(
       screen.getByText(/Busca «legal» en todos los campos, no sólo en Estado/),
     ).toBeInTheDocument()
+  })
+})
+
+describe('AppHeader — the «ediciones web» pill (indicator spec §4)', () => {
+  function renderHeader(activeImport: ReturnType<typeof makeActiveImport> | null, canPublish = true) {
+    return renderWithRouter(
+      <WebEditsContext.Provider
+        value={{
+          history: makeHistory({ in_force_count: 3 }),
+          status: 'ready',
+          refresh: vi.fn(),
+          openLog: vi.fn(),
+        }}
+      >
+        <AppHeader
+          me={me}
+          activeImport={activeImport}
+          currentPath={ROUTES.resumen}
+          canPublish={canPublish}
+        />
+      </WebEditsContext.Provider>,
+    )
+  }
+
+  it('sits right after the version chip, for every signed-in role', () => {
+    const { container } = renderHeader(makeActiveImport(), false)
+    const pill = screen.getByRole('button', { name: '3 ediciones web' })
+    expect(container.querySelector('.version-chip')?.nextElementSibling).toBe(pill)
+  })
+
+  it('is absent when nothing is published', () => {
+    renderHeader(null)
+    expect(screen.queryByTestId('edits-pill')).not.toBeInTheDocument()
   })
 })
