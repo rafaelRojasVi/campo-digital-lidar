@@ -1360,3 +1360,39 @@ def test_history_needs_a_version_validates_the_limit_and_is_open_to_viewers(
 
     _login_with_grants(client, "transelec-viewer", VIEWER)
     assert _history(client) == {"in_force_count": 0, "needs_review_count": 0, "entries": []}
+
+
+# ---------------------------------------------------------------------------
+# The summary says how many PMFs show an edited state (indicator spec §2)
+# ---------------------------------------------------------------------------
+
+
+def _web_edited(client: TestClient, query: str = "") -> int:
+    response = client.get(f"/transelec/summary{query}")
+    assert response.status_code == 200, response.text
+    return response.json()["web_edited_pmf_count"]
+
+
+def test_summary_counts_pmfs_whose_counted_row_has_an_edited_state(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    assert _web_edited(client) == 0
+
+    mp001_second = _row(client, "MP001", 1)["source_row_number"]
+    mp002 = _row(client, "MP002")["source_row_number"]
+    mp003_first = _row(client, "MP003", 0)["source_row_number"]
+    # Not counted: a PMF's second row, and a field the headline does not read.
+    _put(client, import_id, mp001_second, "estado_resumido", "Aprobado", expected="En tramite")
+    _put(client, import_id, mp002, "numero_ingreso", "ING-20", expected="ING-2")
+    assert _web_edited(client) == 0
+
+    # Counted: «Estado» on MP003's first row.
+    _put(client, import_id, mp003_first, "estado", "Desistido", expected="Aprobado")
+    assert _web_edited(client) == 1
+
+    # The filters decide the first row, as for every other summary number.
+    assert _web_edited(client, "?q=A2") == 1  # only MP001's second row is in scope
+    assert _web_edited(client, "?empresa=Forestal%20Sur") == 0
+    assert _web_edited(client, "?empresa=Forestal%20Norte") == 1

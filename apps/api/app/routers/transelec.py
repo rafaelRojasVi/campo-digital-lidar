@@ -101,7 +101,11 @@ from transelec_ingestion.plazo_conaf import (
     build_plazos,
 )
 from transelec_ingestion.resumen_layout import AEF_TRACKING_FIELDS, PmfFieldValue
-from transelec_ingestion.status_rollups import RolledRow, estado_resumido_first_row
+from transelec_ingestion.status_rollups import (
+    RolledRow,
+    estado_resumido_first_row,
+    first_row_wins,
+)
 from transelec_ingestion.summary_view import SummaryInputRow, build_summary
 from transelec_ingestion.xlsx_contract import TranselecWorkbookError
 
@@ -1057,6 +1061,26 @@ class ReforestacionView(BaseModel):
     propietarios: str
 
 
+# The headline counts each PMF under its first row's «Estado resumido» (and
+# «Estado detallado» under its «Estado»), so only those two fields on that row
+# move a headline number. Indicator spec §2.
+_HEADLINE_STATE_FIELDS = frozenset({"estado_resumido", "estado"})
+
+
+def _web_edited_pmf_count(rows: Sequence[Row[Any]]) -> int:
+    """PMFs whose first row in ``rows`` shows an edited state; ``rows`` are
+    the request's filtered rows, so this follows the filters like every other
+    summary number."""
+
+    by_number = {row.source_row_number: row for row in rows}
+    winners = first_row_wins((_to_rolled_row(row) for row in rows), key="pmf")
+    return sum(
+        1
+        for winner in winners.values()
+        if _HEADLINE_STATE_FIELDS.intersection(by_number[winner.source_row_number].web_fields or ())
+    )
+
+
 class TranselecSummaryResponse(BaseModel):
     import_id: int
     row_count: int
@@ -1083,6 +1107,7 @@ class TranselecSummaryResponse(BaseModel):
     calidad_pmf_sin_numero_ingreso: int
     calidad_numero_resolucion: str
     calidad_pmf_estado_resumido_conflictivo: list[EstadoResumidoConflictView]
+    web_edited_pmf_count: int
 
 
 @router.get(
@@ -1143,6 +1168,7 @@ def get_summary(
             EstadoResumidoConflictView(**asdict(item))
             for item in summary.calidad_pmf_estado_resumido_conflictivo
         ],
+        web_edited_pmf_count=_web_edited_pmf_count(rows),
     )
 
 
