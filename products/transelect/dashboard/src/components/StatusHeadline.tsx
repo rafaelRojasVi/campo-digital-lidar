@@ -13,6 +13,7 @@
  */
 import type { TranselecFilterState, TranselecSummary } from '../api'
 import { formatInteger, formatNumber } from '../format'
+import { pillVisible } from '../lib/editLog'
 import { searchFromFilters } from '../lib/filterUrl'
 import {
   bucketFilters,
@@ -21,6 +22,7 @@ import {
   statusSegments,
   type StatusBucket,
 } from '../lib/statusHeadline'
+import { useWebEdits } from '../lib/webEditsState'
 import { Link, ROUTES } from '../router'
 import { CompositionBar } from '../ui/CompositionBar'
 import { HowCalculated } from '../ui/HowCalculated'
@@ -39,6 +41,7 @@ export function StatusHeadline({
   const buckets = statusBuckets(summary)
   const reconciles = bucketsReconcile(buckets, summary.pmf_count)
   const conflicts = summary.calidad_pmf_estado_resumido_conflictivo
+  const { history, openLog } = useWebEdits()
 
   return (
     <section className="lead-block" aria-labelledby="estado-title" data-testid="status-headline">
@@ -116,6 +119,21 @@ export function StatusHeadline({
             resumido» ({conflicts.map((conflict) => conflict.pmf).join(', ')}). Cada uno se cuenta
             una sola vez, con el estado de su primera fila.{' '}
             <Link to={ROUTES.calidad}>Ver el detalle en Calidad</Link>.
+          </p>
+        )}
+
+        {/* The headline moved because of a web edit: say so on the page, and
+            open the header's log from here (the bar is sticky, so it opens
+            in view; its toggle handler moves focus into it). */}
+        {summary.web_edited_pmf_count > 0 && (
+          <p className="hint" data-testid="status-web-note">
+            Incluye {formatInteger(summary.web_edited_pmf_count)} PMF con estado editado en la
+            web.{' '}
+            {pillVisible(history) && (
+              <button type="button" className="btn-link" onClick={openLog}>
+                Ver ediciones
+              </button>
+            )}
           </p>
         )}
 
