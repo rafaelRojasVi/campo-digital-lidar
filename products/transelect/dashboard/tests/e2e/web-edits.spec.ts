@@ -56,11 +56,13 @@ function rowWith(edits: Override[], index = 1) {
 }
 
 /**
- * A stateful stand-in for the override routes: PUT stores the edit, DELETE
- * removes it, and the list, the PMF detail and the rows list all reflect it.
+ * A stateful stand-in for the override routes: PUT stores the edit, ending
+ * any earlier edit of the same cell as the server does; DELETE removes it;
+ * and the list, the PMF detail and the rows list all reflect it.
  */
 function statefulEdits(edits: Override[], saves: unknown[] = []): StubOptions {
-  let nextId = 31;
+  // Above any seeded edit, so ids stay unique as they are on the server.
+  let nextId = Math.max(30, ...edits.map((entry) => entry.id)) + 1;
   return {
     rowOverrides: (index) => {
       const { estado_resumido, web_fields } = rowWith(edits, index) as Record<
@@ -96,6 +98,12 @@ function statefulEdits(edits: Override[], saves: unknown[] = []): StubOptions {
             planilla_value_at_edit: body.expected_value,
             source_row_number: body.source_row_number,
           };
+          const same = edits.findIndex(
+            (other) =>
+              other.field === entry.field &&
+              other.source_row_number === entry.source_row_number,
+          );
+          if (same >= 0) edits.splice(same, 1);
           edits.push(entry);
           return fulfill(route, {
             override_id: entry.id,
@@ -437,4 +445,165 @@ test("Calidad hides the block when no edit is in conflict", async ({
   await page.goto("/transelec/calidad");
   await expect(page.getByTestId("quality-panel")).toBeVisible();
   await expect(page.getByTestId("web-edit-conflicts")).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------
+// The header pill and its log (indicator spec §4-§5)
+// ---------------------------------------------------------------------------
+
+function logEntry(overrides: Record<string, unknown> = {}) {
+  return {
+    ...BASE_OVERRIDE,
+    id: 31,
+    state: "aplicada",
+    ended_at: null,
+    ended_by_display_name: null,
+    ...overrides,
+  };
+}
+
+const ONE_IN_FORCE = {
+  in_force_count: 1,
+  needs_review_count: 0,
+  entries: [
+    logEntry(),
+    logEntry({
+      id: 30,
+      state: "discarded",
+      source_row_number: null,
+      web_value: "Tachado",
+      ended_at: "2026-10-04T16:00:00+00:00",
+      ended_by_display_name: "Dev Admin",
+    }),
+  ],
+};
+
+/** The in-memory edits as the history route would list them, newest first. */
+function withHistory(edits: Override[]): StubOptions {
+  const base = statefulEdits(edits);
+  return {
+    ...base,
+    extra: async (page: Page) => {
+      await base.extra?.(page);
+      await page.route("**/api/transelec/overrides/history*", (route) =>
+        fulfill(route, {
+          in_force_count: edits.length,
+          needs_review_count: 0,
+          entries: [...edits].reverse().map((entry) => logEntry(entry)),
+        }),
+      );
+    },
+  };
+}
+
+test("the pill opens the log; Esc and an outside click close it, and focus returns to the pill", async ({
+  page,
+}) => {
+  await stubPlatform(page, { history: ONE_IN_FORCE });
+  await page.goto("/transelec");
+  await expect(page.getByTestId("kpi-row")).toBeVisible();
+
+  const pill = page.getByRole("button", { name: "1 edición web" });
+  await expect(pill).toHaveAttribute("aria-expanded", "false");
+  await pill.click();
+  const log = page.getByRole("dialog", { name: "Ediciones web" });
+  await expect(log).toBeVisible();
+  await expect(log.getByRole("heading", { name: "Ediciones web" })).toBeFocused();
+  await expect(pill).toHaveAttribute("aria-expanded", "true");
+  await expect(log.getByTestId("edit-log-30")).toContainText(
+    "revertida al valor de la planilla · Dev Admin",
+  );
+
+  await page.keyboard.press("Escape");
+  await expect(log).toBeHidden();
+  await expect(pill).toBeFocused();
+  await expect(pill).toHaveAttribute("aria-expanded", "false");
+
+  await pill.click();
+  await expect(log).toBeVisible();
+  await page.mouse.click(5, 600);
+  await expect(log).toBeHidden();
+});
+
+test("a log entry opens the Explorador drawer on its row, and an edit there updates the log", async ({
+  page,
+}) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  await stubPlatform(page, withHistory([{ ...BASE_OVERRIDE, id: 31 }]));
+  await page.goto("/transelec");
+  await page.getByRole("button", { name: "1 edición web" }).click();
+  await page.getByTestId("edit-log-31").getByRole("link").click();
+
+  await expect(page).toHaveURL(/\/transelec\/explorador\?q=PMF-001&fila=1$/);
+  await expect(page.getByRole("dialog", { name: "Ediciones web" })).toBeHidden();
+  const drawer = page.getByTestId("row-drawer");
+  await expect(drawer.getByTestId("drawer-provenance")).toContainText("Fila de origen 1");
+
+  // The stub's version has a column for «Estado resumido» only. A second
+  // edit of the same cell replaces the first, as the server does.
+  await drawer.getByRole("button", { name: "Editar Estado resumido" }).click();
+  await drawer.getByLabel("Nuevo valor de Estado resumido").fill("Desistido");
+  await drawer.getByRole("button", { name: "Guardar" }).click();
+  await expect(drawer.getByTestId("editables-status")).toContainText(
+    "Se guardó el cambio en Estado resumido.",
+  );
+
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(page).toHaveURL(/\/transelec\/explorador\?q=PMF-001$/);
+  const pill = page.getByRole("button", { name: "1 edición web" });
+  await pill.click();
+  const log = page.getByRole("dialog", { name: "Ediciones web" });
+  await expect(log.getByRole("listitem")).toHaveCount(1);
+  await expect(log.getByRole("listitem").first()).toContainText("Desistido");
+  expect(consoleErrors).toEqual([]);
+});
+
+test("a log entry whose row is gone says so instead of opening a drawer", async ({
+  page,
+}) => {
+  await stubPlatform(page, {
+    history: {
+      in_force_count: 1,
+      needs_review_count: 0,
+      entries: [logEntry({ source_row_number: 999 })],
+    },
+  });
+  await page.goto("/transelec");
+  await page.getByRole("button", { name: "1 edición web" }).click();
+  await page.getByTestId("edit-log-31").getByRole("link").click();
+
+  await expect(
+    page.getByText("No se encontró esta fila en la versión activa."),
+  ).toBeVisible();
+  await expect(page.getByTestId("row-drawer")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/transelec\/explorador\?q=PMF-001$/);
+});
+
+test("a viewer sees the pill and the log, without the operators' footer", async ({
+  page,
+}) => {
+  await stubPlatform(page, { me: VIEWER, history: ONE_IN_FORCE });
+  await page.goto("/transelec");
+  await page.getByRole("button", { name: "1 edición web" }).click();
+  const log = page.getByRole("dialog", { name: "Ediciones web" });
+  await expect(log).toBeVisible();
+  await expect(log.getByTestId("edit-log-31")).toBeVisible();
+  await expect(log.getByRole("link", { name: /Ediciones web/ })).toHaveCount(0);
+  await expect(log.getByRole("button", { name: /Descargar/ })).toHaveCount(0);
+});
+
+test("the log's arrow sits on the line of the values it joins", async ({ page }) => {
+  await stubPlatform(page, { history: ONE_IN_FORCE });
+  await page.goto("/transelec");
+  await page.getByRole("button", { name: "1 edición web" }).click();
+  const change = page.getByTestId("edit-log-31").locator(".edit-log-change");
+  const before = await change.locator(".edit-log-value").first().boundingBox();
+  const arrow = await change.locator('[aria-hidden="true"]').boundingBox();
+  if (!before || !arrow) throw new Error("log entry not measured");
+  const middle = (box: { y: number; height: number }) => box.y + box.height / 2;
+  expect(Math.abs(middle(arrow) - middle(before))).toBeLessThanOrEqual(3);
 });

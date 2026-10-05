@@ -14,7 +14,6 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { createPortal } from 'react-dom'
 import {
   type EditableFieldName,
   type OverrideConflictCode,
@@ -32,10 +31,19 @@ import {
   overrideFor,
   webTooltip,
 } from '../lib/webEdits'
-import { ConfirmDialog } from './ConfirmDialog'
+import { useWebEdits } from '../lib/webEditsState'
+import { DrawerConfirm } from './DrawerConfirm'
+import { OficinaVirtualLink } from './OficinaVirtualLink'
 import { SourceDate } from './SourceDate'
 import { AlertBanner } from './StateViews'
 import { WebChip } from './WebChip'
+
+/**
+ * What the open editor holds, for the drawer around it: `unsaved` asks
+ * before a row switch throws the change away; `saving` holds the switch
+ * until the answer arrives, so its result (or error) is seen on this row.
+ */
+export type EditState = 'idle' | 'unsaved' | 'saving'
 
 const RELOAD_COPY = {
   version_changed:
@@ -43,8 +51,6 @@ const RELOAD_COPY = {
   value_changed:
     'Otra persona cambió este valor mientras lo editaba. Recargue para ver el valor actual.',
 } as const
-
-const FOCUSABLE = 'button:not([disabled])'
 
 export function EditableFieldsSection({
   row,
@@ -57,6 +63,7 @@ export function EditableFieldsSection({
   onSaved,
   onReload,
   onRowEdited,
+  onEditStateChange,
 }: {
   row: ResumenRow
   activeImportId: number | null
@@ -71,7 +78,10 @@ export function EditableFieldsSection({
   onReload: () => void
   /** Called after a revert or reload so surfaces showing this row can refresh it. */
   onRowEdited?: () => void
+  /** Told what the open editor holds whenever that changes (see `EditState`). */
+  onEditStateChange?: (state: EditState) => void
 }) {
+  const { refresh: refreshEdits } = useWebEdits()
   const [editing, setEditing] = useState<EditableFieldName | null>(null)
   const [draft, setDraft] = useState('')
   // The value the editor saw when it opened; what a save is checked against.
@@ -94,14 +104,24 @@ export function EditableFieldsSection({
     focusTarget.current = id
   }
 
+  const editState: EditState = busy
+    ? 'saving'
+    : editing !== null && draft !== (seenValue ?? '')
+      ? 'unsaved'
+      : 'idle'
+  useEffect(() => {
+    onEditStateChange?.(editState)
+  }, [editState, onEditStateChange])
+
   useEffect(() => {
     if (!focusTarget.current || editing !== null || reverting !== null) return
     document.querySelector<HTMLElement>(`[data-focus-id="${focusTarget.current}"]`)?.focus()
     focusTarget.current = null
   })
 
-  const editable = (spec: EditableFieldSpec) =>
-    canEdit && activeImportId !== null && (sourceFields === null || sourceFields.includes(spec.name))
+  const inSource = (spec: EditableFieldSpec) =>
+    sourceFields === null || sourceFields.includes(spec.name)
+  const editable = (spec: EditableFieldSpec) => canEdit && activeImportId !== null && inSource(spec)
 
   const start = (spec: EditableFieldSpec) => {
     setEditing(spec.name)
@@ -149,6 +169,7 @@ export function EditableFieldsSection({
           ? `${spec.label} se dejó vacío.`
           : `Se guardó el cambio en ${spec.label}.`,
     )
+    if (result.data.changed) refreshEdits()
     onSaved(result.data.row)
   }
 
@@ -164,6 +185,7 @@ export function EditableFieldsSection({
       return
     }
     setStatus(`${spec.label} volvió al valor de la planilla.`)
+    refreshEdits()
     onReload()
     onRowEdited?.()
   }
@@ -181,6 +203,7 @@ export function EditableFieldsSection({
     setDraft('')
     setFocusTarget(`edit-${spec.name}`)
     setStatus(`Se recargó ${spec.label}. Revise el valor actual y vuelva a editar si corresponde.`)
+    refreshEdits()
     onReload()
     onRowEdited?.()
   }
@@ -191,29 +214,6 @@ export function EditableFieldsSection({
     event.stopPropagation()
     event.preventDefault()
     cancel(spec)
-  }
-
-  const onDialogKeyDown = (event: KeyboardEvent<HTMLElement>, spec: EditableFieldSpec) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation()
-      event.preventDefault()
-      setReverting(null)
-      setFocusTarget(`revert-${spec.name}`)
-    } else if (event.key === 'Tab') {
-      // The drawer's own Tab containment does not know about this dialog.
-      const buttons = [...event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE)]
-      if (buttons.length === 0) return
-      event.stopPropagation()
-      const first = buttons[0]
-      const last = buttons[buttons.length - 1]
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
   }
 
   return (
@@ -302,7 +302,10 @@ export function EditableFieldsSection({
                   <>
                     <span className="editable-value">
                       <span>
-                        {spec.kind === 'date' ? (
+                        {!inSource(spec) && !web ? (
+                          // Not «Sin dato»: the cell is not empty, the column is absent.
+                          <span className="hint">La planilla publicada no tiene esta columna.</span>
+                        ) : spec.kind === 'date' ? (
                           <SourceDate
                             row={row}
                             field={spec.name as 'fecha_ingreso'}
@@ -314,6 +317,17 @@ export function EditableFieldsSection({
                       </span>
                       {web && <WebChip />}
                     </span>
+                    {/* For editors, Tramitación no longer repeats the N.º de
+                        ingreso, so its CONAF link and «Copiar N.º» live here. */}
+                    {canEdit &&
+                      (spec.name === 'numero_ingreso' ||
+                        (spec.name === 'numero_ingreso_2' && row.numero_ingreso_2)) && (
+                        <OficinaVirtualLink
+                          key={row[spec.name] ?? ''}
+                          numero={row[spec.name]}
+                          testId={spec.name === 'numero_ingreso' ? 'drawer-ov-1' : 'drawer-ov-2'}
+                        />
+                      )}
                     {web && (
                       <span className="editable-provenance" data-testid={`provenance-${spec.name}`}>
                         {override
@@ -374,30 +388,24 @@ export function EditableFieldsSection({
           )
         })}
       </dl>
-      {reverting &&
-        createPortal(
-          <div onKeyDown={(event) => onDialogKeyDown(event, reverting.spec)}>
-            <ConfirmDialog
-              title="Volver al valor de la planilla"
-              confirmLabel="Volver al valor de la planilla"
-              busy={busy}
-              onConfirm={() => void revert(reverting.override, reverting.spec)}
-              onCancel={() => {
-                setReverting(null)
-                setFocusTarget(`revert-${reverting.spec.name}`)
-              }}
-            >
-              <p>
-                {reverting.spec.label} volverá a «
-                {displayValue(reverting.spec, reverting.override.planilla_value_at_edit) ||
-                  '(vacía)'}
-                », el valor que tenía la planilla cuando se editó. Se pierde el valor puesto en la
-                web.
-              </p>
-            </ConfirmDialog>
-          </div>,
-          document.body,
-        )}
+      {reverting && (
+        <DrawerConfirm
+          title="Volver al valor de la planilla"
+          confirmLabel="Volver al valor de la planilla"
+          busy={busy}
+          onConfirm={() => void revert(reverting.override, reverting.spec)}
+          onCancel={() => {
+            setReverting(null)
+            setFocusTarget(`revert-${reverting.spec.name}`)
+          }}
+        >
+          <p>
+            {reverting.spec.label} volverá a «
+            {displayValue(reverting.spec, reverting.override.planilla_value_at_edit) || '(vacía)'}
+            », el valor que tenía la planilla cuando se editó. Se pierde el valor puesto en la web.
+          </p>
+        </DrawerConfirm>
+      )}
     </section>
   )
 }

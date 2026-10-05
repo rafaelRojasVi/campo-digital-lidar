@@ -9,6 +9,7 @@ import {
   overrideFor,
   specFor,
   suggestionsFrom,
+  webFieldsDescription,
   webTooltip,
 } from './webEdits'
 
@@ -87,5 +88,50 @@ describe('web edit helpers', () => {
     })
     expect(canEdit(grant('operator'))).toBe(true)
     expect(canEdit(grant('viewer'))).toBe(false)
+  })
+})
+
+describe('webFieldsDescription', () => {
+  it('names the edited fields, joined with «y»', () => {
+    expect(webFieldsDescription(['numero_ingreso_2'])).toBe('N.º ingreso 2 editado en la web')
+    expect(webFieldsDescription(['reingreso_tec', 'reingreso_legal'])).toBe(
+      'Reingreso técnico y Reingreso legal editados en la web',
+    )
+    expect(webFieldsDescription(['fecha_ingreso', 'fecha_ingreso_2', 'fecha_90_dias'])).toBe(
+      'Fecha ingreso, Fecha ingreso 2 y 90 días editados en la web',
+    )
+  })
+})
+
+describe('suggestionsFrom groups spellings of one value (indicator spec §10)', () => {
+  const rows = (values: (string | null)[]) =>
+    values.map((estado, index) => makeRow({ source_row_number: index + 1, estado }))
+
+  it('keeps the spelling the version uses most', () => {
+    expect(
+      suggestionsFrom(
+        rows(['En Evaluacion', 'En evaluacion', 'En evaluacion', 'Aprobado']),
+        'estado',
+      ),
+    ).toEqual(['Aprobado', 'En evaluacion'])
+  })
+
+  it('ignores accents, case, NBSP and repeated spaces', () => {
+    expect(
+      suggestionsFrom(
+        rows(['En evaluación', 'EN  EVALUACION', 'En evaluacion ', 'En evaluación']),
+        'estado',
+      ),
+    ).toEqual(['En evaluación'])
+  })
+
+  it('ties go to the first spelling in Spanish order', () => {
+    const first = ['rechazado', 'Rechazado'].sort((a, b) => a.localeCompare(b, 'es'))[0]
+    expect(suggestionsFrom(rows(['Rechazado', 'rechazado']), 'estado')).toEqual([first])
+    expect(suggestionsFrom(rows(['rechazado', 'Rechazado']), 'estado')).toEqual([first])
+  })
+
+  it('skips blanks', () => {
+    expect(suggestionsFrom(rows([null, '  ', ' ']), 'estado')).toEqual([])
   })
 })

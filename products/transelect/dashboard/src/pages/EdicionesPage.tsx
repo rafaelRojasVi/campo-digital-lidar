@@ -9,17 +9,18 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import {
+  EDIT_HISTORY_LIMIT,
   EMPTY_FILTERS,
   type ResumenRow,
   type TranselecOverride,
   discardOverride,
-  downloadOverridesXlsx,
   keepOverride,
   listOverrides,
   listRows,
   overrideConflictCode,
 } from "../api";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EditLogList } from "../components/EditLog";
 import { RowDetailDrawer } from "../components/RowDetailDrawer";
 import {
   AlertBanner,
@@ -34,6 +35,12 @@ import {
   formatEditDate,
   specFor,
 } from "../lib/webEdits";
+import { useWebEdits } from "../lib/webEditsState";
+import {
+  DOWNLOAD_BUSY,
+  DOWNLOAD_LABEL,
+  useXlsxDownload,
+} from "../lib/xlsxDownload";
 import { SectionHeader } from "../ui/Primitives";
 
 const ORDER: Record<TranselecOverride["status"], number> = {
@@ -52,22 +59,6 @@ const CONFLICT_COPY = {
     "Esta edición ya no está en conflicto. La lista se actualizó.",
 } as const;
 
-const DOWNLOAD_BUSY = "Preparando la planilla…";
-const DOWNLOAD_SERVER_ERROR =
-  "La plataforma no pudo preparar la planilla. Intente de nuevo; si se repite, contacte a soporte.";
-
-/** 403 and a bare 5xx get fixed Spanish copy; 404/409/422 keep the server's own detail. */
-function downloadErrorCopy(result: {
-  status: number;
-  error: string;
-  payload?: unknown;
-}): string {
-  if (result.status === 403) return classifyFailure(result).message;
-  if (result.status >= 500 && result.payload === undefined)
-    return DOWNLOAD_SERVER_ERROR;
-  return result.error;
-}
-
 function plural(count: number, one: string, many: string): string {
   return `${formatInteger(count)} ${count === 1 ? one : many}`;
 }
@@ -79,6 +70,11 @@ export function EdicionesPage({
   activeImportId?: number | null;
   sourceFields?: readonly string[] | null;
 }) {
+  const {
+    history: editsHistory,
+    status: editsStatus,
+    refresh: refreshEdits,
+  } = useWebEdits();
   const [overrides, setOverrides] = useState<TranselecOverride[] | null>(null);
   const [failure, setFailure] = useState<FailureView | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -87,8 +83,11 @@ export function EdicionesPage({
   const [confirming, setConfirming] = useState<TranselecOverride | null>(null);
   const [openRow, setOpenRow] = useState<ResumenRow | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const {
+    downloading,
+    error: downloadError,
+    download,
+  } = useXlsxDownload();
 
   useEffect(() => {
     let cancelled = false;
@@ -129,7 +128,10 @@ export function EdicionesPage({
       if (!result.ok) {
         const code = overrideConflictCode(result.payload);
         setActionError(code ? CONFLICT_COPY[code] : result.error);
-        if (code) reload();
+        if (code) {
+          reload();
+          refreshEdits();
+        }
         return;
       }
       setStatus(
@@ -138,34 +140,10 @@ export function EdicionesPage({
           : `Se descartó la edición de ${override.field_label} en ${override.pmf}.`,
       );
       reload();
+      refreshEdits();
     },
-    [reload],
+    [reload, refreshEdits],
   );
-
-  const download = useCallback(async () => {
-    // aria-disabled, not disabled: the button keeps keyboard focus while busy.
-    if (downloading) return;
-    setDownloading(true);
-    setDownloadError(null);
-    setStatus(DOWNLOAD_BUSY);
-    const result = await downloadOverridesXlsx();
-    setDownloading(false);
-    setStatus("");
-    if (!result.ok) {
-      setDownloadError(downloadErrorCopy(result));
-      return;
-    }
-    const url = URL.createObjectURL(result.data.blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = result.data.filename;
-    anchor.rel = "noopener";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    // Safari can abort the save if the URL is revoked in the same tick.
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-  }, [downloading]);
 
   const viewRow = useCallback(async (override: TranselecOverride) => {
     setBusyId(override.id);
@@ -231,12 +209,15 @@ export function EdicionesPage({
             type="button"
             className="btn"
             aria-disabled={downloading}
-            onClick={() => void download()}
+            onClick={() => {
+              setStatus("");
+              void download();
+            }}
             data-testid="download-xlsx"
           >
             {downloading
               ? DOWNLOAD_BUSY
-              : "Descargar planilla con ediciones (.xlsx)"}
+              : DOWNLOAD_LABEL}
           </button>
         </div>
         {downloadError && (
@@ -272,9 +253,9 @@ export function EdicionesPage({
           aria-live="polite"
           data-testid="edits-status"
         >
-          {status}
+          {downloading ? DOWNLOAD_BUSY : status}
         </div>
-        {status && status !== DOWNLOAD_BUSY && (
+        {status && (
           <p className="hint no-print" aria-hidden="true">
             {status}
           </p>
@@ -397,6 +378,25 @@ export function EdicionesPage({
               </tbody>
             </table>
           </div>
+        )}
+      </section>
+
+      <section aria-labelledby="historial-title" data-testid="edits-history">
+        <SectionHeader
+          id="historial-title"
+          title="Historial"
+          meta={`Últimas ${EDIT_HISTORY_LIMIT} ediciones, de la más reciente a la más antigua, incluidas las reemplazadas y las revertidas.`}
+        />
+        {editsHistory ? (
+          editsHistory.entries.length === 0 ? (
+            <div className="empty">Todavía no hay ediciones web.</div>
+          ) : (
+            <EditLogList entries={editsHistory.entries} />
+          )
+        ) : editsStatus === "error" ? (
+          <p className="hint">No se pudo cargar el historial de ediciones.</p>
+        ) : (
+          <LoadingBlock label="Cargando el historial…" lines={2} />
         )}
       </section>
 

@@ -454,6 +454,116 @@ def list_overrides(
     ]
 
 
+HistoryState = Literal[
+    "aplicada",
+    "incorporada",
+    "en_conflicto",
+    "huerfana",
+    "superseded",
+    "discarded",
+    "kept",
+    "incorporated",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryRecord:
+    """One edit, active or ended, as the edits log shows it."""
+
+    id: int
+    field: str
+    state: HistoryState
+    pmf: str
+    rol: str | None
+    numero_predio: str | None
+    numero_area_corta: str | None
+    source_row_number: int | None
+    web: Signature
+    planilla_at_edit: Signature
+    created_by_display_name: str
+    created_at: dt.datetime
+    ended_at: dt.datetime | None
+    ended_by_display_name: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryPage:
+    in_force_count: int
+    needs_review_count: int
+    entries: list[HistoryRecord]
+
+
+def list_override_history(connection: Connection, *, import_id: int, limit: int) -> HistoryPage:
+    """The latest ``limit`` edits, active or ended, newest first, plus counts.
+
+    Spec: docs/superpowers/specs/2026-10-05-transelec-web-edits-indicator-design.md §1.
+    An active edit's state is its status against ``import_id``; an ended
+    edit's is its ``end_reason``, and it carries no row: it acts on none, and
+    its ``key_ordinal`` may point at another row in this version. The state
+    view is filtered to one import inside the joined subquery, so PostgreSQL
+    pushes the filter below the view's cross join over every import. The
+    counts cover every active edit, whatever ``limit`` is.
+    """
+
+    rows = connection.execute(
+        text(
+            """
+            SELECT o.id, o.field, o.pmf, o.rol, o.numero_predio, o.numero_area_corta,
+                   o.value_text, o.value_date, o.planilla_value_text, o.planilla_value_date,
+                   o.created_at, o.ended_at, o.end_reason,
+                   author.display_name AS created_by_display_name,
+                   ender.display_name AS ended_by_display_name,
+                   s.status, s.source_row_number
+            FROM platform.transelec_field_override AS o
+            JOIN platform.app_user AS author ON author.id = o.created_by_app_user_id
+            LEFT JOIN platform.app_user AS ender ON ender.id = o.ended_by_app_user_id
+            LEFT JOIN (
+                SELECT override_id, status, source_row_number
+                FROM platform.transelec_override_state
+                WHERE import_id = :import_id
+            ) AS s ON s.override_id = o.id
+            ORDER BY o.created_at DESC, o.id DESC
+            LIMIT :limit
+            """
+        ),
+        {"import_id": import_id, "limit": limit},
+    ).all()
+    counts = connection.execute(
+        text(
+            """
+            SELECT count(*) FILTER (WHERE status = 'aplicada') AS in_force,
+                   count(*) FILTER (WHERE status IN ('en_conflicto', 'huerfana')) AS needs_review
+            FROM platform.transelec_override_state
+            WHERE import_id = :import_id
+            """
+        ),
+        {"import_id": import_id},
+    ).one()
+    return HistoryPage(
+        in_force_count=counts.in_force,
+        needs_review_count=counts.needs_review,
+        entries=[
+            HistoryRecord(
+                id=row.id,
+                field=row.field,
+                state=row.status if row.ended_at is None else row.end_reason,
+                pmf=row.pmf,
+                rol=row.rol,
+                numero_predio=row.numero_predio,
+                numero_area_corta=row.numero_area_corta,
+                source_row_number=row.source_row_number if row.ended_at is None else None,
+                web=(row.value_text, row.value_date),
+                planilla_at_edit=(row.planilla_value_text, row.planilla_value_date),
+                created_by_display_name=row.created_by_display_name,
+                created_at=row.created_at,
+                ended_at=row.ended_at,
+                ended_by_display_name=row.ended_by_display_name,
+            )
+            for row in rows
+        ],
+    )
+
+
 def retire_incorporated_overrides(
     connection: Connection, *, import_id: int, actor_app_user_id: int
 ) -> int:

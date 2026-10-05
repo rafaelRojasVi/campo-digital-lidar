@@ -1082,6 +1082,11 @@ a.status-card .status-card-go {
   overflow-wrap: anywhere;
 }
 
+/* Above the Estado table when a line shows a value edited on the web. */
+.estado-web-note {
+  margin: 0 0 var(--s-3);
+}
+
 .estado-table .estado-flag {
   display: block;
   margin-top: var(--s-2);

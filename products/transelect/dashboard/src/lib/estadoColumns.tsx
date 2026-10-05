@@ -8,7 +8,7 @@
  * it never edits this list.
  */
 import type { ReactNode } from 'react'
-import type { LifecycleRow } from '../api'
+import type { EditableFieldName, LifecycleRow } from '../api'
 import { OficinaVirtualLink } from '../components/OficinaVirtualLink'
 import { cell } from '../format'
 import {
@@ -24,6 +24,8 @@ export interface EstadoColumn {
   render: (row: LifecycleRow) => ReactNode
   /** An extra column only: the base column it follows (default: after the last). */
   after?: string
+  /** The fields this column shows; an edit to any of them marks the cell «web». */
+  webFields?: readonly EditableFieldName[]
 }
 
 export const ESTADO_COLUMNS: readonly EstadoColumn[] = [
@@ -31,6 +33,7 @@ export const ESTADO_COLUMNS: readonly EstadoColumn[] = [
   {
     key: 'grupo',
     header: 'Grupo',
+    webFields: ['estado_resumido', 'estado'],
     render: (row) => (
       <span className={`pill ${LIFECYCLE_GROUP_PILL[row.lifecycle_group]}`}>
         {LIFECYCLE_GROUP_LABELS[row.lifecycle_group]}
@@ -40,6 +43,7 @@ export const ESTADO_COLUMNS: readonly EstadoColumn[] = [
   {
     key: 'paso',
     header: 'Paso',
+    webFields: ['estado_resumido', 'estado'],
     // The step or the reason, plus any flag: both are long, so the cell wraps.
     render: (row) => (
       <>
@@ -56,15 +60,22 @@ export const ESTADO_COLUMNS: readonly EstadoColumn[] = [
       </>
     ),
   },
-  { key: 'tipo_rechazo', header: 'Tipo de rechazo', render: (row) => cell(row.tipo_rechazo, '—') },
+  {
+    key: 'tipo_rechazo',
+    header: 'Tipo de rechazo',
+    webFields: ['tipo_rechazo'],
+    render: (row) => cell(row.tipo_rechazo, '—'),
+  },
   {
     key: 'ingresos',
     header: 'N.º ingreso (1 / 2)',
+    webFields: ['numero_ingreso', 'numero_ingreso_2'],
     render: (row) => `${cell(row.numero_ingreso, 'Sin ingreso')} / ${cell(row.numero_ingreso_2, '—')}`,
   },
   {
     key: 'reingresos',
     header: 'Reingreso Tec / Legal / RecRep',
+    webFields: ['reingreso_tec', 'reingreso_legal', 'reingreso_recrep'],
     // Raw, as the planilla has them: their meaning is an open question.
     render: (row) =>
       [row.reingreso_tec, row.reingreso_legal, row.reingreso_recrep]

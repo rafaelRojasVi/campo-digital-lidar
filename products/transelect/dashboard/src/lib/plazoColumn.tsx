@@ -12,6 +12,8 @@ export function plazoColumn(byPmf: ReadonlyMap<string, PlazoPmf>, loading: boole
     key: 'plazo',
     header: 'Plazo CONAF',
     after: 'pmf',
+    // The term counts from these dates.
+    webFields: ['fecha_ingreso', 'fecha_ingreso_2', 'fecha_90_dias'],
     render: (row) => <PlazoCell plazo={byPmf.get(row.pmf)} loading={loading} />,
   }
 }

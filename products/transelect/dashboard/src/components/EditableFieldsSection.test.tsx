@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TranselecOverride } from '../api'
 import { EditableFieldsSection } from './EditableFieldsSection'
+import { WebEditsContext } from '../lib/webEditsState'
 import { makeRow } from '../test/factories'
 
 vi.mock('../api', async (importOriginal) => {
@@ -70,7 +71,7 @@ describe('EditableFieldsSection', () => {
       expectedValue: 'En tramite',
     })
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ estado_resumido: 'Aprobado' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('Se guardó')
+    expect(await screen.findByTestId('editables-status')).toHaveTextContent('Se guardó')
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Editar Estado resumido' })).toHaveFocus(),
     )
@@ -249,7 +250,7 @@ describe('EditableFieldsSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
     await userEvent.clear(screen.getByLabelText('Nuevo valor de Estado vigente'))
     await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('Estado vigente se dejó vacío.')
+    expect(await screen.findByTestId('editables-status')).toHaveTextContent('Estado vigente se dejó vacío.')
   })
 
   it('tells the page to refresh the row after a revert and after Recargar', async () => {
@@ -337,5 +338,149 @@ describe('EditableFieldsSection', () => {
         Object.defineProperty(window, 'location', { configurable: true, value: original })
       }
     })
+  })
+})
+
+describe('EditableFieldsSection — the shared edits log', () => {
+  const refresh = vi.fn()
+  const withLog = (node: React.ReactNode) => (
+    <WebEditsContext.Provider value={{ history: null, status: 'ready', refresh, openLog: vi.fn() }}>
+      {node}
+    </WebEditsContext.Provider>
+  )
+
+  beforeEach(() => {
+    refresh.mockReset()
+    vi.mocked(saveOverride).mockReset()
+    vi.mocked(discardOverride).mockReset()
+  })
+
+  async function saveEstadoResumido(changed: boolean) {
+    const row = makeRow({ source_row_number: 2, estado_resumido: 'En tramite' })
+    vi.mocked(saveOverride).mockResolvedValue({
+      ok: true,
+      data: { override_id: changed ? 31 : null, changed, row },
+    })
+    render(withLog(<EditableFieldsSection {...base} row={row} canEdit onSaved={vi.fn()} />))
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado resumido' }))
+    await userEvent.clear(screen.getByLabelText('Nuevo valor de Estado resumido'))
+    await userEvent.type(screen.getByLabelText('Nuevo valor de Estado resumido'), 'Aprobado')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    await screen.findByText(/Se guardó|no hubo cambios/)
+  }
+
+  it('refreshes the log after a save that changed something', async () => {
+    await saveEstadoResumido(true)
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not refresh it after a save that changed nothing', async () => {
+    await saveEstadoResumido(false)
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('refreshes the log after a revert', async () => {
+    vi.mocked(discardOverride).mockResolvedValue({ ok: true, data: undefined })
+    render(
+      withLog(
+        <EditableFieldsSection
+          {...base}
+          row={makeRow({ source_row_number: 2, web_fields: ['estado'] })}
+          overrides={[applied]}
+          canEdit
+          onSaved={vi.fn()}
+        />,
+      ),
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Volver al valor de la planilla de Estado vigente' }),
+    )
+    await userEvent.click(screen.getByTestId('confirm-accept'))
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('EditableFieldsSection — unsaved changes', () => {
+  it('reports an open editor holding a change, a save in flight, and neither', async () => {
+    let finish!: (value: unknown) => void
+    vi.mocked(saveOverride).mockReturnValue(
+      new Promise((done) => {
+        finish = done
+      }) as never,
+    )
+    const onEditStateChange = vi.fn()
+    const row = makeRow({ estado: 'En evaluacion' })
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={row}
+        canEdit
+        onSaved={vi.fn()}
+        onEditStateChange={onEditStateChange}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+    expect(onEditStateChange).toHaveBeenLastCalledWith('idle')
+    await userEvent.type(screen.getByLabelText('Nuevo valor de Estado vigente'), ' x')
+    expect(onEditStateChange).toHaveBeenLastCalledWith('unsaved')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(onEditStateChange).toHaveBeenLastCalledWith('saving')
+    await act(async () =>
+      finish({ ok: true, data: { override_id: 1, changed: true, row } }),
+    )
+    expect(onEditStateChange).toHaveBeenLastCalledWith('idle')
+  })
+
+  it('reports an unsaved change as gone after Cancelar', async () => {
+    const onEditStateChange = vi.fn()
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow({ estado: 'En evaluacion' })}
+        canEdit
+        onSaved={vi.fn()}
+        onEditStateChange={onEditStateChange}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado vigente' }))
+    await userEvent.type(screen.getByLabelText('Nuevo valor de Estado vigente'), ' x')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(onEditStateChange).toHaveBeenLastCalledWith('idle')
+  })
+})
+
+describe('EditableFieldsSection — a field the planilla has no column for', () => {
+  it('says the column is missing instead of «Sin dato»', () => {
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow({ numero_ingreso_2: null, fecha_ingreso_2: null })}
+        canEdit
+        sourceFields={['estado', 'estado_resumido', 'tipo_rechazo', 'numero_ingreso', 'fecha_ingreso']}
+        onSaved={vi.fn()}
+      />,
+    )
+    for (const field of ['numero_ingreso_2', 'fecha_ingreso_2']) {
+      const row = screen.getByTestId(`editable-${field}`)
+      expect(row).toHaveTextContent('La planilla publicada no tiene esta columna.')
+      expect(row).not.toHaveTextContent('Sin dato')
+    }
+    // A field the planilla has, but empty, still reads «Sin dato».
+    expect(screen.getByTestId('editable-tipo_rechazo')).toHaveTextContent('Sin dato')
+  })
+
+  it('still shows a web value for it, with its chip', () => {
+    render(
+      <EditableFieldsSection
+        {...base}
+        row={makeRow({ numero_ingreso_2: 'ING-9', web_fields: ['numero_ingreso_2'] })}
+        canEdit={false}
+        sourceFields={['estado']}
+        onSaved={vi.fn()}
+      />,
+    )
+    const row = screen.getByTestId('editable-numero_ingreso_2')
+    expect(row).toHaveTextContent('ING-9')
+    expect(row).not.toHaveTextContent('no tiene esta columna')
   })
 })

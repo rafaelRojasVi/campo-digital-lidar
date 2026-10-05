@@ -7,10 +7,12 @@
  * reader from a percentage and a denominator.
  */
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import { EMPTY_FILTERS } from '../api'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
+import { EMPTY_FILTERS, type TranselecEditHistory } from '../api'
+import { WebEditsContext } from '../lib/webEditsState'
 import { ROUTES, RouterProvider } from '../router'
-import { makeSummary } from '../test/factories'
+import { makeHistory, makeSummary } from '../test/factories'
 import { StatusHeadline } from './StatusHeadline'
 
 function renderHeadline(summary = makeSummary(), filters = EMPTY_FILTERS) {
@@ -127,5 +129,54 @@ describe('StatusHeadline', () => {
   it('names the rule behind the figures instead of hiding it', () => {
     renderHeadline()
     expect(screen.getByText('estado_resumido_first_row')).toBeInTheDocument()
+  })
+})
+
+describe('StatusHeadline — totals that include web edits (indicator spec §8)', () => {
+  function renderWithEdits(
+    webEdited: number,
+    history: TranselecEditHistory | null = makeHistory(),
+    openLog = vi.fn(),
+  ) {
+    return render(
+      <RouterProvider initialPath={ROUTES.resumen}>
+        <WebEditsContext.Provider
+          value={{ history, status: history ? 'ready' : 'error', refresh: vi.fn(), openLog }}
+        >
+          <StatusHeadline
+            summary={makeSummary({ web_edited_pmf_count: webEdited })}
+            filters={EMPTY_FILTERS}
+          />
+        </WebEditsContext.Provider>
+      </RouterProvider>,
+    )
+  }
+
+  it('says how many PMF are counted under an edited state, and opens the log', async () => {
+    const openLog = vi.fn()
+    renderWithEdits(2, makeHistory(), openLog)
+    expect(screen.getByTestId('status-web-note')).toHaveTextContent(
+      'Incluye 2 PMF con estado editado en la web.',
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Ver ediciones' }))
+    expect(openLog).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads the same for one PMF', () => {
+    renderWithEdits(1)
+    expect(screen.getByTestId('status-web-note')).toHaveTextContent(
+      'Incluye 1 PMF con estado editado en la web.',
+    )
+  })
+
+  it('offers no «Ver ediciones» when the log is not on the page', () => {
+    renderWithEdits(1, null)
+    expect(screen.getByTestId('status-web-note')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ver ediciones' })).not.toBeInTheDocument()
+  })
+
+  it('says nothing when no counted state was edited', () => {
+    renderWithEdits(0)
+    expect(screen.queryByTestId('status-web-note')).not.toBeInTheDocument()
   })
 })

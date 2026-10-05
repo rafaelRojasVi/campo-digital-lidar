@@ -4,6 +4,8 @@
  */
 import type { LifecycleRow } from '../api'
 import { ESTADO_COLUMNS, type EstadoColumn } from '../lib/estadoColumns'
+import { editedAmong, webFieldsDescription } from '../lib/webEdits'
+import { WebChip } from './WebChip'
 
 function withExtraColumns(extra: readonly EstadoColumn[]): EstadoColumn[] {
   const columns: EstadoColumn[] = []
@@ -34,51 +36,66 @@ export function EstadoTable({
   emptyText?: string
 }) {
   const columns = withExtraColumns(extraColumns)
+  // A cell is marked «web» when a field it shows was edited on the panel.
+  const edited = (row: LifecycleRow, column: EstadoColumn) =>
+    column.webFields ? editedAmong(row, column.webFields) : []
+  const anyEdited = rows.some((row) => columns.some((column) => edited(row, column).length > 0))
 
   return (
-    <div className="tablewrap" data-testid="estado-table">
-      <table className="queue-table rows-table estado-table">
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th scope="col" key={column.key}>
-                {column.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.source_row_number}
-              tabIndex={0}
-              aria-selected={selectedRow === row.source_row_number}
-              aria-haspopup="dialog"
-              data-testid={`estado-row-${row.source_row_number}`}
-              onClick={() => onOpen(row)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  onOpen(row)
-                }
-              }}
-            >
+    <>
+      {anyEdited && (
+        <p className="hint estado-web-note" data-testid="estado-web-note">
+          Los valores marcados «web» se editaron en el panel; la planilla publicada no cambió.
+        </p>
+      )}
+      <div className="tablewrap" data-testid="estado-table">
+        <table className="queue-table rows-table estado-table">
+          <thead>
+            <tr>
               {columns.map((column) => (
-                <td key={column.key} data-col={column.key}>
-                  {column.render(row)}
-                </td>
+                <th scope="col" key={column.key}>
+                  {column.header}
+                </th>
               ))}
             </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={columns.length} className="empty">
-                {emptyText}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.source_row_number}
+                tabIndex={0}
+                aria-selected={selectedRow === row.source_row_number}
+                aria-haspopup="dialog"
+                data-testid={`estado-row-${row.source_row_number}`}
+                onClick={() => onOpen(row)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    onOpen(row)
+                  }
+                }}
+              >
+                {columns.map((column) => {
+                  const fields = edited(row, column)
+                  return (
+                    <td key={column.key} data-col={column.key}>
+                      {column.render(row)}
+                      {fields.length > 0 && <WebChip description={webFieldsDescription(fields)} />}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={columns.length} className="empty">
+                  {emptyText}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }

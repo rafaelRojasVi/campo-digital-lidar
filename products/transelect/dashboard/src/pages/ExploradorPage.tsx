@@ -21,6 +21,7 @@ import {
   type TranselecRowsPage,
   type TranselecSummary,
   exportCsvUrl,
+  getPmfDetail,
   getSummary,
   listRows,
 } from '../api'
@@ -39,6 +40,7 @@ import { formatInteger } from '../format'
 import { activeFilterChips, activeFilterCount, withoutChip } from '../lib/filterUrl'
 import { collectAllRows, deriveFilterOptions } from '../lib/rowCollection'
 import { useReads, type FilterController } from '../lib/useFilters'
+import { ROUTES, useRouter } from '../router'
 import { Chip, Disclosure, SectionHeader, useDisclosure } from '../ui/Primitives'
 
 const DEFAULT_PAGE_SIZE = 25
@@ -109,6 +111,74 @@ export function ExploradorPage({
     setRowsMeta({ total: data.page.total_count, hasMore: data.page.has_more })
     setPageFailure(null)
   }, [data])
+
+  const { search, navigate } = useRouter()
+  const fila = new URLSearchParams(search).get('fila')
+  // What became of the row a log link asked for, when it could not be opened.
+  const [filaNotice, setFilaNotice] = useState<'missing' | 'failed' | null>(null)
+  const handledFila = useRef<string | null>(null)
+  // The PMF lookup below can answer after the reader has left this page; it
+  // must not then pull them back here by rewriting the address.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
+  /** The address without `fila`, every filter kept. */
+  const dropFila = useCallback(() => {
+    const params = new URLSearchParams(search)
+    if (!params.has('fila')) return
+    params.delete('fila')
+    const rest = params.toString()
+    navigate(`${ROUTES.explorador}${rest ? `?${rest}` : ''}`, { replace: true })
+  }, [search, navigate])
+
+  // A log entry links here with `?q=<pmf>&fila=<n>` (indicator spec §5): open
+  // that row's drawer once the filtered rows are in. A search for the PMF can
+  // match other PMFs too, so a row past the first page is found through the
+  // PMF's own detail instead.
+  useEffect(() => {
+    if (fila === null) {
+      handledFila.current = null
+      return
+    }
+    if (loading || !data || handledFila.current === fila) return
+    handledFila.current = fila
+    const target = /^\d+$/.test(fila) ? Number(fila) : null
+    const onPage = data.page.items.find((entry) => entry.source_row_number === target)
+    if (onPage) {
+      setFilaNotice(null)
+      setOpenRow(onPage)
+      return
+    }
+    void (async () => {
+      const detail = target !== null && filters.q ? await getPmfDetail(filters.q) : null
+      if (!mounted.current || handledFila.current !== fila) return
+      const row = detail?.ok
+        ? detail.data.rows.find((entry) => entry.source_row_number === target)
+        : undefined
+      if (row) {
+        setFilaNotice(null)
+        setOpenRow(row)
+        return
+      }
+      // A 404 means the PMF is not in this version; any other failure is a
+      // load problem, not a statement about the data.
+      setFilaNotice(detail && !detail.ok && detail.status !== 404 ? 'failed' : 'missing')
+      dropFila()
+    })()
+  }, [fila, data, loading, filters.q, dropFila])
+
+  // The notice belongs to the link that brought the reader here; a new
+  // filter state is a new question.
+  const [noticeKey, setNoticeKey] = useState(key)
+  if (noticeKey !== key) {
+    setNoticeKey(key)
+    setFilaNotice(null)
+  }
 
   // Filter option lists come from the active version's full row set: the read
   // API exposes no distinct-values endpoint and this work does not change the
@@ -281,6 +351,18 @@ export function ExploradorPage({
           de filtros. Los filtros siguen aplicándose en el servidor sobre el total.
         </AlertBanner>
       )}
+      {filaNotice === 'missing' && (
+        <AlertBanner tone="warn" title="Fila no encontrada.">
+          {' '}
+          No se encontró esta fila en la versión activa.
+        </AlertBanner>
+      )}
+      {filaNotice === 'failed' && (
+        <AlertBanner title="No se pudo abrir la fila.">
+          {' '}
+          No se pudo cargar esta fila. Vuelva a abrirla desde el registro de ediciones.
+        </AlertBanner>
+      )}
       {pageFailure && (
         <AlertBanner title="No se pudo cargar esta página">{pageFailure}</AlertBanner>
       )}
@@ -333,7 +415,10 @@ export function ExploradorPage({
       {openRow && (
         <RowDetailDrawer
           row={openRow}
-          onClose={() => setOpenRow(null)}
+          onClose={() => {
+            setOpenRow(null)
+            dropFila()
+          }}
           sourceFields={sourceFields}
           canEdit={canEdit}
           activeImportId={activeImportId}

@@ -11,6 +11,7 @@ import {
 } from './api'
 import { AppHeader } from './components/AppHeader'
 import { LoginCard } from './components/LoginCard'
+import { WebEditsProvider } from './components/WebEditsProvider'
 import { LoadingBlock, StateBlock } from './components/StateViews'
 import { classifyFailure, type ApiFailure } from './lib/apiState'
 import { useFilters } from './lib/useFilters'
@@ -248,7 +249,7 @@ function Shell() {
   }
 
   return (
-    <>
+    <WebEditsProvider activeImport={activeImport}>
       <a className="skip-link" href="#contenido">
         Saltar al contenido
       </a>
@@ -261,7 +262,7 @@ function Shell() {
         onSignedOut={onSignedOut}
       />
       <main id="contenido">{body()}</main>
-    </>
+    </WebEditsProvider>
   )
 }
 
