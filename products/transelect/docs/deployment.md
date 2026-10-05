@@ -44,8 +44,31 @@ Container packaging: **built and locally verified** (this document).
   [hosted release](../../forestry/docs/hosted-release-v1.md)) redeployed the
   same `f984e18` as Railway deployment `96946275`: `SUCCESS` in about 30 s,
   pre-deploy ran no upgrade, `/health` and `/ready` answer `200`.
+- **FACT (2026-10-05 15:19 UTC, Railway deployment list, deploy log and
+  checked from outside):** production serves `main` at `b478a73` (PR #91:
+  the web edits pill, log and history), Railway deployment `20c79b8c`. It
+  was uploaded with `railway up` from a clean checkout of `b478a73`: a
+  Railway incident («GitHub-triggered builds are delayed»,
+  status.railway.com, 2026-10-05) held the GitHub deployment `b6da791f` of
+  the same commit in the queue for more than 20 minutes, and Railway removed
+  `b6da791f` once `20c79b8c` went live. An uploaded deployment records no
+  commit; the commit is known from the checkout. The pre-deploy
+  `alembic upgrade head` ran no upgrade (the database stays at `0012`), and
+  the log shows the `campo-entrypoint` line, application startup and `/ready`
+  `200`. From outside: `/health`, `/ready`, `/transelec/`,
+  `/transelec/estado`, `/transelec/ediciones`, `/rodales/` and
+  `/rodales/versiones` answer `200`; `/api/transelec/overrides/history` (new),
+  `/api/transelec/overrides`, `/api/transelec/summary`,
+  `/api/transelec/export.xlsx` and `/api/forestry/versions` answer `401`
+  signed out; the served Transelec bundle carries the new history client.
+  The HTTP logs show no `5xx` after the deploy. No backup was taken just
+  before it (no migration).
 - Railway auto-deploy is off, so deploys are manual. Since 2026-09-28 the
-  service deploys from `main`.
+  service deploys from `main`: `railway redeploy --service
+  campo-digital-platform --from-source` builds the latest `main` from GitHub.
+  When GitHub-triggered builds are delayed, `railway up --service
+  campo-digital-platform` from a clean `main` checkout deploys the same code
+  without recording the commit.
 - **DECISION (2026-09-28):** no backups. The Hobby plan has no scheduled
   backups (Pro only), and Rafael accepted the risk: published workbook data
   can be rebuilt by re-importing, grants and audit history cannot. A manual
