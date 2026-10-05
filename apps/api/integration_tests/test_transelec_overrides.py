@@ -1221,3 +1221,142 @@ def test_estado_and_plazos_read_web_edits(client: TestClient, tmp_path: Path) ->
     plazo = _pmf_entry(client, "/transelec/plazos", "pmfs", "MP002")
     assert plazo["base_field"] == "fecha_ingreso"
     assert plazo["estado"] != "sin_fecha_texto"
+
+
+# ---------------------------------------------------------------------------
+# The history list (indicator spec §1)
+# ---------------------------------------------------------------------------
+
+
+def _history(client: TestClient, limit: int | None = None) -> dict[str, Any]:
+    query = "" if limit is None else f"?limit={limit}"
+    response = client.get(f"/transelec/overrides/history{query}")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_history_lists_every_ending_newest_first(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "base.xlsx"))
+    mp001 = _row(client, "MP001", 0)["source_row_number"]
+    mp003 = _row(client, "MP003", 0)["source_row_number"]
+
+    _put(client, import_id, mp001, "estado", "A", expected="En evaluacion")
+    _put(client, import_id, mp001, "estado", "B", expected="A")  # A superseded
+    _put(client, import_id, mp001, "estado", "En evaluacion", expected="B")  # B discarded by a save
+    reverted = _put(client, import_id, mp003, "tipo_rechazo", "Legal", expected=None).json()
+    gone = client.delete(
+        f"/transelec/overrides/{reverted['override_id']}", headers={"Origin": _SAME_ORIGIN}
+    )
+    assert gone.status_code == 204  # discarded with DELETE
+    _put(client, import_id, mp003, "estado_resumido", "Desistido", expected="Aprobado")
+
+    body = _history(client)
+
+    assert [(e["field"], e["web_value"], e["state"]) for e in body["entries"]] == [
+        ("estado_resumido", "Desistido", "aplicada"),
+        ("tipo_rechazo", "Legal", "discarded"),
+        ("estado", "B", "discarded"),
+        ("estado", "A", "superseded"),
+    ]
+    in_force, *ended = body["entries"]
+    assert in_force["source_row_number"] == mp003
+    assert in_force["ended_at"] is None and in_force["ended_by_display_name"] is None
+    assert in_force["planilla_value_at_edit"] == "Aprobado"
+    assert in_force["field_label"] == EDITABLE_BY_NAME["estado_resumido"].label
+    for entry in ended:
+        assert entry["source_row_number"] is None
+        assert entry["ended_at"] is not None
+        assert entry["ended_by_display_name"] == "transelec-operator"
+        assert entry["created_by_display_name"] == "transelec-operator"
+    assert ended[-1]["planilla_value_at_edit"] == "En evaluacion"
+    assert (body["in_force_count"], body["needs_review_count"]) == (1, 0)
+
+
+def test_history_shows_kept_and_incorporated_edits_and_survives_a_restore(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _login_with_grants(client, "transelec-admin", ADMIN)
+    first = _publish(client, _workbook(tmp_path, "v1.xlsx"))
+    row_a = _row(client, "MP001", 0)["source_row_number"]
+    row_b = _row(client, "MP001", 1)["source_row_number"]
+    _put(client, first, row_a, "estado_resumido", "Aprobado", expected="En tramite")
+    _put(client, first, row_b, "estado_resumido", "Aprobado", expected="En tramite")
+
+    rows = [dict(item) for item in _BASE_ROWS]
+    rows[0]["estado_resumido"] = "Aprobado"  # incorporates row A's edit
+    rows[1]["estado_resumido"] = "Desistido"  # contradicts row B's edit
+    _publish(client, _workbook(tmp_path, "v2.xlsx", rows), filename="v2.xlsx")
+
+    conflict = _history(client)["entries"][0]
+    assert (conflict["state"], conflict["source_row_number"]) == ("en_conflicto", row_b)
+    assert _history(client)["needs_review_count"] == 1
+    kept = client.post(
+        f"/transelec/overrides/{conflict['id']}/keep", headers={"Origin": _SAME_ORIGIN}
+    )
+    assert kept.status_code == 200, kept.text
+
+    body = _history(client)
+    assert [e["state"] for e in body["entries"]] == ["aplicada", "kept", "incorporated"]
+    assert body["entries"][1]["ended_by_display_name"] == "transelec-admin"
+    assert body["entries"][2]["ended_by_display_name"] == "transelec-admin"
+
+    restored = client.post(f"/transelec/imports/{first}/restore", headers={"Origin": _SAME_ORIGIN})
+    assert restored.status_code == 200, restored.text
+    after = _history(client)
+    assert [e["id"] for e in after["entries"]] == [e["id"] for e in body["entries"]]
+    assert after["entries"][0]["state"] == "en_conflicto"  # v1 still says «En tramite»
+
+
+def test_history_rows_and_counts_ignore_the_limit(client: TestClient, tmp_path: Path) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    import_id = _publish(client, _workbook(tmp_path, "v1.xlsx"))
+    mp002 = _row(client, "MP002")["source_row_number"]
+    mp001 = _row(client, "MP001", 0)["source_row_number"]
+    _put(client, import_id, mp002, "estado", "Reingresado", expected="Rechazado")
+    _put(client, import_id, mp001, "estado", "Aprobado", expected="En evaluacion")
+    _put(client, import_id, mp001, "tipo_rechazo", "Legal", expected=None)
+
+    rows = [dict(item) for item in _BASE_ROWS if item["pmf"] != "MP002"]
+    _publish(client, _workbook(tmp_path, "v2.xlsx", rows), filename="v2.xlsx")
+
+    limited = _history(client, limit=1)
+    assert len(limited["entries"]) == 1
+    assert (limited["in_force_count"], limited["needs_review_count"]) == (2, 1)
+    by_key = {(e["pmf"], e["field"]): e for e in _history(client)["entries"]}
+    assert by_key[("MP002", "estado")]["state"] == "huerfana"
+    assert by_key[("MP002", "estado")]["source_row_number"] is None
+    assert (
+        by_key[("MP001", "estado")]["source_row_number"]
+        == _row(client, "MP001", 0)["source_row_number"]
+    )
+
+
+def test_an_active_incorporada_edit_is_listed_but_counted_in_neither(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _login_with_grants(client, "transelec-operator", OPERATOR)
+    first = _publish(client, _new_layout_workbook(tmp_path, "v1.xlsx", "X"))
+    row = _row(client, "MP001", 0)["source_row_number"]
+    _put(client, first, row, "numero_ingreso_2", None, expected="X")
+    _publish(client, _workbook(tmp_path, "v2.xlsx"))  # older layout: no «…2» column
+
+    body = _history(client)
+    assert [e["state"] for e in body["entries"]] == ["incorporada"]
+    assert (body["in_force_count"], body["needs_review_count"]) == (0, 0)
+
+
+def test_history_needs_a_version_validates_the_limit_and_is_open_to_viewers(
+    client: TestClient, tmp_path: Path
+) -> None:
+    assert client.get("/transelec/overrides/history").status_code == 401
+    _login_with_grants(client, "transelec-admin", ADMIN)
+    assert client.get("/transelec/overrides/history").status_code == 404
+    _publish(client, _workbook(tmp_path, "base.xlsx"))
+    assert client.get("/transelec/overrides/history?limit=0").status_code == 422
+    assert client.get("/transelec/overrides/history?limit=201").status_code == 422
+    assert client.get("/api/transelec/overrides/history").status_code == 200
+    client.cookies.clear()
+
+    _login_with_grants(client, "transelec-viewer", VIEWER)
+    assert _history(client) == {"in_force_count": 0, "needs_review_count": 0, "entries": []}

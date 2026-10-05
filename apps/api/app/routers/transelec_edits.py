@@ -43,6 +43,8 @@ from app.routers.transelec import (
 )
 from app.transelec_overrides import (
     FieldNotInSourceError,
+    HistoryRecord,
+    HistoryState,
     NoActiveVersionError,
     NotInConflictError,
     OverrideNotFoundError,
@@ -53,6 +55,7 @@ from app.transelec_overrides import (
     VersionChangedError,
     discard_override,
     keep_override,
+    list_override_history,
     list_overrides,
     save_override,
 )
@@ -314,6 +317,74 @@ def list_field_overrides(
         _override_view(record)
         for record in list_overrides(connection, import_id=import_id, status=status, pmf=pmf)
     ]
+
+
+class OverrideHistoryEntryView(BaseModel):
+    id: int
+    field: str
+    field_label: str
+    pmf: str
+    rol: str | None
+    numero_predio: str | None
+    numero_area_corta: str | None
+    source_row_number: int | None
+    web_value: str | None
+    planilla_value_at_edit: str | None
+    created_by_display_name: str
+    created_at: str
+    state: HistoryState
+    ended_at: str | None
+    ended_by_display_name: str | None
+
+
+class OverrideHistoryResponse(BaseModel):
+    in_force_count: int
+    needs_review_count: int
+    entries: list[OverrideHistoryEntryView]
+
+
+def _history_entry_view(record: HistoryRecord) -> OverrideHistoryEntryView:
+    return OverrideHistoryEntryView(
+        id=record.id,
+        field=record.field,
+        field_label=EDITABLE_BY_NAME[record.field].label,
+        pmf=record.pmf,
+        rol=record.rol,
+        numero_predio=record.numero_predio,
+        numero_area_corta=record.numero_area_corta,
+        source_row_number=record.source_row_number,
+        web_value=display(record.web),
+        planilla_value_at_edit=display(record.planilla_at_edit),
+        created_by_display_name=record.created_by_display_name,
+        created_at=record.created_at.isoformat(),
+        state=record.state,
+        ended_at=None if record.ended_at is None else record.ended_at.isoformat(),
+        ended_by_display_name=record.ended_by_display_name,
+    )
+
+
+@router.get(
+    "/overrides/history",
+    response_model=OverrideHistoryResponse,
+    dependencies=[Depends(require_transelec_grant(Action.VIEW))],
+)
+def list_field_override_history(
+    connection: Annotated[Connection, Depends(get_db_connection)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> OverrideHistoryResponse:
+    """The latest edits, active or ended, for the header's edits log.
+
+    Spec: docs/superpowers/specs/2026-10-05-transelec-web-edits-indicator-design.md §1.
+    A read: no audit row.
+    """
+
+    import_id = _require_active_import_id(connection)
+    page = list_override_history(connection, import_id=import_id, limit=limit)
+    return OverrideHistoryResponse(
+        in_force_count=page.in_force_count,
+        needs_review_count=page.needs_review_count,
+        entries=[_history_entry_view(record) for record in page.entries],
+    )
 
 
 _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
