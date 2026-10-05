@@ -148,6 +148,7 @@ function summaryBody(shape: SummaryShape) {
         source_row_number: 3,
       },
     ],
+    web_edited_pmf_count: 0,
   }
 }
 
@@ -351,6 +352,8 @@ export interface StubOptions {
   meStatus?: number
   /** Extra fields merged into every list row (`/pmfs?`), by 1-based row index. */
   rowOverrides?: (index: number) => Record<string, unknown>
+  /** The header's edits log (`/overrides/history`); nothing in force by default. */
+  history?: Record<string, unknown>
 }
 
 const DEFAULT_ME = {
@@ -450,6 +453,16 @@ export async function stubPlatform(page: Page, options: StubOptions = {}): Promi
   await page.route('**/api/transelec/overrides/**', (route) => {
     if (fail) return json(route, failBody, fail)
     return json(route, {}, 404)
+  })
+  // The header's edits log (indicator spec §1). Registered after the item
+  // routes so it wins over them, and before `options.extra` so a test's own
+  // handler wins over it. Nothing in force by default: the pill stays hidden.
+  await page.route('**/api/transelec/overrides/history*', (route) => {
+    if (fail) return json(route, failBody, fail)
+    return json(
+      route,
+      options.history ?? { in_force_count: 0, needs_review_count: 0, entries: [] },
+    )
   })
 
   if (options.extra) await options.extra(page)

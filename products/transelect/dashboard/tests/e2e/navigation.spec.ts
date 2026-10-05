@@ -455,3 +455,84 @@ test.describe('the shell bar with a long signed-in name', () => {
     })
   }
 })
+
+test.describe('the shell bar with the «ediciones web» pill', () => {
+  // The most the pill ever says: edits in force and edits to review.
+  const entry = (id: number) => ({
+    id,
+    field: 'estado_resumido',
+    field_label: 'Estado resumido',
+    pmf: `PMF-00${id}`,
+    rol: null,
+    numero_predio: null,
+    numero_area_corta: null,
+    source_row_number: id,
+    web_value: 'Un valor web bastante más largo que el que cabe en una línea del panel',
+    planilla_value_at_edit: 'En tramite',
+    created_by_display_name: 'Dev Admin',
+    created_at: '2026-10-04T15:00:00+00:00',
+    state: 'aplicada',
+    ended_at: null,
+    ended_by_display_name: null,
+  })
+  const HISTORY = {
+    in_force_count: 5,
+    needs_review_count: 2,
+    entries: Array.from({ length: 10 }, (_, index) => entry(index + 1)),
+  }
+
+  for (const width of [1280, 1366, 1440]) {
+    test(`nothing overlaps at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await stubPlatform(page, { history: HISTORY })
+      await page.goto('/transelec')
+      await expect(page.getByTestId('kpi-row')).toBeVisible()
+      const pill = page.getByTestId('edits-pill')
+      await expect(pill).toBeVisible()
+
+      const links = nav(page).getByRole('link')
+      const last = await links.nth((await links.count()) - 1).boundingBox()
+      const side = await page.locator('.shell-side').boundingBox()
+      const chip = await page.locator('.version-chip').boundingBox()
+      const box = await pill.boundingBox()
+      if (!last || !side || !chip || !box) throw new Error(`bar not measured at ${width}px`)
+      expect(last.x + last.width).toBeLessThanOrEqual(side.x)
+      expect(chip.x + chip.width, 'pill drawn over the version chip').toBeLessThanOrEqual(box.x)
+      expect(box.x + box.width).toBeLessThanOrEqual(width)
+      const clipped = await page
+        .locator('.version-chip')
+        .evaluate((element) => element.scrollWidth > element.clientWidth)
+      expect(clipped, `version chip clipped at ${width}px`).toBe(false)
+    })
+  }
+
+  test('at 1023px the pill keeps its numbers and still names itself in full', async ({ page }) => {
+    await page.setViewportSize({ width: 1023, height: 800 })
+    await stubPlatform(page, { history: HISTORY })
+    await page.goto('/transelec')
+    const pill = page.getByTestId('edits-pill')
+    await expect(pill).toBeVisible()
+    await expect(pill).toHaveAccessibleName('5 ediciones web · 2 por revisar')
+    expect((await pill.innerText()).replace(/\s+/g, ' ').trim()).toBe('5 · 2')
+  })
+
+  test('on a 390px phone the log is a panel inside the screen, scrolling within', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await stubPlatform(page, { history: HISTORY })
+    await page.goto('/transelec')
+    await page.getByTestId('edits-pill').click()
+    const log = page.getByRole('dialog', { name: 'Ediciones web' })
+    await expect(log).toBeVisible()
+    const box = await log.boundingBox()
+    if (!box) throw new Error('log not measured')
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(390)
+    expect(box.height).toBeLessThanOrEqual(844 * 0.7 + 1)
+    const pageScrolls = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    )
+    expect(pageScrolls).toBe(false)
+  })
+})
