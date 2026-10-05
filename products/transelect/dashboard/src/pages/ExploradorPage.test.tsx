@@ -2,7 +2,7 @@
  * The Explorador's `?fila=<n>`: a link from the edits log (indicator spec §5)
  * opens that row's drawer once the filtered rows are in.
  */
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useFilters } from '../lib/useFilters'
@@ -85,6 +85,28 @@ describe('Explorador ?fila=', () => {
     renderAt('/transelec/explorador?q=MP001&fila=90')
     expect(await screen.findByTestId('drawer')).toHaveTextContent('fila 90')
     expect(getPmfDetail).toHaveBeenCalledWith('MP001')
+  })
+
+  it('does not move the reader if they left before the row was found', async () => {
+    let answer!: (value: Awaited<ReturnType<typeof getPmfDetail>>) => void
+    vi.mocked(getPmfDetail).mockReturnValue(
+      new Promise((done) => {
+        answer = done
+      }),
+    )
+    const { unmount } = renderAt('/transelec/explorador?q=MP001&fila=999')
+    await vi.waitFor(() => expect(getPmfDetail).toHaveBeenCalled())
+    unmount()
+    window.history.replaceState({}, '', '/transelec/estado')
+    await act(async () => answer({ ok: false, status: 404, error: 'No encontrado' }))
+    expect(window.location.pathname).toBe('/transelec/estado')
+  })
+
+  it('says the row could not be loaded when the lookup fails', async () => {
+    vi.mocked(getPmfDetail).mockResolvedValue({ ok: false, status: 503, error: 'Servicio no disponible' })
+    renderAt('/transelec/explorador?q=MP001&fila=999')
+    expect(await screen.findByText(/No se pudo cargar esta fila\./)).toBeInTheDocument()
+    expect(screen.queryByText(/No se encontró esta fila/)).not.toBeInTheDocument()
   })
 
   it('says so when the row is not in the active version, and drops fila', async () => {

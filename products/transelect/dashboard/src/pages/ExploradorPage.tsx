@@ -114,8 +114,18 @@ export function ExploradorPage({
 
   const { search, navigate } = useRouter()
   const fila = new URLSearchParams(search).get('fila')
-  const [filaMissing, setFilaMissing] = useState(false)
+  // What became of the row a log link asked for, when it could not be opened.
+  const [filaNotice, setFilaNotice] = useState<'missing' | 'failed' | null>(null)
   const handledFila = useRef<string | null>(null)
+  // The PMF lookup below can answer after the reader has left this page; it
+  // must not then pull them back here by rewriting the address.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   /** The address without `fila`, every filter kept. */
   const dropFila = useCallback(() => {
@@ -140,19 +150,25 @@ export function ExploradorPage({
     const target = /^\d+$/.test(fila) ? Number(fila) : null
     const onPage = data.page.items.find((entry) => entry.source_row_number === target)
     if (onPage) {
-      setFilaMissing(false)
+      setFilaNotice(null)
       setOpenRow(onPage)
       return
     }
     void (async () => {
       const detail = target !== null && filters.q ? await getPmfDetail(filters.q) : null
-      if (handledFila.current !== fila) return
+      if (!mounted.current || handledFila.current !== fila) return
       const row = detail?.ok
         ? detail.data.rows.find((entry) => entry.source_row_number === target)
         : undefined
-      setFilaMissing(!row)
-      if (row) setOpenRow(row)
-      else dropFila()
+      if (row) {
+        setFilaNotice(null)
+        setOpenRow(row)
+        return
+      }
+      // A 404 means the PMF is not in this version; any other failure is a
+      // load problem, not a statement about the data.
+      setFilaNotice(detail && !detail.ok && detail.status !== 404 ? 'failed' : 'missing')
+      dropFila()
     })()
   }, [fila, data, loading, filters.q, dropFila])
 
@@ -161,7 +177,7 @@ export function ExploradorPage({
   const [noticeKey, setNoticeKey] = useState(key)
   if (noticeKey !== key) {
     setNoticeKey(key)
-    setFilaMissing(false)
+    setFilaNotice(null)
   }
 
   // Filter option lists come from the active version's full row set: the read
@@ -335,10 +351,16 @@ export function ExploradorPage({
           de filtros. Los filtros siguen aplicándose en el servidor sobre el total.
         </AlertBanner>
       )}
-      {filaMissing && (
+      {filaNotice === 'missing' && (
         <AlertBanner tone="warn" title="Fila no encontrada.">
           {' '}
           No se encontró esta fila en la versión activa.
+        </AlertBanner>
+      )}
+      {filaNotice === 'failed' && (
+        <AlertBanner title="No se pudo abrir la fila.">
+          {' '}
+          No se pudo cargar esta fila. Vuelva a abrirla desde el registro de ediciones.
         </AlertBanner>
       )}
       {pageFailure && (
