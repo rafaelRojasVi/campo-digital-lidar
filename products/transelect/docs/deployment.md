@@ -24,10 +24,21 @@ Container packaging: **built and locally verified** (this document).
   are served, and the new API routes `/transelec/lifecycle`,
   `/transelec/plazos`, `/transelec/overrides` and `/transelec/export.xlsx`
   answer `401` signed out. The served bundle carries the new screens.
-  **INFERENCE:** the pre-deploy migration took the database to `0012` (the
-  field-override table and the effective-row view); the deploy would have
-  stopped had it failed. The head was not read. No backup was taken just
-  before this deploy; the latest dump is the cutover's final dump.
+  No backup was taken just before this deploy; the latest dump is the
+  cutover's final dump.
+- **FACT (2026-10-05, deploy log):** that deploy's pre-deploy step took the
+  database to `0012` (the field-override table and the effective-row view).
+  The deploy log of `4b99fdf5` shows `Running upgrade 0011 -> 0012,
+  Establish Transelec field overrides (web edits) and the effective-row
+  view.` before the `campo-entrypoint` line.
+- **FACT (2026-10-05 02:26 UTC, Railway deployment list, deploy log and
+  checked from outside):** production serves `main` at `f984e18`, Railway
+  deployment `a6d0f96d`, redeployed by hand 2026-10-04 21:06 UTC. It adds
+  only documentation (PR #84) on top of `f742639`. Its pre-deploy
+  `alembic upgrade head` ran no upgrade, the log shows the
+  `campo-entrypoint` line and `/ready` `200` probes, the deployment list
+  shows it `SUCCESS` with `4b99fdf5` `REMOVED`, and `/health` and `/ready`
+  answer `200`.
 - Railway auto-deploy is off, so deploys are manual. Since 2026-09-28 the
   service deploys from `main`.
 - **DECISION (2026-09-28):** no backups. The Hobby plan has no scheduled
