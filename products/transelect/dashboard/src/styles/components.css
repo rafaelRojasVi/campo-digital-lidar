@@ -305,6 +305,16 @@ a.edit-log-target:hover {
   font-weight: 650;
 }
 
+/* «antes → después» on one baseline. The values are line-clamped boxes,
+   which inline layout would align by their bottom edge, dropping the arrow
+   below the text; a wrapping flex row aligns them by their first line. */
+.edit-log-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--s-2);
+}
+
 /* Two lines on screen; the full value stays in the DOM and in `title`. */
 .edit-log-value {
   display: -webkit-inline-box;

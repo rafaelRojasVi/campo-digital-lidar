@@ -595,3 +595,15 @@ test("a viewer sees the pill and the log, without the operators' footer", async 
   await expect(log.getByRole("link", { name: /Ediciones web/ })).toHaveCount(0);
   await expect(log.getByRole("button", { name: /Descargar/ })).toHaveCount(0);
 });
+
+test("the log's arrow sits on the line of the values it joins", async ({ page }) => {
+  await stubPlatform(page, { history: ONE_IN_FORCE });
+  await page.goto("/transelec");
+  await page.getByRole("button", { name: "1 edición web" }).click();
+  const change = page.getByTestId("edit-log-31").locator(".edit-log-change");
+  const before = await change.locator(".edit-log-value").first().boundingBox();
+  const arrow = await change.locator('[aria-hidden="true"]').boundingBox();
+  if (!before || !arrow) throw new Error("log entry not measured");
+  const middle = (box: { y: number; height: number }) => box.y + box.height / 2;
+  expect(Math.abs(middle(arrow) - middle(before))).toBeLessThanOrEqual(3);
+});
