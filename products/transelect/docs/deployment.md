@@ -44,8 +44,20 @@ Container packaging: **built and locally verified** (this document).
   [hosted release](../../forestry/docs/hosted-release-v1.md)) redeployed the
   same `f984e18` as Railway deployment `96946275`: `SUCCESS` in about 30 s,
   pre-deploy ran no upgrade, `/health` and `/ready` answer `200`.
-- **FACT (2026-10-05 15:19 UTC, Railway deployment list, deploy log and
-  checked from outside):** production serves `main` at `b478a73` (PR #91:
+- **FACT (2026-10-05 16:27 UTC, Railway deployment list, deploy log and
+  checked from outside):** production serves `main` at `318ca55` (PR #92:
+  the Estado table fits the page; the Oficina Virtual link opens a
+  plain-digit N.º in CONAF), Railway deployment `523d1f19`, built from
+  GitHub by `railway redeploy --service campo-digital-platform
+  --from-source` (16:25 to 16:27 UTC; the GitHub-build delay of `20c79b8c`
+  was over). The pre-deploy `alembic upgrade head` ran no upgrade (the
+  database stays at `0012`). From outside: `/health`, `/ready` and
+  `/transelec/estado` answer `200`, `/api/transelec/lifecycle` answers `401`
+  signed out, and the served Transelec bundle carries the new
+  `consultas/action.php` link. The logs show no errors or `5xx` after the
+  deploy. No backup was taken just before it (no migration).
+- **FACT (2026-10-05 15:19 UTC, until `523d1f19`):** production served
+  `main` at `b478a73` (PR #91:
   the web edits pill, log and history), Railway deployment `20c79b8c`. It
   was uploaded with `railway up` from a clean checkout of `b478a73`: a
   Railway incident («GitHub-triggered builds are delayed»,
