@@ -34,6 +34,7 @@ import {
   formatEditDate,
   specFor,
 } from "../lib/webEdits";
+import { useWebEdits } from "../lib/webEditsState";
 import { SectionHeader } from "../ui/Primitives";
 
 const ORDER: Record<TranselecOverride["status"], number> = {
@@ -79,6 +80,7 @@ export function EdicionesPage({
   activeImportId?: number | null;
   sourceFields?: readonly string[] | null;
 }) {
+  const { refresh: refreshEdits } = useWebEdits();
   const [overrides, setOverrides] = useState<TranselecOverride[] | null>(null);
   const [failure, setFailure] = useState<FailureView | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -129,7 +131,10 @@ export function EdicionesPage({
       if (!result.ok) {
         const code = overrideConflictCode(result.payload);
         setActionError(code ? CONFLICT_COPY[code] : result.error);
-        if (code) reload();
+        if (code) {
+          reload();
+          refreshEdits();
+        }
         return;
       }
       setStatus(
@@ -138,8 +143,9 @@ export function EdicionesPage({
           : `Se descartó la edición de ${override.field_label} en ${override.pmf}.`,
       );
       reload();
+      refreshEdits();
     },
-    [reload],
+    [reload, refreshEdits],
   );
 
   const download = useCallback(async () => {

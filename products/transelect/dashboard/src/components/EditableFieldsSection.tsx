@@ -32,6 +32,7 @@ import {
   overrideFor,
   webTooltip,
 } from '../lib/webEdits'
+import { useWebEdits } from '../lib/webEditsState'
 import { ConfirmDialog } from './ConfirmDialog'
 import { SourceDate } from './SourceDate'
 import { AlertBanner } from './StateViews'
@@ -72,6 +73,7 @@ export function EditableFieldsSection({
   /** Called after a revert or reload so surfaces showing this row can refresh it. */
   onRowEdited?: () => void
 }) {
+  const { refresh: refreshEdits } = useWebEdits()
   const [editing, setEditing] = useState<EditableFieldName | null>(null)
   const [draft, setDraft] = useState('')
   // The value the editor saw when it opened; what a save is checked against.
@@ -149,6 +151,7 @@ export function EditableFieldsSection({
           ? `${spec.label} se dejó vacío.`
           : `Se guardó el cambio en ${spec.label}.`,
     )
+    if (result.data.changed) refreshEdits()
     onSaved(result.data.row)
   }
 
@@ -164,6 +167,7 @@ export function EditableFieldsSection({
       return
     }
     setStatus(`${spec.label} volvió al valor de la planilla.`)
+    refreshEdits()
     onReload()
     onRowEdited?.()
   }
@@ -181,6 +185,7 @@ export function EditableFieldsSection({
     setDraft('')
     setFocusTarget(`edit-${spec.name}`)
     setStatus(`Se recargó ${spec.label}. Revise el valor actual y vuelva a editar si corresponde.`)
+    refreshEdits()
     onReload()
     onRowEdited?.()
   }

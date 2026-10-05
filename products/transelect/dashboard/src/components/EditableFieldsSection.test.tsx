@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TranselecOverride } from '../api'
 import { EditableFieldsSection } from './EditableFieldsSection'
+import { WebEditsContext } from '../lib/webEditsState'
 import { makeRow } from '../test/factories'
 
 vi.mock('../api', async (importOriginal) => {
@@ -337,5 +338,64 @@ describe('EditableFieldsSection', () => {
         Object.defineProperty(window, 'location', { configurable: true, value: original })
       }
     })
+  })
+})
+
+describe('EditableFieldsSection — the shared edits log', () => {
+  const refresh = vi.fn()
+  const withLog = (node: React.ReactNode) => (
+    <WebEditsContext.Provider value={{ history: null, status: 'ready', refresh, openLog: vi.fn() }}>
+      {node}
+    </WebEditsContext.Provider>
+  )
+
+  beforeEach(() => {
+    refresh.mockReset()
+    vi.mocked(saveOverride).mockReset()
+    vi.mocked(discardOverride).mockReset()
+  })
+
+  async function saveEstadoResumido(changed: boolean) {
+    const row = makeRow({ source_row_number: 2, estado_resumido: 'En tramite' })
+    vi.mocked(saveOverride).mockResolvedValue({
+      ok: true,
+      data: { override_id: changed ? 31 : null, changed, row },
+    })
+    render(withLog(<EditableFieldsSection {...base} row={row} canEdit onSaved={vi.fn()} />))
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Estado resumido' }))
+    await userEvent.clear(screen.getByLabelText('Nuevo valor de Estado resumido'))
+    await userEvent.type(screen.getByLabelText('Nuevo valor de Estado resumido'), 'Aprobado')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    await screen.findByText(/Se guardó|no hubo cambios/)
+  }
+
+  it('refreshes the log after a save that changed something', async () => {
+    await saveEstadoResumido(true)
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not refresh it after a save that changed nothing', async () => {
+    await saveEstadoResumido(false)
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('refreshes the log after a revert', async () => {
+    vi.mocked(discardOverride).mockResolvedValue({ ok: true, data: undefined })
+    render(
+      withLog(
+        <EditableFieldsSection
+          {...base}
+          row={makeRow({ source_row_number: 2, web_fields: ['estado'] })}
+          overrides={[applied]}
+          canEdit
+          onSaved={vi.fn()}
+        />,
+      ),
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Volver al valor de la planilla de Estado vigente' }),
+    )
+    await userEvent.click(screen.getByTestId('confirm-accept'))
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
   })
 })

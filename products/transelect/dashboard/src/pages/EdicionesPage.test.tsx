@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TranselecOverride } from "../api";
 import { RouterProvider } from "../router";
 import { EdicionesPage } from "./EdicionesPage";
+import { WebEditsContext } from "../lib/webEditsState";
 
 vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
@@ -477,5 +478,51 @@ describe("EdicionesPage", () => {
       );
       expect(alert).not.toHaveTextContent("Bad Gateway");
     });
+  });
+});
+
+describe("EdicionesPage — the shared edits log", () => {
+  const refresh = vi.fn();
+
+  function renderWithLog() {
+    return render(
+      <RouterProvider initialPath="/transelec/ediciones">
+        <WebEditsContext.Provider
+          value={{ history: null, status: "ready", refresh, openLog: vi.fn() }}
+        >
+          <EdicionesPage />
+        </WebEditsContext.Provider>
+      </RouterProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    refresh.mockReset();
+    vi.mocked(listOverrides).mockReset();
+    vi.mocked(keepOverride).mockReset();
+    vi.mocked(discardOverride).mockReset();
+  });
+
+  it("refreshes the log after keeping a web value", async () => {
+    vi.mocked(listOverrides).mockResolvedValue({ ok: true, data: [make(1, "en_conflicto")] });
+    vi.mocked(keepOverride).mockResolvedValue({ ok: true, data: { override_id: 9 } });
+    renderWithLog();
+    await userEvent.click(
+      within(await screen.findByTestId("override-1")).getByRole("button", {
+        name: "Mantener valor web",
+      }),
+    );
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+  });
+
+  it("refreshes the log after discarding an edit", async () => {
+    vi.mocked(listOverrides).mockResolvedValue({ ok: true, data: [make(1, "aplicada")] });
+    vi.mocked(discardOverride).mockResolvedValue({ ok: true, data: undefined });
+    renderWithLog();
+    await userEvent.click(
+      within(await screen.findByTestId("override-1")).getByRole("button", { name: "Descartar" }),
+    );
+    await userEvent.click(screen.getByTestId("confirm-accept"));
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
   });
 });
