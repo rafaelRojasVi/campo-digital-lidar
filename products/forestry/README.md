@@ -19,7 +19,7 @@ exposes the persisted evidence as a read-only factual HTTP projection under
 Dashboard V1 (2026-08-30) is a map-centric read-only web application over
 that API, verified in the browser against the real snapshot and launched
 locally with `make forestry-dev`. [Hosted release V1](docs/hosted-release-v1.md)
-(2026-09-29, not yet deployed) puts the API behind platform sign-in and a
+(2026-09-29, deployed, no data or grant yet; see its status) puts the API behind platform sign-in and a
 `forestry` grant, serves the dashboard at `/rodales/` on the platform, and
 adds a verified, controlled snapshot import for the hosted database.
 
