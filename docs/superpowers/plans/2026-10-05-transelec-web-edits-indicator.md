@@ -185,9 +185,10 @@ def test_history_rows_and_counts_ignore_the_limit(client: TestClient, tmp_path: 
     by_key = {(e["pmf"], e["field"]): e for e in _history(client)["entries"]}
     assert by_key[("MP002", "estado")]["state"] == "huerfana"
     assert by_key[("MP002", "estado")]["source_row_number"] is None
-    assert by_key[("MP001", "estado")]["source_row_number"] == _row(client, "MP001", 0)[
-        "source_row_number"
-    ]
+    assert (
+        by_key[("MP001", "estado")]["source_row_number"]
+        == _row(client, "MP001", 0)["source_row_number"]
+    )
 
 
 def test_an_active_incorporada_edit_is_listed_but_counted_in_neither(
@@ -2475,3 +2476,13 @@ export function suggestionsFrom(rows: readonly ResumenRow[], field: EditableFiel
 - **A log link whose row is not on the Explorador's first page** opens through `GET /pmfs/{pmf}` (the spec says only "once its rows load"). `?q=` is a substring search over every field, so a PMF's rows are not guaranteed to be on page 1.
 - **A save that answers after a row switch** refreshes the drawer's data but does not switch it back (the spec says "a save always goes to the row the editor was opened on"; this is the matching rule for its response).
 - **Download in the popover** shares one hook with Ediciones web instead of a second copy.
+
+## Deviations from the plan (decided while building)
+
+- **The provider derives its status** (idle without a version, loading until the first answer) and sets state only when an answer arrives, instead of calling `setStatus` inside `load()`. Same states, and oxlint stays at its baseline (no `set-state-in-effect`).
+- **The Explorador's «fila» notice resets during render** on a filter change, for the same reason.
+- **Ediciones web still clears its status message when a download starts**, as the old inline download did, so the live region does not re-announce a stale message afterwards.
+- **`.estado-web-note` lives in `sections.css`** beside the Estado table rules (single-section rules belong there).
+- **`products/transelect/docs/deployment.md` is not changed:** it records what production served on a date; the history route goes into the next deploy record.
+- **Two existing `EditableFieldsSection` tests read the section's status by test id:** editors now get the CONAF link in the section, which has its own `role="status"`.
+- **The e2e edit in «a log entry opens the Explorador drawer…» uses «Estado resumido»:** the stub's active version has a column for no other editable field.

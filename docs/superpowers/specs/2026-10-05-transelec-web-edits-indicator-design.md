@@ -1,8 +1,10 @@
 # Transelec: show which values were edited on the web, and their history
 
-Date: 2026-10-05. Status: design approved by Rafael in chat, revised the
-same day after three reviews (backend, frontend, UI and accessibility);
-awaiting his review before the implementation plan.
+Date: 2026-10-05. Status: implemented on `feat/transelec-edits-indicator`
+([plan](../plans/2026-10-05-transelec-web-edits-indicator.md), whose
+"Deviations" section lists the calls made while building it). Design
+approved by Rafael in chat and revised the same day after three reviews
+(backend, frontend, UI and accessibility).
 Follows [web edits and the «web» download](2026-10-04-transelec-web-edits-xlsx-design.md)
 (PR #83). This is Spec 1 of two; Spec 2 (editing a whole PMF, editing in
 the table) is outlined under "Out of scope".
